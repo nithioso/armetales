@@ -396,7 +396,7 @@ UI.ready(function () {
     $('#report').hidden = sinDatos; $('#emptyHost').hidden = !sinDatos; $('#exportBtn').disabled = sinDatos;
     if (sinDatos) {
       var nm = A.sedes.filter(function (s) { return s.id === st.sede; })[0].nombre;
-      $('#emptyHost').innerHTML = '<div class="card"><div class="card-body">' + UI.empty({ icon: 'bar-chart', title: nm + ' aún no tiene entregas en el periodo', text: 'Los indicadores se calculan con los despachos cerrados de cada sede. Cuando ' + nm + ' empiece a despachar, aparecerán aquí.', action: { label: 'Ver CEDI Bogotá', id: 'back' } }) + '</div></div>';
+      $('#emptyHost').innerHTML = '<div class="card"><div class="card-body">' + UI.empty({ icon: 'bar-chart', title: nm + ' aún no tiene entregas en el periodo', text: 'Los indicadores se calculan con los despachos cerrados de cada sede. Cuando ' + nm + ' empiece a despachar, aparecerán aquí.', action: { label: 'Ver CEDI La Uribe', id: 'back' } }) + '</div></div>';
       $('#emptyHost [data-empty-action]').addEventListener('click', function () { st.sede = SEDE_DATOS; render(); });
       return;
     }

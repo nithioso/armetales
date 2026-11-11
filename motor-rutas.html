@@ -241,7 +241,7 @@ UI.ready(function () {
   TRIPS.forEach(function (t) { t.stops = mkStops(t.pedidoIds); t.initial = t.stops.map(function (s) { return s.id; }); });
 
   var st = { trip: null, S: {}, order: [], prof: 'corta', sel: null, manual: false, prev: null, busy: false, vehFilter: 'excl', unit: 'km', versions: {}, flash: null, altSel: null };
-  var mp = UI.map($('#routeMap'), { center: [4.65, -74.12], zoom: 11 }), mapFit = true;
+  var mp = UI.map($('#routeMap'), { center: [5.05, -75.5], zoom: 11 }), mapFit = true;
 
   /* ---------- evaluación de una secuencia ---------- */
   function ev(order, prof, light) {
@@ -432,7 +432,7 @@ UI.ready(function () {
     var line = [[ORG.lat, ORG.lng]].concat(st.order.map(function (id) { return [st.S[id].lat, st.S[id].lng]; }));
     if (line.length > 1) mp.route(line, { color: blue, weight: 4, opacity: .9 });
     if (line.length > 1) mp.route([line[line.length - 1], [ORG.lat, ORG.lng]], { color: blue, weight: 3, dashed: true, opacity: .7 });
-    mp.pin({ lat: ORG.lat, lng: ORG.lng, state: 'origin', n: 'C', title: 'CEDI Bogotá', popup: '<strong>CEDI Bogotá</strong><br>Salida ' + clock(P.salida) + ' · regreso ' + clock(M.end) });
+    mp.pin({ lat: ORG.lat, lng: ORG.lng, state: 'origin', n: 'C', title: 'CEDI La Uribe', popup: '<strong>CEDI La Uribe</strong><br>Salida ' + clock(P.salida) + ' · regreso ' + clock(M.end) });
     st.order.forEach(function (id, i) {
       var s = st.S[id], r = rows[id], late = r.late > 0;
       mp.pin({ lat: s.lat, lng: s.lng, n: i + 1, state: st.sel === id ? 'current' : late ? 'partial' : 'pending', title: s.cliente, popup: '<strong>' + esc(s.cliente) + '</strong><br>' + esc(s.municipio) + '<br>Llega ' + clock(r.arr) + ' · ventana ' + clock(s.vi) + '–' + clock(s.vf) + (late ? '<br><strong>Fuera de ventana (+' + Math.round(r.late) + ' min)</strong>' : '') + '<br><span class="mono">' + s.lat.toFixed(4) + ', ' + s.lng.toFixed(4) + '</span>', onClick: function () { st.sel = id; drawStops(); drawMap(true); var li = $('.stop[data-id="' + id + '"]', $('#stopList')); if (li) li.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } });
@@ -495,7 +495,7 @@ UI.ready(function () {
 
   /* ---------- matriz (HU-092 / HU-093) ---------- */
   function drawMatrix() {
-    var nodes = [{ id: 'C', n: 'C', name: 'CEDI Bogotá', lat: ORG.lat, lng: ORG.lng }].concat(st.order.map(function (id, i) { var s = st.S[id]; return { id: id, n: i + 1, name: s.cliente, lat: s.lat, lng: s.lng }; }));
+    var nodes = [{ id: 'C', n: 'C', name: 'CEDI La Uribe', lat: ORG.lat, lng: ORG.lng }].concat(st.order.map(function (id, i) { var s = st.S[id]; return { id: id, n: i + 1, name: s.cliente, lat: s.lat, lng: s.lng }; }));
     $('#mxSub').textContent = nodes.length - 1 ? 'CEDI y ' + (nodes.length - 1) + ' paradas · ' + (st.unit === 'km' ? 'kilómetros por vía' : 'minutos de recorrido en vehículo') : '';
     if (nodes.length < 2) { $('#mxHost').innerHTML = UI.empty({ icon: 'map', title: 'Sin paradas para la matriz', text: 'Reincorpora paradas para calcular distancias.' }); return; }
     var pf = PERFIL[st.prof], vals = [], max = 0, min = Infinity;
@@ -621,7 +621,7 @@ UI.ready(function () {
   /* ---------- guardar / aplicar ---------- */
   $('#btnSave').addEventListener('click', function () {
     UI.modal({ title: 'Guardar versión de la ruta', subtitle: st.trip.id + ' · ' + F.num(M.km, 1) + ' km · ' + dur(M.total), width: 480,
-      body: '<div class="field"><label class="label" for="vNote">Descripción de la versión</label><input class="input" id="vNote" maxlength="80" placeholder="Ej.: Ajuste manual por cierre de la Av. Boyacá"><span class="error-text" id="vNoteErr" hidden></span></div>',
+      body: '<div class="field"><label class="label" for="vNote">Descripción de la versión</label><input class="input" id="vNote" maxlength="80" placeholder="Ej.: Ajuste manual por cierre de la Av. Kevin Ángel"><span class="error-text" id="vNoteErr" hidden></span></div>',
       footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Guardar versión', kind: 'primary', onClick: function (api) {
         var v = $('#vNote', api.body).value.trim(); if (v.length < 4) { var e = $('#vNoteErr', api.body); e.hidden = false; e.innerHTML = UI.icon('alert-circle', 'icon-sm') + 'Describe la versión en al menos 4 caracteres.'; $('#vNote', api.body).setAttribute('aria-invalid', 'true'); return false; }
         snap(v, A.usuarioActual.nombre, st.order, st.prof); st.manual = false; drawAll(); UI.toast('Versión ' + st.verCur + ' guardada y marcada como vigente.', 'success');

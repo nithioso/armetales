@@ -210,8 +210,8 @@ UI.ready(function () {
     var corte = A.sedes[0].corteHora, ped0 = A.pedidos.filter(function (p) { return p.estado === 'En preparación' || p.estado === 'En firme'; }).length, th = r.umbral;
     var m = {
       'RN-01': { sev: 'exito', t: 'Pedido ' + ped.pedidoId + ' listo para despacho', x: ped.cliente + ' · ' + F.kg(ped.pesoKg) + '. Preparación certificada por el Jefe de bodega.', href: 'pedidos.html?id=' + ped.pedidoId },
-      'RN-02': { sev: 'alerta', t: 'Vehículo UFR 264 no apto para la ruta asignada', x: 'Tiene pico y placa hoy entre 16:00 y 19:00 en Bogotá. Reasigna el vehículo antes de confirmar el plan.', href: 'vehiculos.html?placa=UFR%20264' },
-      'RN-03': { sev: 'alerta', t: ped0 + ' pedidos con preparación sin cerrar', x: 'Faltan ' + (th || 60) + ' min para el corte de las ' + corte + ' en CEDI Bogotá.', href: 'preparacion.html' },
+      'RN-02': { sev: 'alerta', t: 'Vehículo UFR 264 no apto para la ruta asignada', x: 'Tiene pico y placa hoy entre 16:00 y 19:00 en Manizales. Reasigna el vehículo antes de confirmar el plan.', href: 'vehiculos.html?placa=UFR%20264' },
+      'RN-03': { sev: 'alerta', t: ped0 + ' pedidos con preparación sin cerrar', x: 'Faltan ' + (th || 60) + ' min para el corte de las ' + corte + ' en CEDI La Uribe.', href: 'preparacion.html' },
       'RN-04': { sev: 'alerta', t: 'Retraso probable en ' + ruta.despachoId, x: 'La próxima parada superaría la ventana del cliente por más de ' + (th || 15) + ' minutos.', href: 'despachos.html?id=' + ruta.despachoId },
       'RN-05': { sev: 'peligro', t: 'Error de integración con ' + log.sistemaOrigen, x: (th || 3) + ' fallos consecutivos. ' + (log.error || 'Sin detalle.'), href: 'integraciones.html' },
       'RN-06': { sev: 'peligro', t: 'Pedido ' + blo.pedidoId + ' bloqueado por stock', x: 'Faltan ' + (blo.bloqueo ? blo.bloqueo.faltante : 'varias') + ' unidades de ' + (blo.bloqueo ? blo.bloqueo.descripcion : 'un SKU') + '.', href: 'pedidos.html?id=' + blo.pedidoId },

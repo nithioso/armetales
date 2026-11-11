@@ -124,7 +124,7 @@ UI.ready(function () {
   function volDe(ids) { return Math.round(ids.reduce(function (s, i) { return s + ped(i).volumenM3; }, 0) * 100) / 100; }
   var PV = {}; A.plan.viajes.forEach(function (v) { PV[v.viajeId] = v; });
   fromViaje(PV['VJ-2'], 'Programado'); fromViaje(PV['VJ-3'], 'Programado');
-  fromViaje(PV['VJ-5'], 'Reprogramado', { fecha: MANANA, nuevaFecha: MANANA + 'T06:00', motivo: 'Cierre vial en la ruta', detalleMotivo: 'Cierre por derrumbe en la vía Bogotá – Tunja; se reprograma para mañana a primera hora.' });
+  fromViaje(PV['VJ-5'], 'Reprogramado', { fecha: MANANA, nuevaFecha: MANANA + 'T06:00', motivo: 'Cierre vial en la ruta', detalleMotivo: 'Cierre por derrumbe en la vía Manizales – Chinchiná; se reprograma para mañana a primera hora.' });
   function byId(id) { return rows.filter(function (r) { return r.id === id; })[0]; }
   function pendCargue(r) { return A.cargue.filter(function (c) { return c.despachoId === r.id && c.estado === 'Pendiente'; }).length; }
 

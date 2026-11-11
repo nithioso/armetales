@@ -281,12 +281,12 @@ UI.ready(function () {
   function runAlerts(id) { return alertsFor().filter(function (a) { return a.run === id; }); }
 
   /* ---------- mapa ---------- */
-  var mp = UI.map($('#tMap'), { center: [4.68, -74.12], zoom: 10 }), vm = {}, devLine = null, needMap = true, L = window.L;
+  var mp = UI.map($('#tMap'), { center: [5.03, -75.55], zoom: 10 }), vm = {}, devLine = null, needMap = true, L = window.L;
   function stState(s) { return s.estado === 'Entregada' ? 'done' : s.estado === 'Fallida' ? 'failed' : s.estado === 'Parcial' ? 'partial' : (s.estado === 'En camino' || s.estado === 'En sitio') ? 'current' : 'pending'; }
   function vehPos(r) { return pointAt(r, r.vdist, r.dev); }
   function drawMap(fitIt) {
     mp.clear(); vm = {}; devLine = null; var fitPts = [], sel = state.sel, o = A.sedes[0];
-    mp.pin({ lat: o.lat, lng: o.lng, state: 'origin', n: 'C', title: 'CEDI Bogotá', popup: '<strong>CEDI Bogotá</strong><br>Punto de salida' });
+    mp.pin({ lat: o.lat, lng: o.lng, state: 'origin', n: 'C', title: 'CEDI La Uribe', popup: '<strong>CEDI La Uribe</strong><br>Punto de salida' });
     runs.forEach(function (r) {
       var dim = sel && sel !== r.id, vp = vehPos(r), cut = 1; while (cut < r.cum.length - 1 && r.cum[cut] < r.vdist) cut++;
       var done = r.poly.slice(0, cut).concat([pointAt(r, r.vdist, 0)]), rest = [pointAt(r, r.vdist, 0)].concat(r.poly.slice(cut));

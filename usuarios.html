@@ -189,14 +189,14 @@ UI.ready(function () {
   var sedeName = function (id) { var s = A.idx.sedes[id]; return s ? s.nombre : id; };
   var bodegasDe = function (sedeId) {
     var out = [{ id: sedeId, nombre: sedeName(sedeId) + ' (principal)' }];
-    if (sedeId === 'CEDI-BOG') out.push({ id: 'BOD-FUN', nombre: 'Bodega Funza' });
+    if (sedeId === 'CEDI-URI') out.push({ id: 'CD-CHI', nombre: 'Centro Chinchiná' });
     return out;
   };
   var bodegaName = function (u) { return u.bodegaId === u.sedeId ? 'Bodega principal' : sedeName(u.bodegaId); };
   var scope = {};                    // alcance por rol
   roles.forEach(function (r) {
     var restr = ['Conductor', 'Operario de bodega', 'Jefe de bodega', 'Analista de inventarios', 'Despachador'].indexOf(r.nombre) > -1;
-    scope[r.rolId] = restr ? { mode: 'sel', sedes: ['CEDI-BOG', 'BOD-FUN'] } : { mode: 'todas', sedes: A.sedes.map(function (s) { return s.id; }) };
+    scope[r.rolId] = restr ? { mode: 'sel', sedes: ['CEDI-URI', 'CD-CHI'] } : { mode: 'todas', sedes: A.sedes.map(function (s) { return s.id; }) };
   });
   var nowIso = function () { return new Date().toISOString(); };
   var histPerm = [
@@ -333,7 +333,7 @@ UI.ready(function () {
 
   /* ----- drawer de detalle ----- */
   function sessionsOf(u) {
-    var n = u.estado === 'Activo' ? 1 + (parseInt(u.usuarioId.slice(-2), 10) % 3) : 0, devs = [['Chrome en Windows 11', 'Bogotá D.C.'], ['App móvil Android', 'Funza'], ['Safari en iPhone', 'Bogotá D.C.']], out = [];
+    var n = u.estado === 'Activo' ? 1 + (parseInt(u.usuarioId.slice(-2), 10) % 3) : 0, devs = [['Chrome en Windows 11', 'Manizales'], ['App móvil Android', 'Chinchiná'], ['Safari en iPhone', 'Manizales']], out = [];
     for (var i = 0; i < n; i++) out.push({ dev: devs[i][0], lugar: devs[i][1], ip: '190.24.' + (40 + i * 7) + '.' + (11 + parseInt(u.usuarioId.slice(-2), 10) * 3 % 200), desde: new Date(Date.now() - (i * 5 + 1) * 36e5 * 1.7).toISOString(), actual: i === 0 && u.usuarioId === ME.usuarioId });
     return out;
   }
@@ -469,7 +469,7 @@ UI.ready(function () {
   /* alcance (HU-019) */
   function drawScope() {
     var sc = scope[selRole]; $$('input[name=scopeMode]').forEach(function (i) { i.checked = i.value === sc.mode; });
-    $('#scopeGrid').innerHTML = A.sedes.map(function (s) { return '<label class="check"><input type="checkbox" value="' + s.id + '"' + (sc.sedes.indexOf(s.id) > -1 ? ' checked' : '') + (sc.mode === 'todas' ? ' disabled' : '') + '><span><strong>' + esc(s.nombre) + '</strong><br><span class="sub-line">' + (s.id === 'CEDI-BOG' ? 'CEDI y Bodega Funza' : esc(s.ciudad)) + '</span></span></label>'; }).join('');
+    $('#scopeGrid').innerHTML = A.sedes.map(function (s) { return '<label class="check"><input type="checkbox" value="' + s.id + '"' + (sc.sedes.indexOf(s.id) > -1 ? ' checked' : '') + (sc.mode === 'todas' ? ' disabled' : '') + '><span><strong>' + esc(s.nombre) + '</strong><br><span class="sub-line">' + (s.id === 'CEDI-URI' ? 'CEDI y Centro Chinchiná' : esc(s.ciudad)) + '</span></span></label>'; }).join('');
     $('#scopeHint').textContent = '';
   }
   $$('input[name=scopeMode]').forEach(function (i) { i.addEventListener('change', function () { $$('#scopeGrid input').forEach(function (c) { c.disabled = i.value === 'todas' && i.checked; }); }); });

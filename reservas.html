@@ -82,7 +82,7 @@
 
   <div class="tab-panel" id="p-con" role="tabpanel" aria-labelledby="t-con" hidden>
     <div class="tab-head">
-      <p class="muted t-13" style="max-width:62ch">Compara las unidades reservadas en la plataforma con las que reporta el inventario de SAP para el CEDI Bogotá. Elige qué sistema manda y alinea las diferencias.</p>
+      <p class="muted t-13" style="max-width:62ch">Compara las unidades reservadas en la plataforma con las que reporta el inventario de SAP para el CEDI La Uribe. Elige qué sistema manda y alinea las diferencias.</p>
       <div class="row gap-3"><label class="switch"><input type="checkbox" id="showAll"> Mostrar coincidentes</label><button type="button" class="btn btn-primary btn-sm" id="concAll"></button></div>
     </div>
     <div id="tblCon"></div>
@@ -93,7 +93,7 @@
 <script src="assets/js/app.js"></script>
 <script>
 UI.ready(function () {
-  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, YO = A.usuarioActual, CEDI = 'CEDI-BOG';
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, YO = A.usuarioActual, CEDI = 'CEDI-URI';
   var ABIERTOS = ['Recibido', 'Stock validado', 'Bloqueado por stock', 'En firme', 'En preparación', 'Listo para despacho', 'Planificado'];
   var NOW = new Date(A.ahora).getTime();
   var BODS = {}; A.sedes.forEach(function (s) { BODS[s.id] = s.nombre; });

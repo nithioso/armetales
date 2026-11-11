@@ -195,10 +195,10 @@ UI.ready(function () {
   }
 
   /* ---------- mapa operativo (HU-166) ---------- */
-  var mp = UI.map($('#opsMap'), { center: [4.68, -74.12], zoom: 10 });
+  var mp = UI.map($('#opsMap'), { center: [5.03, -75.55], zoom: 10 });
   function drawMap() {
     mp.clear(); var show = hoyDsp.filter(function (d) { return d.estado === 'En ruta' && (state.route === 'all' || d.despachoId === state.route); }), all = [], vpts = [];
-    mp.pin({ lat: A.sedes[0].lat, lng: A.sedes[0].lng, state: 'origin', n: 'C', title: 'CEDI Bogotá', popup: '<strong>CEDI Bogotá</strong><br>Punto de salida' });
+    mp.pin({ lat: A.sedes[0].lat, lng: A.sedes[0].lng, state: 'origin', n: 'C', title: 'CEDI La Uribe', popup: '<strong>CEDI La Uribe</strong><br>Punto de salida' });
     show.forEach(function (d) {
       var col = routeColors[d.despachoId], poly = A.polilineas[d.despachoId]; mp.route(poly, { color: col, weight: 4, opacity: .8 }); all = all.concat(poly);
       A.paradas.filter(function (x) { return x.despachoId === d.despachoId; }).forEach(function (x) {
@@ -287,7 +287,7 @@ UI.ready(function () {
   function segBind(id, cb) { $(id).addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; UI.$$('button', $(id)).forEach(function (x) { x.setAttribute('aria-pressed', x === b); }); cb(b); }); }
   segBind('#periodSeg', function (b) { state.period = +b.dataset.p; renderKpis(); drawTrend(); });
   segBind('#metricSeg', function (b) { state.metric = b.dataset.m; drawTrend(); });
-  $('#sedeSel').addEventListener('change', function (e) { var n = e.target.options[e.target.selectedIndex].text; UI.toast('Vista filtrada: ' + n + '. En la demo los datos de ejemplo corresponden al CEDI Bogotá.', 'info'); });
+  $('#sedeSel').addEventListener('change', function (e) { var n = e.target.options[e.target.selectedIndex].text; UI.toast('Vista filtrada: ' + n + '. En la demo los datos de ejemplo corresponden al CEDI La Uribe.', 'info'); });
   $('#refreshBtn').addEventListener('click', function () { var b = this; b.disabled = true; $('#kpiRow').innerHTML = [1, 2, 3, 4, 5].map(function () { return '<div class="card kpi"><span class="skeleton sk-line" style="width:50%"></span><span class="skeleton" style="height:34px;width:60%"></span><span class="skeleton sk-line" style="width:70%"></span></div>'; }).join(''); tbl.setLoading(true); setTimeout(function () { renderKpis(); tbl.setLoading(false); b.disabled = false; UI.toast('Datos actualizados.', 'success'); }, 650); });
 
   /* arranque con skeleton breve */

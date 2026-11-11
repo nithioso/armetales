@@ -41,13 +41,14 @@ function hav(a,b){var R=6371,t=Math.PI/180,dl=(b[0]-a[0])*t,dn=(b[1]-a[1])*t;var
 
 /* ---------- sedes / bodegas ---------- */
 var sedes = [
- {id:'CEDI-BOG',nombre:'CEDI Bogotá',tipo:'CEDI',ciudad:'Bogotá D.C.',barrio:'Fontibón',direccion:'Av. Calle 17 # 99-50, Zona Industrial',lat:4.6745,lng:-74.1465,principal:true,corteHora:'15:00',consolidacionMin:90,capacidadM3:6400,posiciones:1840,responsable:'Héctor Mauricio Bernal',activa:true},
- {id:'BOD-FUN',nombre:'Bodega Funza',tipo:'Bodega',ciudad:'Funza',barrio:'Zona Industrial',direccion:'Km 2 vía Funza – Siberia, Parque Industrial Dorado',lat:4.7110,lng:-74.2085,principal:false,corteHora:'14:00',consolidacionMin:60,capacidadM3:2100,posiciones:560,responsable:'Wilson Parra Cifuentes',activa:true},
- {id:'SED-MDE',nombre:'Sede Medellín',tipo:'Sede',ciudad:'Itagüí',barrio:'Calatrava',direccion:'Cra 50 # 36 Sur-120, Itagüí',lat:6.1717,lng:-75.6114,principal:false,corteHora:'15:30',consolidacionMin:90,capacidadM3:3000,posiciones:780,responsable:'Natalia Ospina Vélez',activa:true},
- {id:'SED-CLO',nombre:'Sede Cali',tipo:'Sede',ciudad:'Yumbo',barrio:'Acopi',direccion:'Cl 15 # 32-80, Acopi, Yumbo',lat:3.5849,lng:-76.4937,principal:false,corteHora:'15:30',consolidacionMin:90,capacidadM3:2800,posiciones:700,responsable:'Jhon Fredy Caicedo',activa:true},
- {id:'SED-BAQ',nombre:'Sede Barranquilla',tipo:'Sede',ciudad:'Barranquilla',barrio:'Zona Franca',direccion:'Vía 40 # 73-290, Zona Franca La Cayena',lat:10.9878,lng:-74.8010,principal:false,corteHora:'14:30',consolidacionMin:75,capacidadM3:2400,posiciones:620,responsable:'Lina Marcela Ortega',activa:true}
+ {id:'CEDI-URI',nombre:'CEDI La Uribe',tipo:'CEDI',ciudad:'Manizales',barrio:'La Uribe',direccion:'Km 4 vía Panamericana, sector La Uribe',lat:5.0285,lng:-75.5340,principal:true,corteHora:'15:00',consolidacionMin:90,capacidadM3:6400,posiciones:1840,responsable:'Héctor Mauricio Bernal',activa:true},
+ {id:'CD-CHI',nombre:'Centro Chinchiná',tipo:'Centro de despacho',ciudad:'Chinchiná',barrio:'Zona Industrial',direccion:'Km 1 vía Chinchiná – Palestina',lat:4.9880,lng:-75.6090,principal:false,corteHora:'14:00',consolidacionMin:60,capacidadM3:2100,posiciones:560,responsable:'Wilson Parra Cifuentes',activa:true},
+ {id:'CD-MZC',nombre:'Manizales Centro',tipo:'Centro de despacho',ciudad:'Manizales',barrio:'Centro',direccion:'Cra 20 # 28-35, Centro',lat:5.0689,lng:-75.5174,principal:false,corteHora:'15:30',consolidacionMin:60,capacidadM3:1400,posiciones:380,responsable:'Natalia Ospina Vélez',activa:true},
+ {id:'CD-MQT',nombre:'Centro Mariquita',tipo:'Centro de despacho',ciudad:'Mariquita',barrio:'Zona Industrial',direccion:'Km 2 vía Mariquita – Honda',lat:5.2010,lng:-74.8790,principal:false,corteHora:'15:30',consolidacionMin:90,capacidadM3:2800,posiciones:700,responsable:'Jhon Fredy Caicedo',activa:true},
+ {id:'CD-ANT',nombre:'Centro Antioquia',tipo:'Centro de despacho',ciudad:'Itagüí',barrio:'Calatrava',direccion:'Cra 50 # 36 Sur-120, Itagüí',lat:6.1717,lng:-75.6114,principal:false,corteHora:'14:30',consolidacionMin:75,capacidadM3:3000,posiciones:780,responsable:'Lina Marcela Ortega',activa:true},
+ {id:'CD-CUN',nombre:'Centro Cundinamarca',tipo:'Centro de despacho',ciudad:'Funza',barrio:'Zona Industrial',direccion:'Km 2 vía Funza – Siberia',lat:4.7110,lng:-74.2085,principal:false,corteHora:'14:00',consolidacionMin:75,capacidadM3:2400,posiciones:620,responsable:'Germán Alberto Quiceno',activa:true}
 ];
-var CEDI='CEDI-BOG', FUNZA='BOD-FUN';
+var CEDI='CEDI-URI', FUNZA='CD-CHI';
 
 /* ---------- productos SAP ---------- */
 var restriccionesProducto = {
@@ -116,52 +117,56 @@ var prodById = {}; productos.forEach(function(p){prodById[p.skuSAP]=p;});
 
 /* ---------- municipios ---------- */
 var MUNI = {
- fon:{n:'Bogotá',loc:'Fontibón',lat:4.6760,lng:-74.1420,zona:'Occidente',ruta:'R-01'},
- sub:{n:'Bogotá',loc:'Suba',lat:4.7410,lng:-74.0830,zona:'Norte',ruta:'R-04'},
- usq:{n:'Bogotá',loc:'Usaquén',lat:4.7110,lng:-74.0300,zona:'Norte',ruta:'R-04'},
- eng:{n:'Bogotá',loc:'Engativá',lat:4.7000,lng:-74.1100,zona:'Norte',ruta:'R-04'},
- ken:{n:'Bogotá',loc:'Kennedy',lat:4.6270,lng:-74.1500,zona:'Sur',ruta:'R-05'},
- bos:{n:'Bogotá',loc:'Bosa',lat:4.6050,lng:-74.1870,zona:'Sur',ruta:'R-05'},
- cbo:{n:'Bogotá',loc:'Ciudad Bolívar',lat:4.5500,lng:-74.1600,zona:'Sur',ruta:'R-05'},
- tju:{n:'Bogotá',loc:'Tunjuelito',lat:4.5870,lng:-74.1380,zona:'Sur',ruta:'R-05'},
- usm:{n:'Bogotá',loc:'Usme',lat:4.4800,lng:-74.1250,zona:'Sur',ruta:'R-05'},
- pua:{n:'Bogotá',loc:'Puente Aranda',lat:4.6150,lng:-74.1100,zona:'Sur',ruta:'R-05'},
- fun:{n:'Funza',lat:4.7168,lng:-74.2117,zona:'Occidente',ruta:'R-01'},
- mos:{n:'Mosquera',lat:4.7059,lng:-74.2302,zona:'Occidente',ruta:'R-01'},
- mad:{n:'Madrid',lat:4.7331,lng:-74.2650,zona:'Occidente',ruta:'R-01'},
- fac:{n:'Facatativá',lat:4.8136,lng:-74.3544,zona:'Occidente',ruta:'R-01'},
- chi:{n:'Chía',lat:4.8587,lng:-74.0586,zona:'Norte',ruta:'R-02'},
- caj:{n:'Cajicá',lat:4.9186,lng:-74.0276,zona:'Norte',ruta:'R-02'},
- zip:{n:'Zipaquirá',lat:5.0222,lng:-74.0043,zona:'Norte',ruta:'R-02'},
- cot:{n:'Cota',lat:4.8100,lng:-74.1030,zona:'Norte',ruta:'R-02'},
- ten:{n:'Tenjo',lat:4.8720,lng:-74.1440,zona:'Norte',ruta:'R-02'},
- sop:{n:'Sopó',lat:4.9060,lng:-73.9410,zona:'Norte',ruta:'R-02'},
- toc:{n:'Tocancipá',lat:4.9658,lng:-73.9124,zona:'Norte',ruta:'R-02'},
- soa:{n:'Soacha',lat:4.5794,lng:-74.2168,zona:'Sur',ruta:'R-03'},
- sib:{n:'Sibaté',lat:4.4866,lng:-74.2603,zona:'Sur',ruta:'R-03'},
- fus:{n:'Fusagasugá',lat:4.3363,lng:-74.3636,zona:'Tequendama',ruta:'R-06'},
- gir:{n:'Girardot',lat:4.3010,lng:-74.8030,zona:'Tequendama',ruta:'R-06'},
- tja:{n:'Tunja',lat:5.5353,lng:-73.3678,zona:'Boyacá',ruta:'R-07'},
- vil:{n:'Villavicencio',lat:4.1420,lng:-73.6266,zona:'Llanos',ruta:'R-08'}
+ cen:{n:'Manizales',loc:'Centro',lat:5.0689,lng:-75.5174,zona:'Manizales',ruta:'R-04'},
+ chp:{n:'Manizales',loc:'Chipre',lat:5.0752,lng:-75.5265,zona:'Manizales',ruta:'R-04'},
+ ver:{n:'Manizales',loc:'Versalles',lat:5.0625,lng:-75.5020,zona:'Manizales',ruta:'R-04'},
+ cab:{n:'Manizales',loc:'El Cable',lat:5.0563,lng:-75.4868,zona:'Manizales',ruta:'R-05'},
+ mil:{n:'Manizales',loc:'Milán',lat:5.0497,lng:-75.4790,zona:'Manizales',ruta:'R-05'},
+ sul:{n:'Manizales',loc:'La Sultana',lat:5.0640,lng:-75.4730,zona:'Manizales',ruta:'R-05'},
+ ene:{n:'Manizales',loc:'La Enea',lat:5.0330,lng:-75.4640,zona:'Manizales',ruta:'R-05'},
+ mal:{n:'Manizales',loc:'Maltería',lat:5.0420,lng:-75.4330,zona:'Manizales',ruta:'R-05'},
+ vma:{n:'Villamaría',lat:5.0456,lng:-75.5154,zona:'Manizales',ruta:'R-05'},
+ sro:{n:'Santa Rosa de Cabal',lat:4.8686,lng:-75.6214,zona:'Risaralda',ruta:'R-01'},
+ dos:{n:'Dosquebradas',lat:4.8390,lng:-75.6670,zona:'Risaralda',ruta:'R-01'},
+ per:{n:'Pereira',lat:4.8133,lng:-75.6961,zona:'Risaralda',ruta:'R-01'},
+ lvi:{n:'La Virginia',lat:4.8990,lng:-75.8830,zona:'Risaralda',ruta:'R-01'},
+ cgo:{n:'Cartago',lat:4.7464,lng:-75.9117,zona:'Risaralda',ruta:'R-01'},
+ nei:{n:'Neira',lat:5.1664,lng:-75.5200,zona:'Norte',ruta:'R-02'},
+ fil:{n:'Filadelfia',lat:5.2970,lng:-75.5620,zona:'Norte',ruta:'R-02'},
+ ara:{n:'Aranzazu',lat:5.2710,lng:-75.4910,zona:'Norte',ruta:'R-02'},
+ sal:{n:'Salamina',lat:5.4030,lng:-75.4870,zona:'Norte',ruta:'R-02'},
+ lme:{n:'La Merced',lat:5.3960,lng:-75.5470,zona:'Norte',ruta:'R-02'},
+ pac:{n:'Pácora',lat:5.5270,lng:-75.4590,zona:'Norte',ruta:'R-02'},
+ agu:{n:'Aguadas',lat:5.6110,lng:-75.4560,zona:'Norte',ruta:'R-02'},
+ chn:{n:'Chinchiná',lat:4.9825,lng:-75.6036,zona:'Sur',ruta:'R-03'},
+ pal:{n:'Palestina',lat:5.0180,lng:-75.6225,zona:'Sur',ruta:'R-03'},
+ ans:{n:'Anserma',lat:5.2380,lng:-75.7850,zona:'Occidente',ruta:'R-06'},
+ rio:{n:'Riosucio',lat:5.4220,lng:-75.7030,zona:'Occidente',ruta:'R-06'},
+ sup:{n:'Supía',lat:5.4470,lng:-75.6500,zona:'Occidente',ruta:'R-06'},
+ cir:{n:'Circasia',lat:4.6190,lng:-75.6360,zona:'Quindío',ruta:'R-07'},
+ mon:{n:'Montenegro',lat:4.5660,lng:-75.7510,zona:'Quindío',ruta:'R-07'},
+ cal:{n:'Calarcá',lat:4.5290,lng:-75.6400,zona:'Quindío',ruta:'R-07'},
+ arm:{n:'Armenia',lat:4.5339,lng:-75.6811,zona:'Quindío',ruta:'R-07'},
+ ldo:{n:'La Dorada',lat:5.4530,lng:-74.6640,zona:'Magdalena',ruta:'R-08'}
 };
-var DEP = {Bogotá:'Bogotá D.C.',Villavicencio:'Meta',Tunja:'Boyacá',Girardot:'Cundinamarca'};
+var DEP = {'Santa Rosa de Cabal':'Risaralda',Dosquebradas:'Risaralda',Pereira:'Risaralda','La Virginia':'Risaralda',Cartago:'Valle del Cauca',Armenia:'Quindío',Circasia:'Quindío',Montenegro:'Quindío','Calarcá':'Quindío'};
 
 /* ---------- clientes ---------- */
 var CL = [
-'Ferretería El Constructor Ltda.|F|sub|Rincón','Constructora Altos de Usaquén S.A.S.|C|usq|Cedritos','Depósito de Materiales San Cristóbal|D|eng|Bonanza',
-'Metalmecánica Industrial Suba S.A.S.|I|sub|Lisboa','Ferrecentro Engativá|F|eng|Villas de Granada','Construcciones Pórtico S.A.S.|C|usq|Toberín','Ferretería Bacatá Norte|F|usq|Santa Bárbara',
-'Ferretería La Mayorista de Kennedy|F|ken|Patio Bonito','Depósito Materiales El Porvenir|D|bos|El Porvenir','Constructora Horizonte Sur S.A.S.|C|cbo|Lucero',
-'Ferretería Tunjuelito Hnos.|F|tju|San Carlos','Cerrajería y Estructuras Usme|I|usm|Alfonso López','Hierros y Aceros Puente Aranda|D|pua|Montevideo',
-'Distribuciones Fontibón Ferretería|F|fon|Modelia','Constructora Ciudad Salitre S.A.S.|C|fon|Salitre',
-'Depósito La Sabana Funza|D|fun|Siete Trojes','Constructora Mosquera Verde S.A.S.|C|mos|Villa Santa Isabel','Ferretería Madrid Centro|F|mad|Centro',
-'Aceros y Cubiertas Facatativá|D|fac|San Rafael','Ferrocampo Funza|F|fun|Centro','Construcciones del Occidente S.A.S.|C|mos|El Trébol','Ferretería La Esperanza Facatativá|F|fac|Manablanca',
-'Ferretería Chía Express|F|chi|Fonquetá','Constructora Cajicá Ecopark S.A.S.|C|caj|Capellanía','Depósito Zipaquirá Hierros|D|zip|San Rafael',
-'Cubiertas y Techos Cota|D|cot|Vereda Parcelas','Ferretería Tenjo Rural|F|ten|Centro','Industrias Metálicas Tocancipá S.A.S.|I|toc|Zona Industrial','Ferretería Sopó Villa|F|sop|Centro',
-'Depósito Soacha Constructor|D|soa|San Mateo','Ferretería Compartir|F|soa|Compartir','Constructora Torres de Soacha S.A.S.|C|soa|Terreros',
-'Hierros del Sur Soacha|D|soa|Ciudad Verde','Ferretería Sibaté Centro|F|sib|Centro','Cemento y Acero Sibaté|D|sib|Villa Anita',
-'Ferretería El Tequendama|F|fus|Centro','Constructora Sumapaz S.A.S.|C|fus|La Pradera','Depósito Girardot Materiales|D|gir|Centro','Ferrometales Girardot|F|gir|Kennedy',
-'Ferretería Boyacá Real|F|tja|Centro','Constructora Hunza S.A.S.|C|tja|Los Muiscas','Aceros del Norte Tunja|D|tja|Avenida Norte',
-'Depósito Llanos Orientales|D|vil|Barzal','Constructora Ariari S.A.S.|C|vil|La Esperanza','Ferretería Villavo Express|F|vil|Centro'
+'Ferretería El Constructor Ltda.|F|chp|Chipre Viejo','Constructora Altos de Chipre S.A.S.|C|cen|San José','Depósito de Materiales Versalles|D|ver|Versalles',
+'Metalmecánica Industrial de Caldas S.A.S.|I|chp|Campohermoso','Ferrecentro Versalles|F|ver|La Estrella','Construcciones Pórtico S.A.S.|C|cen|Los Agustinos','Ferretería La 23|F|cen|Centro',
+'Ferretería La Mayorista de Milán|F|mil|Milán','Depósito Materiales La Sultana|D|sul|La Sultana','Constructora Horizonte La Enea S.A.S.|C|ene|La Enea',
+'Ferretería Villamaría Hnos.|F|vma|Centro','Cerrajería y Estructuras Maltería|I|mal|Zona Industrial Maltería','Hierros y Aceros El Cable|D|cab|Palogrande',
+'Distribuciones Santa Rosa Ferretería|F|sro|La Hermosa','Constructora Los Araucarios S.A.S.|C|sro|Centro',
+'Depósito La Badea|D|dos|La Badea','Constructora Pinares de Pereira S.A.S.|C|per|Pinares','Ferretería La Virginia Centro|F|lvi|Centro',
+'Aceros y Cubiertas Cartago|D|cgo|El Prado','Ferrocampo Dosquebradas|F|dos|Santa Mónica','Construcciones del Otún S.A.S.|C|per|Cuba','Ferretería La Esperanza Cartago|F|cgo|Santa Ana',
+'Ferretería Aranzazu Express|F|ara|Centro','Constructora Salamina Colonial S.A.S.|C|sal|La Palma','Depósito Pácora Hierros|D|pac|Centro',
+'Cubiertas y Techos Neira|D|nei|Pueblo Rico','Ferretería Filadelfia Rural|F|fil|Centro','Industrias Metálicas Aguadas S.A.S.|I|agu|Zona Industrial','Ferretería La Merced|F|lme|Centro',
+'Depósito Chinchiná Constructor|D|chn|La Frontera','Ferretería El Cafetal|F|chn|Centro','Constructora Torres de Chinchiná S.A.S.|C|chn|Los Mangos',
+'Hierros del Sur Chinchiná|D|chn|El Túnel','Ferretería Palestina Centro|F|pal|Centro','Cemento y Acero Arauca|D|pal|Arauca',
+'Ferretería El Ingrumá|F|ans|Centro','Constructora Occidente Caldense S.A.S.|C|ans|San Pedro','Depósito Riosucio Materiales|D|rio|La Candelaria','Ferrometales Riosucio|F|rio|San Sebastián',
+'Ferretería Quindío Real|F|arm|Centro','Constructora Cuyabra S.A.S.|C|arm|La Castellana','Aceros del Café Armenia|D|arm|Avenida Bolívar',
+'Depósito Magdalena Medio|D|ldo|Las Ferias','Constructora Puerto Dorado S.A.S.|C|ldo|Conejo','Ferretería La Dorada Express|F|ldo|Centro'
 ];
 var VIAS = ['Cra','Cl','Av. Cra','Diag','Tv'];
 var VENT = [['07:00','12:00'],['08:00','17:00'],['07:00','16:00'],['13:00','17:00'],['06:00','11:00'],['07:30','15:30']];
@@ -181,8 +186,8 @@ var clientes = CL.map(function (s, i) {
   var nm1 = a[0].replace(/ (Ltda\.|S\.A\.S\.)$/, '');
   return {
     clienteIdSAP:'CL'+pad(1004200+i*17+ri(0,9),7), nit:nitTxt, razonSocial:a[0], tipo:TIPO[a[1]], tipoCodigo:a[1],
-    direccionEntrega:pick(VIAS)+' '+ri(5,120)+(ri(0,1)?' # ':' Sur # ')+ri(2,90)+'-'+ri(1,99)+', '+a[3],
-    municipio:m.n, localidad:m.loc||null, departamento:DEP[m.n]||'Cundinamarca', barrio:a[3], zona:m.zona, rutaId:m.ruta, municipioKey:a[2],
+    direccionEntrega:pick(VIAS)+' '+ri(5,120)+(ri(0,1)?' # ':' # ')+ri(2,90)+'-'+ri(1,99)+', '+a[3],
+    municipio:m.n, localidad:m.loc||null, departamento:DEP[m.n]||'Caldas', barrio:a[3], zona:m.zona, rutaId:m.ruta, municipioKey:a[2],
     latitud:lat, longitud:lng, ventanaInicio:v[0], ventanaFin:v[1], restricciones:nr,
     contacto:{nombre:nm, cargo:pick(['Almacenista','Jefe de compras','Residente de obra','Gerente','Coordinador de bodega']), telefono:'3'+ri(0,2)+ri(0,9)+' '+ri(100,999)+' '+ri(1000,9999), correo:nm.split(' ')[0].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')+'@'+nm1.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'').slice(0,16)+'.com.co'},
     descargueMin:a[1]==='C'?ri(35,70):a[1]==='I'?ri(25,45):ri(15,40),
@@ -196,7 +201,7 @@ var cliById = {}; clientes.forEach(function(c){cliById[c.clienteIdSAP]=c;});
 /* ---------- conductores y vehículos ---------- */
 var CD = ['Pedro Antonio Gómez','Jhon Jairo Cardona','Luis Fernando Moreno','Wilmer Alexander Castro','José Ariel Rincón','Édgar Mauricio Suárez','Carlos Andrés Peña','Néstor Raúl Villamil','Freddy Hernán Ortiz','Óscar Iván Barreto','Milton César Parra','Alirio Bautista Cruz','Duván Esteban Rojas','Jorge Eliécer Talero'];
 var conductores = CD.map(function (n, i) {
-  return {conductorId:'CND-'+pad(i+1,3), nombre:n, cedula:(ri(0,1)?'79.':'80.')+ri(100,999)+'.'+ri(100,999), telefono:'3'+ri(0,2)+ri(0,9)+' '+ri(100,999)+' '+ri(1000,9999),
+  return {conductorId:'CND-'+pad(i+1,3), nombre:n, cedula:(ri(0,1)?'75.':'16.')+ri(100,999)+'.'+ri(100,999), telefono:'3'+ri(0,2)+ri(0,9)+' '+ri(100,999)+' '+ri(1000,9999),
     licencia:i<2?'C3':pick(['C2','C2','C3']), licenciaVence:ymd(ri(40,700)), sedeId:CEDI, usuarioId:i===0?'USR-006':null, estado:'Disponible', vehiculoId:null,
     experienciaAnios:ri(3,22), calificacion:rf(4.2,4.95,1), entregasMes:ri(38,140)};
 });
@@ -224,7 +229,7 @@ var vehiculos = VH.map(function (r, i) {
   return {placa:r[0], tipo:r[1], marca:r[2], modelo:r[3], anio:r[4], pesoMaxKg:r[5], volumenMaxM3:r[6], largoM:r[7], anchoM:r[8], altoM:r[9], ejes:r[10],
     carroceria:r[11], estibas:r[12], requiereAyudante:r[13], conductorId:conductores[i].conductorId, rutasCobertura:r[14], estado:'Disponible',
     restricciones:{
-      picoPlacaCarga:{ciudad:'Bogotá', diaRestriccion:dias[diaRest], horario:'06:00–09:00 y 16:00–19:00', aplicaHoy:restHoy},
+      picoPlacaCarga:{ciudad:'Manizales', diaRestriccion:dias[diaRest], horario:'06:00–09:00 y 16:00–19:00', aplicaHoy:restHoy},
       centro:r[5]>3500?'Sin ingreso al centro ampliado (> 3,5 t)':'Sin restricción de tonelaje en el centro',
       alturaMaxM:r[1]==='Tractomula'?4.4:4.1
     },
@@ -290,29 +295,28 @@ var ORIG = [sedes[0].lat, sedes[0].lng];
 function mpt(k){return [MUNI[k].lat, MUNI[k].lng];}
 function mname(k){return MUNI[k].loc||MUNI[k].n;}
 var PEAJ = {
- 'R-01':{fac:[['Peaje Cartagenita',14300]]},
- 'R-02':{cot:[['Peaje Siberia',13900]],zip:[['Peaje Cajicá',13400]],toc:[['Peaje Tocancipá',14100]]},
- 'R-03':{sib:[['Peaje Chusacá',12900]]},
- 'R-06':{fus:[['Peaje Chusacá',12900],['Peaje Chinauta',12200]],gir:[['Peaje Flandes',13100]]},
- 'R-07':{chi:[['Peaje Andes',13800]],toc:[['Peaje Tocancipá',14100]],tja:[['Peaje Sesquilé',13600],['Peaje Albarracín',12800]]},
- 'R-08':{vil:[['Peaje Naranjal',14900],['Peaje Chipaque',14300],['Peaje Pipiral',15200]]}
+ 'R-01':{sro:[['Peaje Pavas',13400],['Peaje Tarapacá I',14100]],dos:[['Peaje Tarapacá II',14100]],cgo:[['Peaje Cerritos II',13800]]},
+ 'R-03':{chn:[['Peaje Pavas',13400]]},
+ 'R-06':{rio:[['Peaje Irra',14300]],sup:[['Peaje Supía',13900]]},
+ 'R-07':{cir:[['Peaje Pavas',13400],['Peaje Tarapacá I',14100],['Peaje Tarapacá II',14100],['Peaje Circasia',13600]]},
+ 'R-08':{ldo:[['Peaje Honda',14900]]}
 };
 var RT = [
- ['R-01','Sabana Occidente','Occidente',['fon','fun','mos','mad','fac'],'Vigente'],
- ['R-02','Sabana Norte','Norte',['cot','ten','chi','caj','zip','toc','sop'],'Vigente'],
- ['R-03','Sur – Soacha/Sibaté','Sur',['soa','sib'],'Vigente'],
- ['R-04','Bogotá Norte','Norte',['eng','sub','usq'],'Vigente'],
- ['R-05','Bogotá Sur','Sur',['pua','ken','bos','tju','cbo','usm'],'Vigente'],
- ['R-06','Tequendama – Girardot','Tequendama',['soa','fus','gir'],'Vigente'],
- ['R-07','Boyacá – Tunja','Boyacá',['chi','sop','toc','tja'],'Vigente'],
- ['R-08','Llanos – Villavicencio','Llanos',['vil'],'En revisión']
+ ['R-01','Risaralda – Pereira / Cartago','Risaralda',['sro','dos','per','lvi','cgo'],'Vigente'],
+ ['R-02','Norte – Neira / Aguadas','Norte',['nei','fil','ara','sal','lme','pac','agu'],'Vigente'],
+ ['R-03','Sur – Chinchiná / Palestina','Sur',['chn','pal'],'Vigente'],
+ ['R-04','Manizales Centro','Manizales',['cen','chp','ver'],'Vigente'],
+ ['R-05','Manizales Oriente – Villamaría','Manizales',['vma','cab','mil','sul','ene','mal'],'Vigente'],
+ ['R-06','Occidente – Anserma / Riosucio','Occidente',['ans','rio','sup'],'Vigente'],
+ ['R-07','Quindío – Armenia','Quindío',['cir','mon','arm','cal'],'Vigente'],
+ ['R-08','Magdalena – La Dorada','Magdalena',['ldo'],'En revisión']
 ];
 var rutas = RT.map(function (r) {
-  var prev = ORIG, prevName = 'CEDI Bogotá', tramos = [], sec = [], trazado = [ORIG.slice()], km = 0, peaje = 0, min = 0;
+  var prev = ORIG, prevName = sedes[0].nombre, tramos = [], sec = [], trazado = [ORIG.slice()], km = 0, peaje = 0, min = 0;
   r[3].forEach(function (k, i) {
-    var p = mpt(k), d = round(hav(prev,p)*1.32+rf(0.5,2.5,1),1);
+    var p = mpt(k), d = round(hav(prev,p)*1.45+rf(0.5,2.5,1),1);
     var pj = ((PEAJ[r[0]]||{})[k]||[]).map(function(x){return {nombre:x[0],valorCOP:x[1]};});
-    var sp = r[2]==='Boyacá'||r[2]==='Tequendama'||r[2]==='Llanos'?48:(r[2]==='Occidente'||r[2]==='Norte'&&r[0]!=='R-04'?38:24);
+    var sp = r[2]==='Manizales'?22:36;
     tramos.push({orden:i+1,desde:prevName,hasta:mname(k),km:d,minutos:Math.round(d/sp*60),peajes:pj});
     sec.push({orden:i+1,municipioKey:k,nombre:mname(k),lat:p[0],lng:p[1]});
     km += d; min += Math.round(d/sp*60); pj.forEach(function(x){peaje+=x.valorCOP;});
@@ -320,7 +324,7 @@ var rutas = RT.map(function (r) {
     prev = p; prevName = mname(k);
   });
   var cn = clientes.filter(function(c){return c.rutaId===r[0];}).length;
-  return {rutaId:r[0], nombre:r[1], zona:r[2], origenId:CEDI, origen:'CEDI Bogotá', municipios:sec.map(function(s){return s.nombre;}), secuencia:sec, tramos:tramos,
+  return {rutaId:r[0], nombre:r[1], zona:r[2], origenId:CEDI, origen:sedes[0].nombre, municipios:sec.map(function(s){return s.nombre;}), secuencia:sec, tramos:tramos,
     kmIda:round(km,1), kmTotal:round(km*2,1), peajesCOP:peaje, duracionIdaMin:min, vigenciaDesde:ymd(-ri(120,400)), vigenciaHasta:ymd(ri(200,365)), estado:r[4], clientes:cn, trazado:trazado};
 });
 var rutaById = {}; rutas.forEach(function(r){rutaById[r.rutaId]=r;});
@@ -352,7 +356,7 @@ function mkPedido(cli, estado, opt){
   var creado = opt.creado!=null?opt.creado:-ri(1,4), ent = opt.entrega!=null?opt.entrega:0;
   var kg = round(ls.reduce(function(s,l){return s+l.pesoKg;},0),1), m3 = round(ls.reduce(function(s,l){return s+l.volumenM3;},0),2);
   var pr = opt.prioridad||(rnd()<0.14?'Alta':rnd()<0.6?'Media':'Baja');
-  var ped = {pedidoId:id, pedidoIdOrigen:id, origen:'Easy Sales', clienteId:cli.clienteIdSAP, cliente:cli.razonSocial, rutaId:cli.rutaId, municipio:cli.municipio==='Bogotá'?'Bogotá · '+cli.localidad:cli.municipio,
+  var ped = {pedidoId:id, pedidoIdOrigen:id, origen:'Easy Sales', clienteId:cli.clienteIdSAP, cliente:cli.razonSocial, rutaId:cli.rutaId, municipio:cli.municipio==='Manizales'?'Manizales · '+cli.localidad:cli.municipio,
     fecha:at(creado,ri(7,16),ri(0,59)), entregaSolicitada:ymd(ent), lineas:ls, estado:estado, prioridad:pr, asesor:pick(ASESORES), ordenCompra:'OC-'+ri(10000,99999),
     bodegaId:CEDI, pesoKg:kg, volumenM3:m3, valorCOP:Math.round(kg*rf(3300,4900,0)/1000)*1000, despachoId:null, observaciones:rnd()<0.18?pick(['Entregar con ayudante','Llamar 30 min antes de llegar','Obra en horario restringido','Factura electrónica adjunta al despacho','Cliente solicita remisión por duplicado']):'', modificado:rnd()<0.1};
   return ped;
@@ -396,7 +400,7 @@ function fit(kg, m3, ruta, soft){
   if(!c.length) return null;
   var v = soft&&c.length>1&&c[1].pesoMaxKg<c[0].pesoMaxKg*1.6&&rnd()<0.45?c[1]:c[0]; usedVeh[v.placa]=1; return v;
 }
-function speedFor(rid){var z=rutaById[rid].zona;return (z==='Boyacá'||z==='Tequendama'||z==='Llanos')?48:(rid==='R-04'||rid==='R-05'?22:36);}
+function speedFor(rid){var z=rutaById[rid].zona;return z==='Manizales'?22:36;}
 function lerpPts(pts,f){var x=f*(pts.length-1),i=Math.min(pts.length-2,Math.floor(x)),t=x-i;return [round(pts[i][0]+(pts[i+1][0]-pts[i][0])*t,5),round(pts[i][1]+(pts[i+1][1]-pts[i][1])*t,5)];}
 var despachos = [], paradas = [], polilineas = {}, posiciones = [], evidencias = [], novedades = [], dspNum = 10;
 var NOVSEQ = 0;
@@ -436,7 +440,7 @@ function buildTrip(trip, kind){
     else { est='Pendiente'; pest='Planificado'; }
     p.estado = pest; p.despachoId = did;
     var done = ch==='E'||ch==='X'||ch==='F';
-    paradas.push({paradaId:pid, despachoId:did, rutaId:trip.rutaId, pedidoId:p.pedidoId, clienteId:c.clienteIdSAP, cliente:c.razonSocial, municipio:c.municipio==='Bogotá'?c.localidad:c.municipio,
+    paradas.push({paradaId:pid, despachoId:did, rutaId:trip.rutaId, pedidoId:p.pedidoId, clienteId:c.clienteIdSAP, cliente:c.razonSocial, municipio:c.municipio==='Manizales'?c.localidad:c.municipio,
       secuencia:i+1, latitud:c.latitud, longitud:c.longitud, eta:iso(arr[i]), estado:est, horaEvento:done?iso(dep[i]):(est==='En sitio'?iso(arr[i]):null), descargueMin:desc[i],
       ventana:c.ventanaInicio+'–'+c.ventanaFin, observacion:''});
     var par = paradas[paradas.length-1];
@@ -482,7 +486,7 @@ TRIPS.hoy.forEach(function(t){buildTrip(t,'hoy');});
 buildTrip(TRIPS.cargando,'cargando');
 vehiculos.forEach(function(v){ if(!posiciones.some(function(p){return p.placa===v.placa;})){
   var mt = v.estado==='Mantenimiento';
-  posiciones.push({placa:v.placa, despachoId:null, rutaId:null, conductorId:v.conductorId, lat:mt?4.6120:round(ORIG[0]+rf(-0.0012,0.0012,5),5), lng:mt?-74.1330:round(ORIG[1]+rf(-0.0012,0.0012,5),5), velocidadKmh:0, rumbo:0, ultimaSenal:ahora(-ri(1,6)), estado:mt?'En taller':(v.estado==='Cargando'?'En muelle':'En patio'), proximaParadaId:null, bateriaPct:ri(40,99)});
+  posiciones.push({placa:v.placa, despachoId:null, rutaId:null, conductorId:v.conductorId, lat:mt?5.0470:round(ORIG[0]+rf(-0.0012,0.0012,5),5), lng:mt?-75.4400:round(ORIG[1]+rf(-0.0012,0.0012,5),5), velocidadKmh:0, rumbo:0, ultimaSenal:ahora(-ri(1,6)), estado:mt?'En taller':(v.estado==='Cargando'?'En muelle':'En patio'), proximaParadaId:null, bateriaPct:ri(40,99)});
 }});
 conductores.forEach(function(c){ if(c.estado==='Disponible'&&rnd()<0.12) c.estado='Descanso'; });
 /* estados de novedad */
@@ -491,7 +495,7 @@ novedades.forEach(function(n,i){ var past = new Date(n.fechaHora)<HOY; n.estado 
   n.accion = n.tipo==='Entrega fallida'?'Reprogramar entrega y contactar al cliente':(n.retorno?'Recibir mercancía en CEDI y emitir nota crédito':'Ajustar factura por cantidad entregada'); });
 /* novedades adicionales (otros orígenes) */
 var otrosPed = pedidos.filter(function(p){return ['Entregado'].indexOf(p.estado)>=0;});
-[['Devolución total','Cliente rechaza por referencia equivocada'],['Producto averiado en cargue','Lámina con oxidación superficial'],['Restricción de acceso','Cierre vial en Av. Boyacá por obra'],['Falla de vehículo','Falla de embrague en vía a Soacha'],['Pedido modificado en origen','Easy Sales cambió cantidad de línea 2'],['Entrega fallida','Cliente solicita aplazar por lluvia en obra'],['Devolución parcial','Sobrante de varilla 3/8" solicitado por la obra'],['Faltante en cargue','Se cargaron 18 de 20 láminas']].forEach(function(x,i){
+[['Devolución total','Cliente rechaza por referencia equivocada'],['Producto averiado en cargue','Lámina con oxidación superficial'],['Restricción de acceso','Cierre vial en la Av. Kevin Ángel por obra'],['Falla de vehículo','Falla de embrague en la vía a Chinchiná'],['Pedido modificado en origen','Easy Sales cambió cantidad de línea 2'],['Entrega fallida','Cliente solicita aplazar por lluvia en obra'],['Devolución parcial','Sobrante de varilla 3/8" solicitado por la obra'],['Faltante en cargue','Se cargaron 18 de 20 láminas']].forEach(function(x,i){
   var p = pick(otrosPed), l = p.lineas[0], d = new Date(NOW.getTime()-ri(8,140)*3600000);
   novedades.push({novedadId:'NOV-'+YYMM+'-'+pad(++NOVSEQ,3), tipo:x[0], pedidoId:p.pedidoId, paradaId:null, despachoId:p.despachoId, clienteId:p.clienteId, motivo:x[1], sku:/Devolución|averiado|Faltante/.test(x[0])?l.sku:null,
     cantidadAfectada:/Devolución|averiado|Faltante/.test(x[0])?Math.max(1,Math.round(l.cantidad*0.15)):null, unidad:l.unidad, estado:pick(EST_NOV), responsable:pick(RESP_NOV), accion:'Seguimiento por el área responsable', fechaHora:iso(d.getTime()), reportadoPor:pick(['CND-002','CND-003','USR-014','USR-002']),
@@ -520,7 +524,8 @@ var BASE = {Varilla:[900,6000],Malla:[180,900],Perfil:[150,1200],'Tubería':[150
 var ACT_RES = {}; reservas.forEach(function(r){ if(r.estado==='Activa') ACT_RES[r.sku]=(ACT_RES[r.sku]||0)+r.cantidad; });
 productos.forEach(function(pr,pi){
   var b = BASE[pr.familia];
-  sedes.forEach(function(s){
+  sedes.forEach(function(s,si){
+    if(si>4){ if(pi%3!==1){var q6=Math.round(b[0]*0.35*(1+(pi%4)*0.35)); pr.stock[s.id]={fisico:q6, reservado:0, disponible:q6, minimo:Math.round(b[0]*0.14), enTransito:pi%5===0?Math.round(b[0]*0.17):0};} return; }
     var esC = s.id===CEDI, esF = s.id===FUNZA, f = esC?1:esF?0.25:0.35;
     if(!esC && !esF && rnd()<0.4) return;
     var base = Math.round(ri(b[0],b[1])*f), res = esC?(ACT_RES[pr.skuSAP]||0):Math.round(base*rf(0,0.06,2));
@@ -677,7 +682,7 @@ var LOGT = {
         ['Existencias',function(){return pick(productos).skuSAP+'@'+CEDI;},['Bloqueo de registro en SAP (E_LOCK) — reintento 3/5']],
         ['Documento de entrega',function(){return '80'+ri(100000,999999);},['Entrega SAP sin pedido de venta asociado','Estado SAP no mapeado: '+pick(['C','D','E'])]]],
  'Data Lake':[['Cliente normalizado',function(){return pick(clientes).clienteIdSAP;},['Esquema v3: campo ventana_fin ausente','Dirección con calidad 0,42: requiere validación manual']],
-        ['Coordenadas',function(){return pick(clientes).clienteIdSAP;},['Registro sin georreferencia (latitud/longitud nulas)','Coordenadas fuera del rango esperado para Cundinamarca']],
+        ['Coordenadas',function(){return pick(clientes).clienteIdSAP;},['Registro sin georreferencia (latitud/longitud nulas)','Coordenadas fuera del rango esperado para Caldas']],
         ['Atributos de producto',function(){return pick(productos).skuSAP;},['Peso por unidad inconsistente con SAP (desviación 12 %)','Dimensiones nulas en atributos de producto']]],
  'Easy Sales':[['Pedido',function(){return pick(pedidos).pedidoId;},['Cliente '+pick(clientes).clienteIdSAP+' sin correspondencia en el maestro','SKU 1009999 no existe en el catálogo SAP','Cambio de cantidad en origen (línea 2): conciliar con la reserva local']],
         ['Cambio de pedido',function(){return pick(pedidos).pedidoId;},['Pedido ya despachado: el cambio no se puede aplicar']]]
@@ -720,7 +725,7 @@ var notificaciones = [
  {notifId:'NTF-002',tipo:'Retraso de entrega',severidad:'alerta',titulo:'Retraso probable en '+despachos[3].despachoId,texto:'La próxima parada supera la ventana del cliente por 18 minutos.',fechaHora:ahora(-25),leida:false,ref:{tipo:'despacho',id:despachos[3].despachoId},destino:'seguimiento.html'},
  {notifId:'NTF-003',tipo:'Error de integración',severidad:'peligro',titulo:'Error de integración con '+errInt.sistemaOrigen,texto:errInt.error,fechaHora:errInt.fechaEvento,leida:false,ref:{tipo:'log',id:errInt.logId},destino:'integraciones.html'},
  {notifId:'NTF-004',tipo:'Pedido listo para despacho',severidad:'exito',titulo:'Pedido '+listos[0].pedidoId+' listo para despacho',texto:'Preparación certificada por el Jefe de bodega.',fechaHora:ahora(-41),leida:false,ref:{tipo:'pedido',id:listos[0].pedidoId},destino:'pedidos.html'},
- {notifId:'NTF-005',tipo:'Vehículo no apto',severidad:'alerta',titulo:'Vehículo UFR 264 con pico y placa hoy',texto:'No debe circular en Bogotá entre 16:00 y 19:00.',fechaHora:ahora(-70),leida:true,ref:{tipo:'vehiculo',id:'UFR 264'},destino:'vehiculos.html'},
+ {notifId:'NTF-005',tipo:'Vehículo no apto',severidad:'alerta',titulo:'Vehículo UFR 264 con pico y placa hoy',texto:'No debe circular en Manizales entre 16:00 y 19:00.',fechaHora:ahora(-70),leida:true,ref:{tipo:'vehiculo',id:'UFR 264'},destino:'vehiculos.html'},
  {notifId:'NTF-006',tipo:'Preparación sin cerrar',severidad:'alerta',titulo:'6 pedidos con preparación sin cerrar',texto:'El corte de las 15:00 se acerca. Revisa los pedidos en preparación.',fechaHora:ahora(-95),leida:true,ref:{tipo:'preparacion',id:null},destino:'preparacion.html'},
  {notifId:'NTF-007',tipo:'Entrega fallida',severidad:'peligro',titulo:'Entrega fallida en '+(novedades.filter(function(n){return n.tipo==='Entrega fallida';})[0]||{}).pedidoId,texto:'Motivo: '+(novedades.filter(function(n){return n.tipo==='Entrega fallida';})[0]||{}).motivo+'.',fechaHora:ahora(-130),leida:true,ref:{tipo:'novedad',id:null},destino:'novedades.html'},
  {notifId:'NTF-008',tipo:'Cierre de despacho',severidad:'exito',titulo:'Despacho '+despachos[0].despachoId+' cerrado',texto:'Todas las entregas fueron confirmadas con evidencia.',fechaHora:ahora(-60*20),leida:true,ref:{tipo:'despacho',id:despachos[0].despachoId},destino:'despachos.html'},

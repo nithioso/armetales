@@ -302,7 +302,7 @@ UI.ready(function () {
   var PHN = ['En camino', 'Llegada', 'Descargue', 'Resultado', 'Evidencias'];
   V.stop = function () {
     var s = S.stops[S.cur], n = nextIdx(), locked = s.phase === 'pending', c = s.cli, ped = s.ped, items = ped.lineas;
-    bar('Parada ' + (s.i + 1) + ' de ' + S.stops.length, c.municipio === 'Bogotá' ? (c.localidad || c.barrio) : c.municipio, true);
+    bar('Parada ' + (s.i + 1) + ' de ' + S.stops.length, c.municipio === 'Manizales' ? (c.localidad || c.barrio) : c.municipio, true);
     var phIdx = PH[s.phase] != null ? PH[s.phase] : -1, html = '';
     if (!locked) html += '<div><div class="pa-prog">' + PHN.map(function (_, i) { return '<i class="' + (i < phIdx ? 'on' : i === phIdx ? 'cur' : '') + '"></i>'; }).join('') + '</div><div class="pa-prog-l"><span>' + (s.phase === 'done' ? 'Parada terminada' : 'Paso ' + (phIdx + 1) + ' de 5 · ' + PHN[Math.min(phIdx, 4)]) + '</span>' + chipFor(s) + '</div></div>';
     html += '<div class="pa-card"><div><div class="t-16 strong">' + esc(s.p.cliente) + '</div><div class="muted t-13">' + esc(c.direccionEntrega) + '</div><div class="muted t-13">' + esc(c.municipio) + (c.localidad ? ' · ' + esc(c.localidad) : '') + '</div></div>' +
@@ -508,7 +508,7 @@ UI.ready(function () {
     closeRoute: function () { S.closed = true; emit('Recorrido finalizado', null, stopsDone() + ' paradas atendidas'); render(); snack('Recorrido cerrado. Regresa al CEDI.'); },
     newNov: function () {
       sheet('<h3>Novedad en la vía</h3><div class="field"><label class="label" for="vt">Tipo</label><select class="select" id="vt"><option value="">Selecciona un tipo</option><option>Retén o cierre de vía</option><option>Falla mecánica</option><option>Accidente o congestión</option><option>Clima adverso</option><option>Otro</option></select><span class="error-text" id="vtE" hidden>' + ic('alert-circle', 'icon-sm') + 'Selecciona el tipo de novedad.</span></div>' +
-        '<div class="field"><label class="label" for="vo">Detalle <span class="opt">(opcional)</span></label><textarea class="textarea" id="vo" placeholder="Ej.: cierre en la Av. Boyacá con calle 60 sur"></textarea></div>' + btn('saveNov', 'Reportar a la torre de control', { icon: 'send' }) + '<button type="button" class="btn btn-ghost btn-block" data-act="closeSheet">Cancelar</button>');
+        '<div class="field"><label class="label" for="vo">Detalle <span class="opt">(opcional)</span></label><textarea class="textarea" id="vo" placeholder="Ej.: cierre en la Av. Santander a la altura de El Cable"></textarea></div>' + btn('saveNov', 'Reportar a la torre de control', { icon: 'send' }) + '<button type="button" class="btn btn-ghost btn-block" data-act="closeSheet">Cancelar</button>');
     },
     saveNov: function () {
       var t = $('#vt').value; $('#vtE').hidden = !!t; if (!t) return; var o = $('#vo').value.trim(); closeSheet();

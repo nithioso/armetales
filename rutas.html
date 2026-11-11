@@ -110,7 +110,7 @@
 <script>
 UI.ready(function () {
   var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$;
-  var ZONAS = ['Norte', 'Sur', 'Occidente', 'Oriente', 'Centro', 'Tequendama', 'Boyacá', 'Llanos'];
+  var ZONAS = ['Manizales', 'Norte', 'Sur', 'Occidente', 'Oriente', 'Risaralda', 'Quindío', 'Magdalena'];
   var view = 'cards', filt = { q: '', zona: '', estado: '' };
   $('#btnNew').innerHTML = UI.icon('plus') + 'Crear ruta';
 
@@ -240,7 +240,7 @@ UI.ready(function () {
         '<div class="d-sec" id="dTramos"></div>' +
         '<div class="d-grid c2"><div class="d-sec" id="dCov"></div><div class="d-sec" id="dCedi"></div></div></div>',
       onClose: function () { if (D && D.map && D.map.destroy) { try { D.map.destroy(); } catch (e) {} } D = null; history.replaceState && history.replaceState(null, '', location.pathname); } });
-    D.api = api; $('#dMap', api.body).style.setProperty('--h', '340px'); D.map = UI.map($('#dMap', api.body), { center: [4.7, -74.1], zoom: 10 });
+    D.api = api; $('#dMap', api.body).style.setProperty('--h', '340px'); D.map = UI.map($('#dMap', api.body), { center: [5.05, -75.55], zoom: 10 });
     renderAll(true); setTimeout(function () { D && D.map.invalidate && D.map.invalidate(); drawMap(true); }, 280);
     if (edit) startEdit();
   }
@@ -383,7 +383,7 @@ UI.ready(function () {
     function er(k) { return W.errs[k] ? '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + esc(W.errs[k]) + '</span>' : ''; }
     function draw() {
       var h = '<div class="wiz-steps">' + ['Datos', 'Municipios', 'Revisión'].map(function (s, i) { return '<span class="' + (W.step === i + 1 ? 'on' : W.step > i + 1 ? 'done' : '') + '"><b>' + (W.step > i + 1 ? '✓' : i + 1) + '</b>' + s + '</span>'; }).join('') + '</div>';
-      if (W.step === 1) h += '<div class="form-grid c2"><div class="field span-2"><label class="label" for="wNombre">Nombre de la ruta</label><input class="input" id="wNombre" value="' + esc(W.nombre) + '" placeholder="Ej.: Sabana Centro – Zipaquirá"' + (W.errs.nombre ? ' aria-invalid="true"' : '') + '>' + er('nombre') + '</div>' +
+      if (W.step === 1) h += '<div class="form-grid c2"><div class="field span-2"><label class="label" for="wNombre">Nombre de la ruta</label><input class="input" id="wNombre" value="' + esc(W.nombre) + '" placeholder="Ej.: Oriente – Fresno / Mariquita"' + (W.errs.nombre ? ' aria-invalid="true"' : '') + '>' + er('nombre') + '</div>' +
         '<div class="field"><label class="label" for="wZona">Zona</label><select class="select" id="wZona">' + ZONAS.map(function (z) { return '<option' + (z === W.zona ? ' selected' : '') + '>' + z + '</option>'; }).join('') + '</select></div>' +
         '<div class="field"><label class="label" for="wCedi">CEDI de salida</label><select class="select" id="wCedi">' + A.sedes.map(function (s) { return '<option value="' + s.id + '"' + (s.id === W.origenId ? ' selected' : '') + '>' + esc(s.nombre) + '</option>'; }).join('') + '</select></div>' +
         '<div class="field"><label class="label" for="wDesde">Vigente desde</label><input class="input" type="date" id="wDesde" value="' + W.desde + '"></div><div class="field"><label class="label" for="wHasta">Vigente hasta</label><input class="input" type="date" id="wHasta" value="' + W.hasta + '"' + (W.errs.vig ? ' aria-invalid="true"' : '') + '>' + er('vig') + '</div></div>';

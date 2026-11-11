@@ -173,7 +173,7 @@
   <!-- ================= RECEPCIÓN ================= -->
   <div id="recepcion" role="tabpanel" aria-labelledby="tabRec" class="tab-panel" hidden>
     <section class="section" aria-label="Documentos por recibir">
-      <div class="section-head"><div><h2 class="section-title">Documentos por recibir</h2><p class="muted t-13" style="margin-top:2px">Órdenes de compra y traslados anunciados para el CEDI Bogotá.</p></div></div>
+      <div class="section-head"><div><h2 class="section-title">Documentos por recibir</h2><p class="muted t-13" style="margin-top:2px">Órdenes de compra y traslados anunciados para el CEDI La Uribe.</p></div></div>
       <div class="doc-list" id="docList"></div>
     </section>
     <section class="section" aria-label="Recepciones registradas">
@@ -468,10 +468,10 @@ UI.ready(function () {
   var ESPERADOS = [
     { doc: 'OC-4500187234', tipo: 'Orden de compra', origen: 'Acería nacional · planta Boyacá', eta: 'Hoy, 10:30', lineas: [['1000235', 600], ['1000236', 400], ['1000237', 300]], pre: [0, -24, 0] },
     { doc: 'OC-4500187301', tipo: 'Orden de compra', origen: 'Distribuidora de láminas del Caribe S.A.S.', eta: 'Hoy, 14:00', lineas: [['1004402', 120], ['1004403', 200]], pre: [0, 0] },
-    { doc: 'TR-3321', tipo: 'Traslado entre bodegas', origen: 'Bodega Funza', eta: 'Mañana, 07:00', lineas: [['1007700', 800], ['1007702', 400]], pre: [0, 0] }
+    { doc: 'TR-3321', tipo: 'Traslado entre bodegas', origen: 'Centro Chinchiná', eta: 'Mañana, 07:00', lineas: [['1007700', 800], ['1007702', 400]], pre: [0, 0] }
   ];
   var RECS = [
-    { id: 'REC-2611-003', doc: 'TR-3320', rem: 'TRF-9981', origen: 'Bodega Funza', fecha: new Date(Date.now() - 85 * 60000), estado: 'En validación', resp: 'USR-012', muelle: 'M-01', lineas: [{ sku: '1002200', esp: 200, rec: 200, ub: null }, { sku: '1002201', esp: 150, rec: 150, ub: null }] },
+    { id: 'REC-2611-003', doc: 'TR-3320', rem: 'TRF-9981', origen: 'Centro Chinchiná', fecha: new Date(Date.now() - 85 * 60000), estado: 'En validación', resp: 'USR-012', muelle: 'M-01', lineas: [{ sku: '1002200', esp: 200, rec: 200, ub: null }, { sku: '1002201', esp: 150, rec: 150, ub: null }] },
     { id: 'REC-2611-002', doc: 'OC-4500187010', rem: 'RM-22841', origen: 'Acería nacional · planta Boyacá', fecha: new Date(Date.now() - 26 * 3600000), estado: 'Con diferencias', resp: 'USR-012', muelle: 'M-02', lineas: [{ sku: '1000234', esp: 1000, rec: 976, ub: null }, { sku: '1000240', esp: 500, rec: 500, ub: null }] },
     { id: 'REC-2611-001', doc: 'OC-4500186990', rem: 'RM-22790', origen: 'Importadora de perfiles Andina S.A.S.', fecha: new Date(Date.now() - 52 * 3600000), estado: 'Ubicada', resp: 'USR-005', muelle: 'M-03', lineas: [{ sku: '1002210', esp: 240, rec: 240, ub: 'C-01-2-01' }, { sku: '1002211', esp: 120, rec: 120, ub: 'C-01-3-02' }, { sku: '1002220', esp: 250, rec: 250, ub: 'C-02-1-02' }] }
   ];

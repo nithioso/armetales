@@ -127,18 +127,18 @@ UI.ready(function () {
     var D = [], at = null, r = rn(e), ped = e.entidad === 'Pedido' ? A.idx.pedidos[e.entidadId] : null, actor = e.usuario;
     switch (e.tipo) {
       case 'Modificación':
-        if (e.entidad === 'Ruta') { D = [['secuencia de municipios', 'Mosquera → Madrid → Facatativá', 'Madrid → Mosquera → Facatativá'], ['kmTotales', '88,4', '91,0'], ['motivo', '—', 'Cierre parcial de la vía principal (cambio manual)'], ['vigencia', 'Vigente', 'Vigente']]; }
+        if (e.entidad === 'Ruta') { D = [['secuencia de municipios', 'Santa Rosa de Cabal → Dosquebradas → Pereira', 'Dosquebradas → Santa Rosa de Cabal → Pereira'], ['kmTotales', '88,4', '91,0'], ['motivo', '—', 'Cierre parcial de la vía principal (cambio manual)'], ['vigencia', 'Vigente', 'Vigente']]; }
         else if (e.antes) { var a = e.antes.split(': '), b = e.despues.split(': '); D = [[a[0], a.slice(1).join(': '), b.slice(1).join(': ')], ['id', e.entidadId, e.entidadId], ['estado', 'Activo', 'Activo']]; }
         else D = [['id', e.entidadId, e.entidadId]];
         break;
       case 'Cambio de estado': var T = [['Recibido', 'Stock validado'], ['Stock validado', 'En firme'], ['En firme', 'En preparación'], ['En preparación', 'Listo para despacho'], ['Listo para despacho', 'Planificado']], t = T[r % T.length]; D = [['estado', t[0], t[1]], ['actualizadoPor', 'Sistema', actor], ['prioridad', ped ? ped.prioridad : 'Media', ped ? ped.prioridad : 'Media'], ['pedidoId', e.entidadId, e.entidadId]]; break;
       case 'Creación':
-        if (e.entidad === 'Reserva') { var rv = find('reservas', 'reservaId', e.entidadId); D = [['reservaId', '—', e.entidadId], ['sku', '—', rv ? rv.sku : '1000241'], ['cantidad', '—', rv ? rv.cantidad + ' ' + rv.unidad.toLowerCase() + 's' : '40 unidades'], ['bodegaId', '—', rv ? rv.bodegaId : 'CEDI-BOG'], ['estado', '—', 'Activa']]; }
+        if (e.entidad === 'Reserva') { var rv = find('reservas', 'reservaId', e.entidadId); D = [['reservaId', '—', e.entidadId], ['sku', '—', rv ? rv.sku : '1000241'], ['cantidad', '—', rv ? rv.cantidad + ' ' + rv.unidad.toLowerCase() + 's' : '40 unidades'], ['bodegaId', '—', rv ? rv.bodegaId : 'CEDI-URI'], ['estado', '—', 'Activa']]; }
         else { var ds = A.idx.despachos[e.entidadId]; D = [['despachoId', '—', e.entidadId], ['vehículo', '—', ds ? ds.vehiculoId : 'WNK 482'], ['ruta', '—', ds ? ds.rutaId : 'R-01'], ['pedidos', '—', ds ? ds.pedidoIds.length : 3], ['estado', '—', 'Programado']]; }
         break;
       case 'Liberación': D = [['estado', 'Activa', 'Liberada'], ['cantidadReservada', String(20 + r % 180), '0'], ['motivo', '—', 'Entrega fallida: se libera el inventario'], ['reservaId', e.entidadId, e.entidadId]]; break;
       case 'Aprobación': D = [['estado', 'Pendiente de aprobación', 'Aprobado'], ['excepción', '—', 'Utilización de ' + (62 + r % 20) + ' %, por debajo del mínimo'], ['aprobadoPor', '—', actor], ['despachoId', e.entidadId, e.entidadId]]; break;
-      case 'Cambio de permisos': D = [['permiso · ' + pickR(e, ['Despachos', 'Planeación', 'Reportes', 'Inventario']), 'Consultar', 'Gestionar'], ['alcance', 'CEDI Bogotá', 'CEDI Bogotá'], ['rolId', e.entidadId, e.entidadId]]; break;
+      case 'Cambio de permisos': D = [['permiso · ' + pickR(e, ['Despachos', 'Planeación', 'Reportes', 'Inventario']), 'Consultar', 'Gestionar'], ['alcance', 'CEDI La Uribe', 'CEDI La Uribe'], ['rolId', e.entidadId, e.entidadId]]; break;
       case 'Sincronización': D = [['estado', 'Pendiente', 'Procesado'], ['registros', '0', String(40 + r % 300)], ['errores', '0', '0'], ['logId', e.entidadId, e.entidadId]]; break;
       case 'Exportación': D = [['formato', '—', pickR(e, ['CSV', 'Excel', 'PDF'])], ['filas', '—', String(60 + r % 500)], ['filtros', '—', 'Últimos 30 días · todas las rutas']]; break;
       case 'Ajuste de inventario': var f = 100 + r % 400, g = f - (1 + r % 9); D = [['stockFísico', String(f), String(g)], ['diferencia', '0', String(g - f)], ['estadoConteo', 'Con diferencia', 'Ajustado'], ['conteoId', e.entidadId, e.entidadId]]; break;
@@ -221,7 +221,7 @@ UI.ready(function () {
       body: '<div class="stack">' + UI.banner({ tone: 'danger', title: 'Edición bloqueada', text: 'Los registros de auditoría son de solo anexado. Ningún rol, ni siquiera Administrador, puede modificarlos o eliminarlos; así el historial sirve como prueba.' }) +
         '<p>Si hay un error en el contexto del evento, se agrega una <strong>anotación</strong> que referencia el original. El original queda intacto y la anotación genera su propio registro y su propia huella.</p>' +
         '<div class="code">PUT /api/auditoria/' + esc(e.registroId) + '\n→ 405 Method Not Allowed\n{ "codigo": "AUDITORIA_INMUTABLE",\n  "mensaje": "Los registros de auditoría no admiten cambios" }</div>' +
-        '<div class="field" id="annField"><label class="label" for="annTxt">Anotación sobre este registro</label><textarea class="textarea" id="annTxt" rows="3" placeholder="Ej.: el ajuste correspondía a la bodega de Funza"></textarea><div class="error-text" id="annErr" hidden></div></div></div>',
+        '<div class="field" id="annField"><label class="label" for="annTxt">Anotación sobre este registro</label><textarea class="textarea" id="annTxt" rows="3" placeholder="Ej.: el ajuste correspondía a la bodega de Chinchiná"></textarea><div class="error-text" id="annErr" hidden></div></div></div>',
       footer: [{ label: 'Entendido', kind: 'ghost' }, { label: 'Agregar anotación', kind: 'primary', keepOpen: true, onClick: function (api) {
         var t = $('#annTxt', api.body).value.trim(), er = $('#annErr', api.body), fld = $('#annField', api.body);
         if (t.length < 10) { er.hidden = false; er.textContent = 'Escribe al menos 10 caracteres para que la anotación sea útil.'; fld.classList.add('is-invalid'); return false; }

@@ -147,7 +147,7 @@ UI.ready(function () {
   var ZONAS = Array.from(new Set(A.clientes.map(function (c) { return c.zona; }))).sort();
   var MUNIS = {};
   A.clientes.forEach(function (c) { var m = MUNIS[c.municipio] || (MUNIS[c.municipio] = { n: 0, lat: 0, lng: 0, z: {} }); m.n++; m.lat += c.latitud; m.lng += c.longitud; m.z[c.zona] = (m.z[c.zona] || 0) + 1; });
-  Object.keys(MUNIS).forEach(function (k) { var m = MUNIS[k]; m.lat /= m.n; m.lng /= m.n; m.zona = Object.keys(m.z).sort(function (a, b) { return m.z[b] - m.z[a]; })[0]; m.radio = k === 'Bogotá' ? 35 : 18; });
+  Object.keys(MUNIS).forEach(function (k) { var m = MUNIS[k]; m.lat /= m.n; m.lng /= m.n; m.zona = Object.keys(m.z).sort(function (a, b) { return m.z[b] - m.z[a]; })[0]; m.radio = k === 'Manizales' ? 35 : 18; });
   var MUNI_LIST = Object.keys(MUNIS).sort(function (a, b) { return a.localeCompare(b, 'es'); });
   var RESTR = ['Acceso máximo para turbo (calle estrecha)', 'Descargue con ayudante (sin montacargas)', 'Vía destapada en los últimos 600 m', 'Descargue restringido en horas pico (zona residencial)', 'Requiere montacargas del cliente', 'Ingreso con EPP y planilla de seguridad social', 'Portería exige cita previa'];
   var VEH_MAX = ['Sin límite de tamaño', 'Hasta tractocamión', 'Hasta camión sencillo', 'Hasta turbo (4,5 t)'];
@@ -282,7 +282,7 @@ UI.ready(function () {
   /* ---------- mapa de clientes ---------- */
   var mapApi = null, mapPins = {}, lastPts = [];
   function drawMap() {
-    if (!mapApi) { mapApi = UI.map($('#cliMap'), { center: [4.68, -74.12], zoom: 10 }); var lg = document.createElement('div'); lg.className = 'map-legend'; lg.innerHTML = '<span><i class="dot ok"></i> Verificada</span><span><i class="dot warn"></i> Aproximada</span><span><i class="dot bad"></i> Por validar</span>'; $('#cliMap').appendChild(lg);
+    if (!mapApi) { mapApi = UI.map($('#cliMap'), { center: [5.03, -75.55], zoom: 10 }); var lg = document.createElement('div'); lg.className = 'map-legend'; lg.innerHTML = '<span><i class="dot ok"></i> Verificada</span><span><i class="dot warn"></i> Aproximada</span><span><i class="dot bad"></i> Por validar</span>'; $('#cliMap').appendChild(lg);
       $('#cliMap').addEventListener('click', function (e) { var b = e.target.closest('[data-open]'); if (b) openClient(b.dataset.open); }); }
     mapApi.clear(); mapPins = {}; var l = filtered(), pts = [];
     l.forEach(function (c) {
@@ -355,7 +355,7 @@ UI.ready(function () {
       fld('dCupo', 'Cupo de crédito', F.cop(c.cupoCreditoCOP), { locked: true }) + fld('dDep', 'Departamento', c.departamento, { locked: true }) + '</div></section>' +
       '<section><h3 class="sec-title">Datos logísticos</h3><p class="muted t-13 mb-2">Los completa el equipo logístico; alimentan la planeación y el motor de rutas.</p><div class="form-grid c2">' +
       fld('dZona', 'Zona de reparto', c.zona, { select: ZONAS }) + fld('dRuta', 'Ruta poblacional', c.rutaId, { select: A.rutas.map(function (r) { return { v: r.rutaId, l: r.rutaId + ' · ' + r.nombre }; }) }) +
-      fld('dSede', 'Sede de despacho', 'CEDI-BOG', { select: sedes.map(function (s) { return { v: s.id, l: s.nombre }; }) }) + fld('dSeg', 'Vendedor asignado', c.vendedor || A.asesores && A.asesores[0] || 'Julián Ospina', { hint: 'Recibe las alertas de entregas fallidas.' }) +
+      fld('dSede', 'Sede de despacho', 'CEDI-URI', { select: sedes.map(function (s) { return { v: s.id, l: s.nombre }; }) }) + fld('dSeg', 'Vendedor asignado', c.vendedor || A.asesores && A.asesores[0] || 'Julián Ospina', { hint: 'Recibe las alertas de entregas fallidas.' }) +
       '</div></section>' +
       '<section><h3 class="sec-title">Completitud</h3>' + checkRows(c) + '</section>' +
       '<div class="row gap-3"><button type="button" class="btn btn-primary" id="dSave">Guardar cambios</button><span class="muted t-13" id="dMsg"></span></div></div>';
@@ -550,12 +550,12 @@ UI.ready(function () {
   }
 
   /* ---------- sincronizar desde SAP / Data Lake (HU-040) ---------- */
-  var synced = false, NUEVOS = [['Ferretería Los Álamos Sopó', 'F', 'sop', 'Los Álamos'], ['Construcciones Andina Cajicá S.A.S.', 'C', 'caj', 'Río Grande']];
+  var synced = false, NUEVOS = [['Ferretería Los Cedros Neira', 'F', 'nei', 'Los Cedros'], ['Construcciones Andina Salamina S.A.S.', 'C', 'sal', 'La Palma']];
   function addNewClients() {
     NUEVOS.forEach(function (n, i) {
-      var mu = MUNIS[{ sop: 'Sopó', caj: 'Cajicá' }[n[2]]]; if (!mu) mu = MUNIS['Chía'] || MUNIS[MUNI_LIST[0]];
-      var nm = i ? { n: 'Fabio Quintero', c: 'Residente de obra' } : { n: 'Rocío Acosta', c: 'Almacenista' }, mname = { sop: 'Sopó', caj: 'Cajicá' }[n[2]] || 'Chía', ref = A.clientes.filter(function (x) { return x.municipio === mname; })[0] || A.clientes[0];
-      var c = { clienteIdSAP: 'CL' + (1005800 + i * 23), nit: i ? '901.482.337-5' : '860.511.904-2', razonSocial: n[0], tipo: n[1] === 'C' ? 'Constructora' : 'Ferretería', tipoCodigo: n[1], direccionEntrega: i ? 'Autopista Norte Km 28, vereda Río Grande' : 'Cra 4 # 3-20, Centro', municipio: mname, localidad: null, departamento: 'Cundinamarca', barrio: n[3], zona: mu.zona, rutaId: ref.rutaId, municipioKey: n[2], latitud: +mu.lat.toFixed(5), longitud: +mu.lng.toFixed(5), ventanaInicio: '07:00', ventanaFin: '16:00', restricciones: [], contacto: { nombre: nm.n, cargo: nm.c, telefono: '31' + (i ? '8' : '2') + ' 604 ' + (i ? '1129' : '7740'), correo: nm.n.split(' ')[0].toLowerCase() + '@' + (i ? 'andina.com.co' : 'losalamos.com.co') }, descargueMin: i ? 45 : 25, frecuencia: 'Semanal', calidadDireccion: 'Por validar', estado: 'Activo', sincronizado: nowIso(), vendedor: null, cupoCreditoCOP: 80000000 };
+      var mu = MUNIS[{ nei: 'Neira', sal: 'Salamina' }[n[2]]]; if (!mu) mu = MUNIS['Aranzazu'] || MUNIS[MUNI_LIST[0]];
+      var nm = i ? { n: 'Fabio Quintero', c: 'Residente de obra' } : { n: 'Rocío Acosta', c: 'Almacenista' }, mname = { nei: 'Neira', sal: 'Salamina' }[n[2]] || 'Aranzazu', ref = A.clientes.filter(function (x) { return x.municipio === mname; })[0] || A.clientes[0];
+      var c = { clienteIdSAP: 'CL' + (1005800 + i * 23), nit: i ? '901.482.337-5' : '860.511.904-2', razonSocial: n[0], tipo: n[1] === 'C' ? 'Constructora' : 'Ferretería', tipoCodigo: n[1], direccionEntrega: i ? 'Autopista Norte Km 28, vereda Río Grande' : 'Cra 4 # 3-20, Centro', municipio: mname, localidad: null, departamento: 'Caldas', barrio: n[3], zona: mu.zona, rutaId: ref.rutaId, municipioKey: n[2], latitud: +mu.lat.toFixed(5), longitud: +mu.lng.toFixed(5), ventanaInicio: '07:00', ventanaFin: '16:00', restricciones: [], contacto: { nombre: nm.n, cargo: nm.c, telefono: '31' + (i ? '8' : '2') + ' 604 ' + (i ? '1129' : '7740'), correo: nm.n.split(' ')[0].toLowerCase() + '@' + (i ? 'andina.com.co' : 'losalamos.com.co') }, descargueMin: i ? 45 : 25, frecuencia: 'Semanal', calidadDireccion: 'Por validar', estado: 'Activo', sincronizado: nowIso(), vendedor: null, cupoCreditoCOP: 80000000 };
       A.clientes.push(c); A.idx.clientes[c.clienteIdSAP] = c;
     });
   }
@@ -588,7 +588,7 @@ UI.ready(function () {
       UI.toast(first ? 'Sincronización completa: ' + nuevos + ' clientes nuevos, ' + stats().p + ' sin georreferencia.' : 'El maestro ya estaba al día.', first ? 'warning' : 'success');
       var rr = $('#syRetry', m.el); if (rr) rr.onclick = function () {
         rr.disabled = true; rr.textContent = 'Reintentando…';
-        setTimeout(function () { NUEVOS.forEach(function (x, i) { var c = A.clientes[A.clientes.length - NUEVOS.length + i]; if (i === 0) { c.calidadDireccion = 'Aproximada'; c.latitud = +(c.latitud + 0.004).toFixed(5); c.longitud = +(c.longitud - 0.003).toFixed(5); } }); refreshAll(); body.innerHTML = '<div class="stack">' + UI.banner({ tone: 'success', title: 'Coordenadas recibidas para 1 de 2 clientes', text: 'Construcciones Andina Cajicá sigue sin coordenadas válidas en el Data Lake. Ubícalo manualmente desde su ficha.' }) + '<div class="row gap-2"><button type="button" class="btn btn-secondary btn-sm" id="syOpen">Abrir ficha</button><a class="btn btn-ghost btn-sm" href="integraciones.html">Ver cola del Data Lake</a></div></div>'; $('#syOpen', m.el).onclick = function () { m.close(); openClient(A.clientes[A.clientes.length - 1].clienteIdSAP, 'cd-dir'); }; UI.toast('Reintento terminado: 1 cliente recibió coordenadas aproximadas.', 'success'); }, 900);
+        setTimeout(function () { NUEVOS.forEach(function (x, i) { var c = A.clientes[A.clientes.length - NUEVOS.length + i]; if (i === 0) { c.calidadDireccion = 'Aproximada'; c.latitud = +(c.latitud + 0.004).toFixed(5); c.longitud = +(c.longitud - 0.003).toFixed(5); } }); refreshAll(); body.innerHTML = '<div class="stack">' + UI.banner({ tone: 'success', title: 'Coordenadas recibidas para 1 de 2 clientes', text: 'Construcciones Andina Salamina sigue sin coordenadas válidas en el Data Lake. Ubícalo manualmente desde su ficha.' }) + '<div class="row gap-2"><button type="button" class="btn btn-secondary btn-sm" id="syOpen">Abrir ficha</button><a class="btn btn-ghost btn-sm" href="integraciones.html">Ver cola del Data Lake</a></div></div>'; $('#syOpen', m.el).onclick = function () { m.close(); openClient(A.clientes[A.clientes.length - 1].clienteIdSAP, 'cd-dir'); }; UI.toast('Reintento terminado: 1 cliente recibió coordenadas aproximadas.', 'success'); }, 900);
       };
     }
   }

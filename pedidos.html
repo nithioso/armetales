@@ -153,7 +153,7 @@ UI.ready(function () {
     columns: [
       { key: 'pedidoId', label: 'Pedido', mono: true },
       { key: 'cliente', label: 'Cliente', title: true, render: function (r) { return '<span class="cell-main">' + esc(r.cliente) + '</span><div class="cell-sub">' + r.lineas.length + ' ' + plural(r.lineas.length, 'ítem', 'ítems') + ' · ' + esc(r.ordenCompra || 'sin OC') + '</div>'; } },
-      { key: 'municipio', label: 'Municipio', hideMobile: true, render: function (r) { return esc(r.municipio.replace('Bogotá · ', 'Bogotá, ')); } },
+      { key: 'municipio', label: 'Municipio', hideMobile: true, render: function (r) { return esc(r.municipio.replace('Manizales · ', 'Manizales, ')); } },
       { key: 'entregaSolicitada', label: 'Entrega solicitada', render: function (r) { var hoy = r.entregaSolicitada <= A.ymd(0) && ABIERTOS.indexOf(r.estado) > -1; return '<span class="nowrap">' + F.fecha(r.entregaSolicitada) + '</span>' + (hoy ? ' <span class="chip chip-sm chip-warning no-dot">Hoy</span>' : ''); } },
       { key: 'pesoKg', label: 'Peso', num: true, render: function (r) { return F.kg(r.pesoKg); } },
       { key: 'estado', label: 'Estado', render: function (r) { return UI.chip(r.estado); } },
@@ -316,11 +316,11 @@ UI.ready(function () {
   function rand(n) { return Math.floor(Math.random() * n); }
   function genPedido() {
     var cli = A.clientes.filter(function (c) { return c.estado === 'Activo'; }); cli = cli[rand(cli.length)];
-    var pool = A.productos.filter(function (x) { return x.estado === 'Activo' && x.stock['CEDI-BOG'] && x.stock['CEDI-BOG'].disponible > 60; }), used = {}, ls = [];
+    var pool = A.productos.filter(function (x) { return x.estado === 'Activo' && x.stock['CEDI-URI'] && x.stock['CEDI-URI'].disponible > 60; }), used = {}, ls = [];
     for (var i = 0, n = 1 + rand(3); i < n; i++) { var pr = pool[rand(pool.length)]; if (used[pr.skuSAP]) continue; used[pr.skuSAP] = 1; var q = pr.pesoKg > 100 ? 1 + rand(3) : 6 + rand(30); ls.push({ sku: pr.skuSAP, descripcion: pr.descripcion, cantidad: q, unidad: pr.unidadBase, pesoKg: Math.round(q * pr.pesoKg * 10) / 10, volumenM3: Math.round(q * pr.volumenM3 * 1000) / 1000 }); }
     var mx = 0; A.pedidos.forEach(function (p) { var k = parseInt(p.pedidoId.slice(3), 10); if (k > mx) mx = k; });
     var kg = ls.reduce(function (s, l) { return s + l.pesoKg; }, 0), m3 = ls.reduce(function (s, l) { return s + l.volumenM3; }, 0), ase = A.pedidos[rand(A.pedidos.length)].asesor, id = 'ES-' + (mx + 1 + rand(3));
-    return { pedidoId: id, pedidoIdOrigen: id, origen: 'Easy Sales', clienteId: cli.clienteIdSAP, cliente: cli.razonSocial, rutaId: cli.rutaId, municipio: cli.municipio === 'Bogotá' ? 'Bogotá · ' + cli.localidad : cli.municipio, fecha: new Date().toISOString(), entregaSolicitada: A.ymd(2 + rand(2)), lineas: ls, estado: 'Recibido', prioridad: ['Baja', 'Media', 'Media'][rand(3)], asesor: ase, ordenCompra: 'OC-' + (10000 + rand(89999)), bodegaId: 'CEDI-BOG', pesoKg: Math.round(kg * 10) / 10, volumenM3: Math.round(m3 * 100) / 100, valorCOP: Math.round(kg * (2100 + rand(900)) / 1000) * 1000, despachoId: null, observaciones: '', modificado: false, historial: [{ estado: 'Recibido', fechaHora: new Date().toISOString(), usuarioId: 'Sistema' }] };
+    return { pedidoId: id, pedidoIdOrigen: id, origen: 'Easy Sales', clienteId: cli.clienteIdSAP, cliente: cli.razonSocial, rutaId: cli.rutaId, municipio: cli.municipio === 'Manizales' ? 'Manizales · ' + cli.localidad : cli.municipio, fecha: new Date().toISOString(), entregaSolicitada: A.ymd(2 + rand(2)), lineas: ls, estado: 'Recibido', prioridad: ['Baja', 'Media', 'Media'][rand(3)], asesor: ase, ordenCompra: 'OC-' + (10000 + rand(89999)), bodegaId: 'CEDI-URI', pesoKg: Math.round(kg * 10) / 10, volumenM3: Math.round(m3 * 100) / 100, valorCOP: Math.round(kg * (2100 + rand(900)) / 1000) * 1000, despachoId: null, observaciones: '', modificado: false, historial: [{ estado: 'Recibido', fechaHora: new Date().toISOString(), usuarioId: 'Sistema' }] };
   }
   $('#importBtn').addEventListener('click', function () {
     var ultima = A.conexiones.filter(function (c) { return c.sistema === 'Easy Sales'; })[0];

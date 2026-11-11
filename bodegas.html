@@ -214,7 +214,7 @@ UI.ready(function () {
     var seen = {};
     A.ubicaciones.filter(function (u) { return u.bodegaId === b.id; }).forEach(function (u) { if (!seen[u.zona]) { seen[u.zona] = 1; AREAS.push({ bodegaId: b.id, codigo: u.zona, nombre: u.zonaNombre, tipo: 'Almacenamiento' }); } });
     AREAS.push({ bodegaId: b.id, codigo: 'MR', nombre: 'Muelle de recibo', tipo: 'Recibo' }, { bodegaId: b.id, codigo: 'MD', nombre: 'Muelle de despacho', tipo: 'Despacho' });
-    if (b.id === 'CEDI-BOG') AREAS.push({ bodegaId: b.id, codigo: 'CU', nombre: 'Cuarentena y calidad', tipo: 'Cuarentena' });
+    if (b.id === 'CEDI-URI') AREAS.push({ bodegaId: b.id, codigo: 'CU', nombre: 'Cuarentena y calidad', tipo: 'Cuarentena' });
   });
   function areasOf(id) { return AREAS.filter(function (a) { return a.bodegaId === (id || S.bod); }); }
   function storageAreas(id) { return areasOf(id).filter(function (a) { return a.tipo === 'Almacenamiento'; }).sort(function (a, b) { return a.codigo < b.codigo ? -1 : 1; }); }
@@ -624,10 +624,10 @@ UI.ready(function () {
     if (pl) { switchBod(pl.dataset.bplan); goTab('pnPlano'); }
   });
   function bodModal(b) {
-    var edit = !!b; b = b || { nombre: '', tipo: 'Bodega', ciudad: '', direccion: '', responsable: '', capacidadM3: '', corteHora: '15:00' };
+    var edit = !!b; b = b || { nombre: '', tipo: 'Centro de despacho', ciudad: '', direccion: '', responsable: '', capacidadM3: '', corteHora: '15:00' };
     UI.modal({ title: edit ? 'Editar bodega' : 'Crear bodega', subtitle: edit ? b.nombre : 'Se sincroniza con el maestro de sedes', width: 580,
-      body: '<div class="form-grid c2"><div class="field span-2"><label class="label" for="bbN">Nombre</label><input class="input" id="bbN" value="' + esc(b.nombre) + '" placeholder="Ej. Bodega Mosquera"><span class="error-text" id="bbNE" hidden></span></div>' +
-        '<div class="field"><label class="label" for="bbT">Tipo</label><select class="select" id="bbT">' + ['CEDI', 'Bodega', 'Sede'].map(function (t) { return '<option' + (b.tipo === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select></div>' +
+      body: '<div class="form-grid c2"><div class="field span-2"><label class="label" for="bbN">Nombre</label><input class="input" id="bbN" value="' + esc(b.nombre) + '" placeholder="Ej. Centro Neira"><span class="error-text" id="bbNE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="bbT">Tipo</label><select class="select" id="bbT">' + ['CEDI', 'Centro de despacho', 'Bodega'].map(function (t) { return '<option' + (b.tipo === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select></div>' +
         '<div class="field"><label class="label" for="bbC">Ciudad</label><input class="input" id="bbC" value="' + esc(b.ciudad) + '"><span class="error-text" id="bbCE" hidden></span></div>' +
         '<div class="field span-2"><label class="label" for="bbD">Dirección</label><input class="input" id="bbD" value="' + esc(b.direccion) + '"><span class="error-text" id="bbDE" hidden></span></div>' +
         '<div class="field"><label class="label" for="bbR">Responsable</label><input class="input" id="bbR" value="' + esc(b.responsable) + '"><span class="error-text" id="bbRE" hidden></span></div>' +
@@ -642,7 +642,7 @@ UI.ready(function () {
         var v = +g('bbV').value; chk('bbV', v >= 100 && v <= 20000 ? '' : 'La capacidad debe estar entre 100 y 20.000 m³.'); if (!ok) return false;
         var data = { nombre: nom, tipo: g('bbT').value, ciudad: g('bbC').value.trim(), direccion: g('bbD').value.trim(), responsable: g('bbR').value.trim(), capacidadM3: v, corteHora: g('bbH').value };
         if (edit) { Object.assign(b, data); toast('Bodega «' + nom + '» actualizada.', 'success'); }
-        else { var nb = Object.assign({ id: 'BOD-' + nom.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() + (BODS.length + 1), principal: false, activa: true, posiciones: 0, consolidacionMin: 60, lat: 4.7, lng: -74.1 }, data); BODS.push(nb); AREAS.push({ bodegaId: nb.id, codigo: 'MR', nombre: 'Muelle de recibo', tipo: 'Recibo' }, { bodegaId: nb.id, codigo: 'MD', nombre: 'Muelle de despacho', tipo: 'Despacho' }); toast('Bodega «' + nom + '» creada. Define su layout para empezar a recibir mercancía.', 'success'); }
+        else { var nb = Object.assign({ id: 'BOD-' + nom.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() + (BODS.length + 1), principal: false, activa: true, posiciones: 0, consolidacionMin: 60, lat: 5.05, lng: -75.5 }, data); BODS.push(nb); AREAS.push({ bodegaId: nb.id, codigo: 'MR', nombre: 'Muelle de recibo', tipo: 'Recibo' }, { bodegaId: nb.id, codigo: 'MD', nombre: 'Muelle de despacho', tipo: 'Despacho' }); toast('Bodega «' + nom + '» creada. Define su layout para empezar a recibir mercancía.', 'success'); }
         fillSel(); refreshAll();
       } }] });
   }
@@ -704,8 +704,8 @@ UI.ready(function () {
   $('#bodSel').addEventListener('change', function (e) { switchBod(e.target.value); toast('Mostrando ' + bod().nombre + '.', 'info', { duration: 2200 }); });
   var tabsApi = UI.tabs($('#tabs'));
 
-  var pb = UI.param('bodega'); S.bod = BODS.some(function (b) { return b.id === pb; }) ? pb : (BODS.some(function (b) { return b.id === UI.sede().id; }) ? UI.sede().id : 'CEDI-BOG');
-  if (!locs().length && !pb) S.bod = 'CEDI-BOG';
+  var pb = UI.param('bodega'); S.bod = BODS.some(function (b) { return b.id === pb; }) ? pb : (BODS.some(function (b) { return b.id === UI.sede().id; }) ? UI.sede().id : 'CEDI-URI');
+  if (!locs().length && !pb) S.bod = 'CEDI-URI';
   fillSel(); renderHead();
   $('#kpiRow').innerHTML = [1, 2, 3, 4].map(function () { return '<div class="card kpi"><span class="skeleton sk-line" style="width:50%"></span><span class="skeleton" style="height:34px;width:60%"></span><span class="skeleton sk-line" style="width:70%"></span></div>'; }).join('');
   $('#planoHost').innerHTML = '<div class="zones">' + [1, 2, 3].map(function () { return '<div class="zone" style="padding:16px">' + UI.skeleton(5) + '</div>'; }).join('') + '</div>';

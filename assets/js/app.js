@@ -390,7 +390,7 @@ UI.map = function (host, o) {
   o = o || {};
   if (!window.L) { host.innerHTML = UI.empty({ icon: 'map', title: 'No se pudo cargar el mapa', text: 'Verifica la conexión a internet para ver las teselas.' }); return { map: null, pin: noop, vehicle: noop, route: noop, fit: noop, clear: noop, invalidate: noop, destroy: noop }; }
   var L = window.L; host.classList.add('map'); host.innerHTML = '';
-  var map = L.map(host, { center: o.center || [4.68, -74.14], zoom: o.zoom || 11, zoomControl: o.zoomControl !== false, scrollWheelZoom: false, attributionControl: true }); if (map.attributionControl) map.attributionControl.setPrefix(false);
+  var map = L.map(host, { center: o.center || [5.03, -75.55], zoom: o.zoom || 11, zoomControl: o.zoomControl !== false, scrollWheelZoom: false, attributionControl: true }); if (map.attributionControl) map.attributionControl.setPrefix(false);
   var ts = tileSet(), tiles = [L.tileLayer(ts.base, { maxNativeZoom: 16, maxZoom: 18, attribution: 'Tiles © Esri — Esri, DeLorme, NAVTEQ' }).addTo(map), L.tileLayer(ts.labels, { maxNativeZoom: 16, maxZoom: 18, opacity: .9 }).addTo(map)], layer = L.featureGroup().addTo(map);
   if (o.scrollZoom) map.scrollWheelZoom.enable(); else { map.on('click', function () { map.scrollWheelZoom.enable(); }); host.addEventListener('mouseleave', function () { map.scrollWheelZoom.disable(); }); }
   var api = {

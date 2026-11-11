@@ -165,7 +165,7 @@ UI.ready(function () {
     AJ.push(o); d.ajusteId = o.id; return o;
   }
   (function () {
-    var cedi = DIFS.filter(function (d) { return d.bodegaId === 'CEDI-BOG'; }), pool = cedi.filter(function (d) { return d.estado === 'Sin resolver'; }).sort(function (a, b) { return b.valor - a.valor; });
+    var cedi = DIFS.filter(function (d) { return d.bodegaId === 'CEDI-URI'; }), pool = cedi.filter(function (d) { return d.estado === 'Sin resolver'; }).sort(function (a, b) { return b.valor - a.valor; });
     var paola = ACTORS[2], hec = ACTORS[1], lau = ACTORS[0], now = A.ahora.getTime();
     var a1 = pool[0] && mkAj(pool[0], 'Pendiente de aprobación', paola, { fecha: now - 5 * 3600000, just: 'Diferencia confirmada en dos conteos. No hay recibos pendientes ni traslados en tránsito.' });
     if (a1) { pool[0].estado = 'Ajuste solicitado'; a1.eventos = [ev(a1.fecha, paola.nombre, 'Solicitó el ajuste de ' + sgn(a1.dif) + ' unidades')]; }
@@ -181,12 +181,12 @@ UI.ready(function () {
   var RANK = [];
   function buildRank() {
     var seed = 5; function rnd() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
-    var skus = {}; A.inventario.filter(function (r) { return r.bodegaId === 'CEDI-BOG'; }).forEach(function (r) { skus[r.sku] = 1; });
+    var skus = {}; A.inventario.filter(function (r) { return r.bodegaId === 'CEDI-URI'; }).forEach(function (r) { skus[r.sku] = 1; });
     var res = {}; A.reservas.filter(function (r) { return r.estado === 'Activa'; }).forEach(function (r) { res[r.sku] = (res[r.sku] || 0) + r.cantidad; });
     var nc = {}; A.novedades.forEach(function (n) { if (n.sku && n.notaCreditoCOP) { var o = nc[n.sku] || (nc[n.sku] = { n: 0, cop: 0 }); o.n++; o.cop += n.notaCreditoCOP; } });
     var list = Object.keys(skus).map(function (sku) {
       var p = prod(sku), o = nc[sku] || { n: 0, cop: 0 }; if (!nc[sku] && rnd() < 0.3) { o = { n: 1 + Math.floor(rnd() * 3), cop: 0 }; o.cop = Math.round(o.n * precio(sku) * (2 + rnd() * 18) / 1000) * 1000; }
-      var difs = DIFS.filter(function (d) { return d.sku === sku && d.bodegaId === 'CEDI-BOG'; }).length, rows = A.inventario.filter(function (r) { return r.bodegaId === 'CEDI-BOG' && r.sku === sku; });
+      var difs = DIFS.filter(function (d) { return d.sku === sku && d.bodegaId === 'CEDI-URI'; }).length, rows = A.inventario.filter(function (r) { return r.bodegaId === 'CEDI-URI' && r.sku === sku; });
       var last = rows.map(function (r) { return r.fechaConteo; }).filter(Boolean).sort().pop(), dias = last ? -dayDiff(last) : 90;
       return { sku: sku, desc: p.descripcion, nc: o.n, ncCOP: o.cop, difs: difs, rot: res[sku] || 0, dias: dias };
     });
@@ -502,14 +502,14 @@ UI.ready(function () {
   function renderEx() {
     var ser = A.kpis.serie, prev = ser.slice(0, 15).reduce(function (a, x) { return a + x.exactitudInvPct; }, 0) / 15, cur = exactitudAvg(15), g = exactitudAvg(30), meta = A.kpis.metas.exactitudInvPct;
     var counted = A.inventario.filter(function (r) { return r.conteo != null; }).length, ok0 = A.inventario.filter(function (r) { return r.conteo != null && !r.diferencia; }).length;
-    var accB = {}; ['CEDI-BOG', 'BOD-FUN'].forEach(function (b) { accB[b] = unitAcc(A.inventario.filter(function (r) { return r.bodegaId === b && r.conteo != null; }).map(function (r) { return { dif: r.diferencia || 0, sistema: r.stockFisico }; })); });
+    var accB = {}; ['CEDI-URI', 'CD-CHI'].forEach(function (b) { accB[b] = unitAcc(A.inventario.filter(function (r) { return r.bodegaId === b && r.conteo != null; }).map(function (r) { return { dif: r.diferencia || 0, sistema: r.stockFisico }; })); });
     $('#exKpis').innerHTML =
       UI.kpi({ label: 'Exactitud global · 30 días', icon: 'target', valueHtml: F.num(g, 1) + '<small>%</small>', delta: { v: Math.abs(cur - prev) < 0.05 ? 0 : cur - prev, unit: ' pts', better: 'up' }, note: 'Meta ' + F.num(meta, 1) + ' %', spark: ser.slice(-14).map(function (x) { return x.exactitudInvPct; }), sparkColor: 'var(--green)' }) +
       UI.kpi({ label: 'Cumplimiento de la meta', icon: 'gauge', valueHtml: (g >= meta ? 'Cumple' : 'Por debajo'), note: g >= meta ? 'Superas la meta por ' + F.num(g - meta, 1) + ' pts' : 'Faltan ' + F.num(meta - g, 1) + ' pts para la meta' }) +
       UI.kpi({ label: 'Ubicaciones contadas', icon: 'scan', value: counted, note: ok0 + ' sin diferencia · ' + (counted - ok0) + ' con diferencia' }) +
       UI.kpi({ label: 'Valor de diferencias abiertas', icon: 'alert-triangle', valueHtml: F.num(DIFS.filter(function (d) { return d.estado === 'Sin resolver' || d.estado === 'Ajuste solicitado'; }).reduce(function (s, d) { return s + d.valor; }, 0) / 1000, 0) + '<small>mil COP</small>', note: DIFS.filter(function (d) { return d.estado === 'Sin resolver'; }).length + ' sin resolver' });
     UI.chart.line($('#exTrend'), { labels: ser.map(function (x) { return x.fecha.slice(8) + '/' + x.fecha.slice(5, 7); }), datasets: [{ label: 'Exactitud', data: ser.map(function (x) { return x.exactitudInvPct; }), color: '#15915A', fill: true }], unit: '%', dec: 1, min: 96, max: 100, target: { value: meta, label: 'Meta' }, maxXTicks: 8 });
-    $('#exBod').innerHTML = ['CEDI-BOG', 'BOD-FUN'].map(function (b) { var v = accB[b]; return '<div><div class="row between"><strong>' + esc(bodName(b)) + '</strong><span class="num strong">' + (v == null ? '—' : F.num(v, 2) + ' %') + '</span></div>' + (v == null ? '' : UI.meter(v, 100, { level: v >= meta ? 'ok' : 'warn', label: 'Exactitud de ' + bodName(b), showValue: false, mark: meta })) + '<div class="muted t-12 mt-1">' + A.inventario.filter(function (r) { return r.bodegaId === b && r.conteo != null; }).length + ' ubicaciones contadas · la marca indica la meta de ' + F.num(meta, 1) + ' %</div></div>'; }).join('') + '<p class="muted t-12">Exactitud por unidades: 1 − |diferencia| ÷ stock del sistema, promediada sobre las ubicaciones contadas.</p>';
+    $('#exBod').innerHTML = ['CEDI-URI', 'CD-CHI'].map(function (b) { var v = accB[b]; return '<div><div class="row between"><strong>' + esc(bodName(b)) + '</strong><span class="num strong">' + (v == null ? '—' : F.num(v, 2) + ' %') + '</span></div>' + (v == null ? '' : UI.meter(v, 100, { level: v >= meta ? 'ok' : 'warn', label: 'Exactitud de ' + bodName(b), showValue: false, mark: meta })) + '<div class="muted t-12 mt-1">' + A.inventario.filter(function (r) { return r.bodegaId === b && r.conteo != null; }).length + ' ubicaciones contadas · la marca indica la meta de ' + F.num(meta, 1) + ' %</div></div>'; }).join('') + '<p class="muted t-12">Exactitud por unidades: 1 − |diferencia| ÷ stock del sistema, promediada sobre las ubicaciones contadas.</p>';
     var sa = skuAcc(null).sort(function (a, b) { return a.acc - b.acc; }).slice(0, 8);
     $('#exSkuSub').textContent = 'Exactitud por unidades · la barra muestra la desviación contra el sistema';
     var mxd = Math.max.apply(null, sa.map(function (x) { return 100 - x.acc; })) || 1;
@@ -540,7 +540,7 @@ UI.ready(function () {
   function switchBod(id) { S.bod = id; S.day = null; fillSel(); refreshAll(); }
   $('#bodSel').addEventListener('change', function (e) { switchBod(e.target.value); toast('Mostrando ' + bodName(S.bod) + '.', 'info', { duration: 2200 }); });
   var tabsApi = UI.tabs($('#tabs'), { onChange: function (id) { if (id === 'pnEx' && rankTbl) renderEx(); } });
-  var pb = UI.param('bodega'); S.bod = A.sedes.some(function (s) { return s.id === pb; }) ? pb : (A.inventario.some(function (r) { return r.bodegaId === UI.sede().id; }) ? UI.sede().id : 'CEDI-BOG');
+  var pb = UI.param('bodega'); S.bod = A.sedes.some(function (s) { return s.id === pb; }) ? pb : (A.inventario.some(function (r) { return r.bodegaId === UI.sede().id; }) ? UI.sede().id : 'CEDI-URI');
   fillSel();
   $('#kpiRow').innerHTML = [1, 2, 3, 4, 5].map(function () { return '<div class="card kpi"><span class="skeleton sk-line" style="width:50%"></span><span class="skeleton" style="height:34px;width:60%"></span><span class="skeleton sk-line" style="width:70%"></span></div>'; }).join('');
   stockTbl.setLoading(true);
