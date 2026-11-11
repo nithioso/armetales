@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notificaciones operativas · Armetales</title>
+<meta name="description" content="Bandeja de notificaciones y reglas por evento de Armetales: umbrales, canales y destinatarios por rol o usuario.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de notificaciones (tokens y componentes viven en app.css) */
+  .nt-tools { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .layout-main-side > * { min-width: 0; } .nt-tools .filter-bar { flex-wrap: wrap; overflow: visible; } .nt-tools > * { min-width: 0; }
+  .nt-day { padding: 8px 16px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); background: var(--surface-2); border-bottom: 1px solid var(--border); }
+  .nt-row { display: flex; gap: 12px; padding: 14px 16px 14px 24px; border-bottom: 1px solid var(--border); position: relative; align-items: flex-start; }
+  .nt-row:last-child { border-bottom: 0; }
+  .nt-row.is-unread::before { content: ""; position: absolute; left: 9px; top: 24px; width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+  .nt-row .nt-main { flex: 1; min-width: 0; }
+  .nt-row .nt-title { font-weight: 600; font-size: 14px; line-height: 1.35; }
+  .nt-row.is-read .nt-title { font-weight: 500; }
+  .nt-row .nt-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 12.5px; color: var(--text-2); margin-top: 6px; }
+  .nt-row .nt-act { display: flex; gap: 6px; align-items: center; flex: none; }
+  @media (max-width: 639px) { .nt-row { flex-wrap: wrap; } .nt-row .nt-act { width: 100%; padding-left: 44px; } }
+  .nt-side-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 28px; gap: 10px; align-items: center; padding: 6px 0; font-size: 13px; }
+  .nt-side-row b { text-align: right; font-variant-numeric: tabular-nums; }
+  .rl-group { margin-bottom: 8px; }
+  .rl-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 1100px) { .rl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .rl-card.is-off { background: var(--surface-2); }
+  .rl-card.is-off .rl-body { opacity: .6; }
+  .rl-head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; padding: 16px 16px 0; }
+  .rl-head h3 { font-size: 15px; font-weight: 600; font-family: var(--font-ui); line-height: 1.3; }
+  .rl-body { padding: 12px 16px 16px; display: grid; gap: 16px; }
+  .rl-sec { display: grid; gap: 8px; }
+  .rl-lab { font-size: 12px; font-weight: 600; color: var(--text-2); }
+  .ch-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ch-opt { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface); min-height: 44px; font-size: 13px; flex-wrap: nowrap; }
+  .ch-opt:has(input:checked) { border-color: var(--blue-line); background: var(--blue-bg); }
+  .ch-opt .tag { height: 18px; font-size: 10.5px; padding: 0 6px; }
+  @media (max-width: 479px) { .ch-opt { flex-wrap: wrap; gap: 4px 8px; } }
+  .rcp { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .rcp-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 10px; border-radius: 999px; background: var(--surface-3); font-size: 12.5px; font-weight: 500; }
+  .rcp-chip.is-usr { background: var(--blue-bg); color: var(--blue-fg); }
+  .rcp-chip button { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: inherit; opacity: .7; }
+  .rcp-chip button:hover { opacity: 1; background: color-mix(in srgb, currentColor 14%, transparent); }
+  .rcp-chip .icon { width: 12px; height: 12px; }
+  .rl-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 4px; border-top: 1px solid var(--border); margin-top: 2px; padding-top: 12px; }
+  .pv { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); padding: 12px; border: 1px dashed var(--border-strong); border-radius: var(--r-ctl); background: var(--surface-2); }
+  @media (min-width: 720px) { .pv { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+  .pv-box { border: 1px solid var(--border); background: var(--surface); border-radius: var(--r-ctl); overflow: hidden; }
+  .pv-box .pv-cap { padding: 6px 12px; font-size: 11.5px; color: var(--text-3); border-bottom: 1px solid var(--border); background: var(--surface-2); }
+  .pv-box .notif-item { border-bottom: 0; padding: 12px; }
+  .pv-mail { padding: 10px 12px; font-size: 13px; }
+  .pv-mail .sub { font-weight: 600; margin-bottom: 6px; }
+  .savebar { position: sticky; bottom: 12px; z-index: 20; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-top: 16px; padding: 10px 14px; border: 1px solid var(--border-strong); border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow-2, 0 8px 24px rgba(0,0,0,.18)); }
+  .savebar[hidden] { display: none; }
+  .pick-list { max-height: 320px; overflow: auto; border: 1px solid var(--border); border-radius: var(--r-ctl); }
+  .pick-list .pk-h { padding: 6px 12px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); background: var(--surface-2); position: sticky; top: 0; }
+  .pick-list label { display: flex; padding: 10px 12px; border-top: 1px solid var(--border); min-height: 44px; align-items: center; }
+  .pick-list label .sub { color: var(--text-2); font-size: 12px; margin-left: auto; padding-left: 12px; }
+  .mini-stat { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .mini-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .mini-stat .l { font-size: 12px; color: var(--text-2); }
+  .num-in { display: inline-flex; align-items: center; gap: 8px; }
+  .num-in .input { width: 96px; text-align: center; font-variant-numeric: tabular-nums; }
+  .select.input-sm { padding-right: 30px; }
+  :root[data-theme="dark"] a.btn { color: var(--b-fg); } /* el color de enlace del tema oscuro pisaba el de los botones-enlace */
+</style>
+</head>
+<body data-page="notificaciones">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Administración</div>
+      <h1 class="page-title">Notificaciones operativas</h1>
+      <p class="page-desc">Qué avisos genera la plataforma, a quién llegan y por qué canal. Cada regla define el umbral que la dispara.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-secondary" id="testBtn"></button>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist" id="mainTabs" aria-label="Secciones de notificaciones">
+    <button class="tab" role="tab" type="button" aria-controls="p-bandeja" aria-selected="true" id="t-bandeja">Bandeja <span class="count" id="cntUnread"></span></button>
+    <button class="tab" role="tab" type="button" aria-controls="p-reglas" aria-selected="false" id="t-reglas">Reglas por evento</button>
+    <button class="tab" role="tab" type="button" aria-controls="p-historial" aria-selected="false" id="t-historial">Historial de envíos</button>
+  </div>
+
+  <div class="tab-panel section" id="p-bandeja" role="tabpanel" aria-labelledby="t-bandeja">
+    <div class="layout-main-side">
+      <div class="card">
+        <div class="nt-tools">
+          <div class="filter-bar" id="sevChips" role="group" aria-label="Filtrar por severidad"></div>
+          <div class="row gap-3">
+            <label class="switch"><input type="checkbox" id="onlyUnread"> Solo sin leer</label>
+            <button type="button" class="btn btn-secondary btn-sm" id="readAll">Marcar todas como leídas</button>
+          </div>
+        </div>
+        <div id="inbox"></div>
+      </div>
+      <aside class="stack" aria-label="Resumen">
+        <div class="card"><div class="card-head"><h2 class="card-title">Sin leer por severidad</h2></div><div class="card-body" id="sideSev"></div></div>
+        <div class="card"><div class="card-head"><h2 class="card-title">Reglas activas</h2></div><div class="card-body stack-sm" id="sideRules"></div></div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="tab-panel section" id="p-reglas" role="tabpanel" aria-labelledby="t-reglas" hidden>
+    <div id="rulesHost"></div>
+    <div class="savebar" id="saveBar" hidden role="region" aria-label="Cambios sin guardar">
+      <span class="strong" id="saveMsg"></span>
+      <span class="row gap-2"><button type="button" class="btn btn-ghost" id="discardBtn">Descartar</button><button type="button" class="btn btn-primary" id="saveBtn">Guardar reglas</button></span>
+    </div>
+  </div>
+
+  <div class="tab-panel section" id="p-historial" role="tabpanel" aria-labelledby="t-historial" hidden>
+    <div id="histTable"></div>
+  </div>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$;
+  var SEV = { peligro: { l: 'Crítica', tone: 'danger', ic: 'alert-circle' }, alerta: { l: 'Alerta', tone: 'warning', ic: 'alert-triangle' }, exito: { l: 'Éxito', tone: 'success', ic: 'check-circle' }, info: { l: 'Informativa', tone: 'info', ic: 'info' } };
+  function hash(s) { var h = 2166136261; s = String(s); for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function rng(seed) { var s = hash(seed) || 1; return function () { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+  var me = A.usuarioActual;
+
+  /* ---------- campana del shell ---------- */
+  function syncBell() {
+    var n = UI.unreadCount(), b = $('#bellBadge'), btn = $('#bellBtn');
+    if (n && !b && btn) { btn.insertAdjacentHTML('beforeend', '<span class="dot-badge" id="bellBadge"></span>'); b = $('#bellBadge'); }
+    if (b) { if (n) b.textContent = n; else b.remove(); }
+    $('#cntUnread').textContent = n; $('#cntUnread').hidden = !n;
+  }
+  function originHref(n) {
+    var r = n.ref || {}, id = r.id, d = n.destino || '#';
+    if (!id) return d;
+    if (r.tipo === 'pedido') return 'pedidos.html?id=' + encodeURIComponent(id);
+    if (r.tipo === 'despacho') return 'despachos.html?id=' + encodeURIComponent(id);
+    if (r.tipo === 'vehiculo') return 'vehiculos.html?placa=' + encodeURIComponent(id);
+    if (r.tipo === 'cliente') return 'clientes.html?id=' + encodeURIComponent(id);
+    return d;
+  }
+
+  /* ================= BANDEJA ================= */
+  var inb = { sev: '', unread: false };
+  function dayKey(iso) { var d = new Date(iso), t = new Date(); d.setHours(0, 0, 0, 0); t.setHours(0, 0, 0, 0); var diff = Math.round((t - d) / 864e5); return diff <= 0 ? 'Hoy' : diff === 1 ? 'Ayer' : 'Anteriores'; }
+  function renderInbox() {
+    var all = A.notificaciones.slice().sort(function (a, b) { return a.fechaHora < b.fechaHora ? 1 : -1; });
+    var cnt = { '': all.length }; Object.keys(SEV).forEach(function (k) { cnt[k] = all.filter(function (n) { return n.severidad === k; }).length; });
+    $('#sevChips').innerHTML = [['', 'Todas']].concat(Object.keys(SEV).map(function (k) { return [k, SEV[k].l + 's'.replace('s', k === 'exito' ? '' : 's')]; })).map(function (x) { return '<button type="button" class="filter-chip" data-s="' + x[0] + '" aria-pressed="' + (inb.sev === x[0]) + '">' + x[1].replace('Éxitos', 'Éxito').replace('Críticas', 'Críticas').replace('Informativass', 'Informativas') + ' <span class="n">' + cnt[x[0]] + '</span></button>'; }).join('');
+    var list = all.filter(function (n) { return (!inb.sev || n.severidad === inb.sev) && (!inb.unread || !n.leida); });
+    if (!list.length) { $('#inbox').innerHTML = UI.empty({ icon: 'inbox', title: inb.unread ? 'Estás al día' : 'Sin notificaciones', text: inb.unread ? 'No tienes notificaciones sin leer con este filtro.' : 'No hay notificaciones con este filtro. Cambia la severidad o ajusta las reglas por evento.' }); }
+    else {
+      var last = '', h = '';
+      list.forEach(function (n) {
+        var g = dayKey(n.fechaHora); if (g !== last) { h += '<div class="nt-day">' + g + '</div>'; last = g; }
+        var s = SEV[n.severidad] || SEV.info;
+        h += '<article class="nt-row ' + (n.leida ? 'is-read' : 'is-unread') + '" data-id="' + n.notifId + '"><span class="notif-ico ' + n.severidad + '">' + UI.icon(s.ic, 'icon-sm') + '</span><div class="nt-main"><div class="nt-title">' + (n.leida ? '' : '<span class="sr-only">Sin leer: </span>') + esc(n.titulo) + '</div><div class="t-13 muted" style="margin-top:2px">' + esc(n.texto) + '</div><div class="nt-meta"><span>' + F.relativo(n.fechaHora) + '</span><span aria-hidden="true">·</span><span>' + esc(n.tipo) + '</span>' + UI.chip(s.l, { tone: s.tone, small: true }) + '</div></div><div class="nt-act"><a class="btn btn-secondary btn-sm" href="' + esc(originHref(n)) + '" data-go="' + n.notifId + '">Ir al origen' + UI.icon('arrow-up-right', 'icon-sm') + '</a><button type="button" class="btn btn-ghost btn-icon btn-sm" data-toggle="' + n.notifId + '" aria-label="' + (n.leida ? 'Marcar como no leída' : 'Marcar como leída') + '" title="' + (n.leida ? 'Marcar como no leída' : 'Marcar como leída') + '">' + UI.icon(n.leida ? 'undo' : 'check') + '</button></div></article>';
+      });
+      $('#inbox').innerHTML = h;
+    }
+    $('#sideSev').innerHTML = Object.keys(SEV).map(function (k) { var u = all.filter(function (n) { return n.severidad === k && !n.leida; }).length; return '<div class="nt-side-row"><span>' + SEV[k].l + '</span>' + UI.meter(u, Math.max(1, all.filter(function (n) { return !n.leida; }).length), { level: k === 'peligro' ? 'crit' : k === 'alerta' ? 'warn' : k === 'exito' ? 'ok' : 'info', showValue: false, label: SEV[k].l }) + '<b>' + u + '</b></div>'; }).join('');
+    var act = rules.filter(function (r) { return r.activo; }).length;
+    $('#sideRules').innerHTML = '<div class="num-display t-28">' + act + '<span class="t-16 muted"> de ' + rules.length + ' eventos</span></div><p class="muted t-13">Los eventos activos generan avisos en la bandeja y envían los canales marcados.</p>' + UI.banner({ tone: 'info', text: 'SMS y WhatsApp están «por definir»: aún no hay proveedor contratado, así que esos envíos no se entregan.' }) + '<button type="button" class="btn btn-secondary btn-sm" id="goRules">Configurar reglas</button>';
+    $('#goRules').onclick = function () { tabs.select('p-reglas'); };
+    syncBell();
+  }
+  $('#sevChips').addEventListener('click', function (e) { var b = e.target.closest('[data-s]'); if (b) { inb.sev = b.dataset.s; renderInbox(); } });
+  $('#onlyUnread').addEventListener('change', function () { inb.unread = this.checked; renderInbox(); });
+  $('#readAll').addEventListener('click', function () { var n = UI.unreadCount(); if (!n) { UI.toast('No hay notificaciones sin leer.', 'info'); return; } A.notificaciones.forEach(function (x) { x.leida = true; }); renderInbox(); UI.toast(n + ' notificaciones marcadas como leídas.', 'success'); });
+  $('#inbox').addEventListener('click', function (e) {
+    var t = e.target.closest('[data-toggle]'), g = e.target.closest('[data-go]');
+    if (t) { var n = A.notificaciones.filter(function (x) { return x.notifId === t.dataset.toggle; })[0]; n.leida = !n.leida; renderInbox(); }
+    else if (g) { var m = A.notificaciones.filter(function (x) { return x.notifId === g.dataset.go; })[0]; m.leida = true; }
+  });
+
+  /* ================= REGLAS ================= */
+  var META = {
+    'RN-01': { desc: 'Cuando Preparación certifica un pedido y queda listo para despacho.', th: null },
+    'RN-02': { desc: 'Cuando se asigna un vehículo que no cumple capacidad, restricción de circulación o compatibilidad de producto.', th: null },
+    'RN-03': { desc: 'Cuando quedan pedidos sin certificar cerca de la hora de corte de la sede.', th: { label: 'Avisar con', unit: 'min antes del corte', min: 10, max: 240, step: 5 } },
+    'RN-04': { desc: 'Cuando la ETA de una parada supera la ventana horaria acordada con el cliente.', th: { label: 'Avisar si el retraso supera', unit: 'min sobre la ventana', min: 5, max: 120, step: 5 } },
+    'RN-05': { desc: 'Cuando una integración (SAP, Data Lake o Easy Sales) falla repetidamente.', th: { label: 'Avisar después de', unit: 'fallos consecutivos', min: 1, max: 10, step: 1 } },
+    'RN-06': { desc: 'Cuando la validación de stock deja un pedido sin existencias suficientes.', th: null },
+    'RN-07': { desc: 'Cuando el conductor registra una entrega fallida o parcial.', th: null },
+    'RN-08': { desc: 'Cuando un conteo cíclico difiere del inventario del sistema.', th: { label: 'Avisar si la diferencia supera', unit: '% del stock', min: 1, max: 20, step: 1 } }
+  };
+  var CH = [['app', 'En la app', false], ['correo', 'Correo', false], ['sms', 'SMS', true], ['whatsapp', 'WhatsApp', true]];
+  var rules = A.reglasNotificacion.map(function (r) {
+    var m = META[r.reglaId] || { desc: '', th: null }, num = r.umbral ? +(String(r.umbral).match(/\d+(?:[.,]\d+)?/) || [m.th ? m.th.min : 0])[0] : null;
+    var cn = r.canales.map(function (c) { return c.toLowerCase().indexOf('app') === 0 ? 'app' : c.toLowerCase().indexOf('correo') === 0 ? 'correo' : c.toLowerCase().indexOf('sms') === 0 ? 'sms' : 'whatsapp'; });
+    return { id: r.reglaId, evento: r.evento, hu: r.huId.replace('ARM-', ''), desc: m.desc, th: m.th, umbral: m.th ? num : null, activo: r.activo, canales: { app: cn.indexOf('app') > -1, correo: cn.indexOf('correo') > -1, sms: cn.indexOf('sms') > -1, whatsapp: cn.indexOf('whatsapp') > -1 }, dest: r.destinatarios.map(function (n) { return { t: 'rol', n: n }; }), open: false, err: {} };
+  });
+  function snap() { return JSON.stringify(rules.map(function (r) { return [r.id, r.activo, r.umbral, r.canales, r.dest]; })); }
+  var saved = snap(), attempted = false;
+  var FLOW = ['RN-01', 'RN-02', 'RN-03', 'RN-04', 'RN-05'];
+
+  function find(arr, f) { for (var i = 0; i < arr.length; i++) if (f(arr[i])) return arr[i]; }
+  function previewOf(r) {
+    var ped = find(A.pedidos, function (p) { return p.estado === 'Listo para despacho'; }) || A.pedidos[0], blo = find(A.pedidos, function (p) { return p.estado === 'Bloqueado por stock'; }) || A.pedidos[1];
+    var ruta = find(A.despachos, function (d) { return d.estado === 'En ruta'; }) || A.despachos[0], log = find(A.logs, function (l) { return l.estado === 'Error'; }) || A.logs[0], nov = find(A.novedades, function (n) { return n.tipo === 'Entrega fallida'; }) || A.novedades[0];
+    var corte = A.sedes[0].corteHora, ped0 = A.pedidos.filter(function (p) { return p.estado === 'En preparación' || p.estado === 'En firme'; }).length, th = r.umbral;
+    var m = {
+      'RN-01': { sev: 'exito', t: 'Pedido ' + ped.pedidoId + ' listo para despacho', x: ped.cliente + ' · ' + F.kg(ped.pesoKg) + '. Preparación certificada por el Jefe de bodega.', href: 'pedidos.html?id=' + ped.pedidoId },
+      'RN-02': { sev: 'alerta', t: 'Vehículo UFR 264 no apto para la ruta asignada', x: 'Tiene pico y placa hoy entre 16:00 y 19:00 en Bogotá. Reasigna el vehículo antes de confirmar el plan.', href: 'vehiculos.html?placa=UFR%20264' },
+      'RN-03': { sev: 'alerta', t: ped0 + ' pedidos con preparación sin cerrar', x: 'Faltan ' + (th || 60) + ' min para el corte de las ' + corte + ' en CEDI Bogotá.', href: 'preparacion.html' },
+      'RN-04': { sev: 'alerta', t: 'Retraso probable en ' + ruta.despachoId, x: 'La próxima parada superaría la ventana del cliente por más de ' + (th || 15) + ' minutos.', href: 'despachos.html?id=' + ruta.despachoId },
+      'RN-05': { sev: 'peligro', t: 'Error de integración con ' + log.sistemaOrigen, x: (th || 3) + ' fallos consecutivos. ' + (log.error || 'Sin detalle.'), href: 'integraciones.html' },
+      'RN-06': { sev: 'peligro', t: 'Pedido ' + blo.pedidoId + ' bloqueado por stock', x: 'Faltan ' + (blo.bloqueo ? blo.bloqueo.faltante : 'varias') + ' unidades de ' + (blo.bloqueo ? blo.bloqueo.descripcion : 'un SKU') + '.', href: 'pedidos.html?id=' + blo.pedidoId },
+      'RN-07': { sev: 'peligro', t: 'Entrega fallida en ' + nov.pedidoId, x: 'Motivo: ' + nov.motivo + '. Programa un reintento.', href: 'novedades.html' },
+      'RN-08': { sev: 'info', t: 'Conteo cíclico con diferencia mayor al ' + (th || 2) + ' %', x: 'La ubicación A-03-2-04 difiere 12 unidades contra el sistema.', href: 'inventario.html' }
+    }[r.id];
+    return m;
+  }
+  function chName(k) { return CH.filter(function (c) { return c[0] === k; })[0][1]; }
+  function ruleCard(r) {
+    var e = r.err || {}, off = !r.activo;
+    var thH = r.th ? '<div class="rl-sec"><div class="rl-lab">Umbral</div><div class="num-in"><span class="t-13">' + r.th.label + '</span><input class="input" type="number" id="th-' + r.id + '" data-th="' + r.id + '" min="' + r.th.min + '" max="' + r.th.max + '" step="' + r.th.step + '" value="' + (r.umbral == null ? '' : r.umbral) + '" aria-label="' + r.th.label + ' ' + r.th.unit + '"' + (e.umbral ? ' aria-invalid="true"' : '') + (off ? ' disabled' : '') + '><span class="t-13">' + r.th.unit + '</span></div>' + (e.umbral ? '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + esc(e.umbral) + '</span>' : '') + '</div>' : '';
+    var chH = '<div class="rl-sec"><div class="rl-lab">Canales</div><div class="ch-grid" role="group" aria-label="Canales de ' + esc(r.evento) + '">' + CH.map(function (c) { return '<label class="ch-opt check"><input type="checkbox" data-ch="' + r.id + ':' + c[0] + '"' + (r.canales[c[0]] ? ' checked' : '') + (off ? ' disabled' : '') + '><span>' + c[1] + '</span>' + (c[2] ? '<span class="tag">por definir</span>' : '') + '</label>'; }).join('') + '</div>' + (e.canal ? '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + esc(e.canal) + '</span>' : (r.canales.sms || r.canales.whatsapp ? '<span class="hint">SMS y WhatsApp no se entregan hasta definir proveedor; el aviso sigue llegando por la app y el correo.</span>' : '')) + '</div>';
+    var dH = '<div class="rl-sec"><div class="rl-lab">Destinatarios</div><div class="rcp">' + (r.dest.length ? r.dest.map(function (d, i) { return '<span class="rcp-chip' + (d.t === 'usr' ? ' is-usr' : '') + '">' + UI.icon(d.t === 'usr' ? 'user' : 'users', 'icon-sm') + esc(d.n) + '<button type="button" data-rm="' + r.id + ':' + i + '" aria-label="Quitar a ' + esc(d.n) + '"' + (off ? ' disabled' : '') + '>' + UI.icon('x') + '</button></span>'; }).join('') : '<span class="muted t-13">Nadie recibirá este aviso.</span>') + '<button type="button" class="btn btn-secondary btn-sm" data-dest="' + r.id + '"' + (off ? ' disabled' : '') + '>' + UI.icon('plus') + 'Editar</button></div>' + (e.dest ? '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + esc(e.dest) + '</span>' : '') + '</div>';
+    var pv = previewOf(r), pvH = r.open ? '<div class="pv" id="pv-' + r.id + '"><div class="pv-box"><div class="pv-cap">Notificación en la app</div><div class="notif-item"><span class="notif-ico ' + pv.sev + '">' + UI.icon(SEV[pv.sev].ic, 'icon-sm') + '</span><span class="grow"><span class="strong t-13">' + esc(pv.t) + '</span><br><span class="t-13 muted">' + esc(pv.x) + '</span><br><span class="t-12 subtle">ahora · ' + esc(r.evento) + '</span></span></div></div><div class="pv-box"><div class="pv-cap">Correo electrónico</div><div class="pv-mail"><div class="sub">[Armetales] ' + esc(pv.t) + '</div><div class="muted">Hola, equipo:<br>' + esc(pv.x) + '<br><br><a href="' + esc(pv.href) + '">Abrir en la plataforma</a></div></div></div></div>' : '';
+    return '<article class="card rl-card' + (off ? ' is-off' : '') + '" id="rl-' + r.id + '"><div class="rl-head"><div><h3>' + esc(r.evento) + '</h3><div class="row gap-2 mt-1">' + UI.chip(off ? 'Inactiva' : 'Activa', { tone: off ? 'neutral' : 'success', small: true }) + '</div></div><label class="switch"><input type="checkbox" data-on="' + r.id + '"' + (r.activo ? ' checked' : '') + ' aria-label="Regla activa: ' + esc(r.evento) + '"><span class="sr-only">Activa</span></label></div>' +
+      '<div class="rl-body"><p class="t-13 muted" style="margin:0">' + esc(r.desc) + '</p>' + thH + chH + dH + '<div class="rl-foot"><button type="button" class="btn btn-ghost btn-sm" data-pv="' + r.id + '" aria-expanded="' + r.open + '">' + UI.icon('eye') + (r.open ? 'Ocultar vista previa' : 'Vista previa del mensaje') + '</button><button type="button" class="btn btn-secondary btn-sm ml-auto" data-test="' + r.id + '"' + (off ? ' disabled' : '') + '>' + UI.icon('send') + 'Enviar prueba</button></div>' + pvH + '</div></article>';
+  }
+  function renderRules() {
+    var flow = rules.filter(function (r) { return FLOW.indexOf(r.id) > -1; }), other = rules.filter(function (r) { return FLOW.indexOf(r.id) < 0; });
+    $('#rulesHost').innerHTML = '<div class="stack-lg"><section class="rl-group"><div class="section-head"><div><h2 class="section-title">Eventos del flujo logístico</h2><p class="muted t-13" style="margin:2px 0 0">Del pedido listo para despacho hasta el error de integración.</p></div></div><div class="rl-grid">' + flow.map(ruleCard).join('') + '</div></section>' +
+      '<section class="rl-group"><div class="section-head"><div><h2 class="section-title">Otros eventos</h2><p class="muted t-13" style="margin:2px 0 0">Avisos de stock, novedades e inventario.</p></div></div><div class="rl-grid">' + other.map(ruleCard).join('') + '</div></section></div>';
+    var dirty = snap() !== saved; $('#saveBar').hidden = !dirty; $('#saveMsg').innerHTML = dirty ? UI.icon('alert-circle', 'icon-sm') + ' Hay cambios sin guardar en las reglas' : '';
+    renderInboxSide();
+  }
+  function renderInboxSide() { var act = rules.filter(function (r) { return r.activo; }).length; var el = $('#sideRules .num-display'); if (el) el.innerHTML = act + '<span class="t-16 muted"> de ' + rules.length + ' eventos</span>'; }
+  function R(id) { return find(rules, function (r) { return r.id === id; }); }
+  function validate(r, soft) {
+    var e = {}; if (!r.activo) return e;
+    if (!r.canales.app && !r.canales.correo) e.canal = 'Selecciona al menos un canal disponible: en la app o correo. SMS y WhatsApp aún no tienen proveedor.';
+    if (!r.dest.length) e.dest = 'Agrega al menos un destinatario por rol o usuario.';
+    if (r.th && (r.umbral == null || isNaN(r.umbral) || r.umbral < r.th.min || r.umbral > r.th.max)) e.umbral = 'Ingresa un valor entre ' + r.th.min + ' y ' + r.th.max + ' ' + r.th.unit + '.';
+    return e;
+  }
+  $('#rulesHost').addEventListener('change', function (e) {
+    var t = e.target, id, r;
+    if (t.dataset.on) { r = R(t.dataset.on); r.activo = t.checked; r.err = attempted ? validate(r) : {}; }
+    else if (t.dataset.ch) { var p = t.dataset.ch.split(':'); r = R(p[0]); r.canales[p[1]] = t.checked; if (attempted) r.err = validate(r); }
+    else if (t.dataset.th) { r = R(t.dataset.th); r.umbral = t.value === '' ? null : +t.value; if (attempted) r.err = validate(r); else { var er = validate(r); r.err = er.umbral ? { umbral: er.umbral } : {}; } }
+    else return;
+    renderRules();
+  });
+  $('#rulesHost').addEventListener('click', function (e) {
+    var b;
+    if ((b = e.target.closest('[data-rm]'))) { var p = b.dataset.rm.split(':'), r = R(p[0]); r.dest.splice(+p[1], 1); if (attempted) r.err = validate(r); renderRules(); }
+    else if ((b = e.target.closest('[data-dest]'))) destModal(R(b.dataset.dest));
+    else if ((b = e.target.closest('[data-pv]'))) { var q = R(b.dataset.pv); q.open = !q.open; renderRules(); var f = $('[data-pv="' + q.id + '"]'); if (f) f.focus(); }
+    else if ((b = e.target.closest('[data-test]'))) sendTest(R(b.dataset.test));
+  });
+  $('#discardBtn').onclick = function () { var s = JSON.parse(saved); rules.forEach(function (r, i) { r.activo = s[i][1]; r.umbral = s[i][2]; r.canales = s[i][3]; r.dest = s[i][4]; r.err = {}; }); attempted = false; renderRules(); UI.toast('Cambios descartados.', 'info'); };
+  $('#saveBtn').onclick = function () {
+    attempted = true; var first = null; rules.forEach(function (r) { r.err = validate(r); if (!first && Object.keys(r.err).length) first = r; });
+    if (first) { renderRules(); UI.toast('Revisa «' + first.evento + '»: ' + (first.err.canal || first.err.dest || first.err.umbral), 'error'); var c = $('#rl-' + first.id); if (c) c.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+    saved = snap(); attempted = false; A.reglasNotificacion.forEach(function (x) { var r = R(x.reglaId); x.activo = r.activo; x.destinatarios = r.dest.map(function (d) { return d.n; }); x.canales = CH.filter(function (c) { return r.canales[c[0]]; }).map(function (c) { return c[0] === 'app' ? 'App' : c[0] === 'correo' ? 'Correo' : c[1]; }); if (r.th) x.umbral = r.umbral + ' ' + r.th.unit; });
+    renderRules(); UI.toast('Reglas guardadas. Aplican a los próximos eventos.', 'success');
+  };
+
+  /* selector múltiple de destinatarios */
+  function destModal(r) {
+    var roles = A.roles.map(function (x) { return x.nombre; }), users = A.usuarios.filter(function (u) { return u.estado === 'Activo'; });
+    var sel = r.dest.map(function (d) { return d.t + '|' + d.n; });
+    var m = UI.modal({ title: 'Destinatarios', subtitle: r.evento, width: 520,
+      body: '<div class="stack"><div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="input" type="search" id="dq" placeholder="Buscar rol o usuario" aria-label="Buscar rol o usuario"></div><div class="pick-list" id="dlist"></div><div class="muted t-13" id="dcount"></div></div>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Aplicar destinatarios', kind: 'primary', onClick: function () { r.dest = sel.map(function (k) { var p = k.split('|'); return { t: p[0], n: p[1] }; }); if (attempted) r.err = validate(r); renderRules(); } }] });
+    function draw() {
+      var q = UI.norm($('#dq', m.body).value), h = '', rs = roles.filter(function (n) { return !q || UI.norm(n).indexOf(q) > -1; }), us = users.filter(function (u) { return !q || UI.norm(u.nombre + ' ' + u.rol).indexOf(q) > -1; });
+      if (rs.length) h += '<div class="pk-h">Roles</div>' + rs.map(function (n) { return '<label class="check"><input type="checkbox" data-k="rol|' + esc(n) + '"' + (sel.indexOf('rol|' + n) > -1 ? ' checked' : '') + '><span>' + esc(n) + '</span></label>'; }).join('');
+      if (us.length) h += '<div class="pk-h">Usuarios</div>' + us.map(function (u) { return '<label class="check"><input type="checkbox" data-k="usr|' + esc(u.nombre) + '"' + (sel.indexOf('usr|' + u.nombre) > -1 ? ' checked' : '') + '><span>' + esc(u.nombre) + '</span><span class="sub">' + esc(u.rol) + '</span></label>'; }).join('');
+      $('#dlist', m.body).innerHTML = h || '<div class="empty" style="padding:24px">Sin resultados para esa búsqueda.</div>'; $('#dcount', m.body).textContent = sel.length + ' seleccionado' + (sel.length === 1 ? '' : 's');
+    }
+    $('#dq', m.body).oninput = draw;
+    $('#dlist', m.body).addEventListener('change', function (e) { var k = e.target.dataset.k, i = sel.indexOf(k); if (e.target.checked && i < 0) sel.push(k); if (!e.target.checked && i > -1) sel.splice(i, 1); $('#dcount', m.body).textContent = sel.length + ' seleccionado' + (sel.length === 1 ? '' : 's'); });
+    draw();
+  }
+
+  /* ================= HISTORIAL + ENVIAR PRUEBA ================= */
+  var hist = [], seq = 0;
+  (function seed() {
+    var r = rng('hist'), users = A.usuarios, n = 38;
+    for (var i = 0; i < n; i++) {
+      var rl = rules[Math.floor(r() * rules.length)], ch = ['app', 'app', 'correo', 'correo', 'sms'][Math.floor(r() * 5)], d = rl.dest[Math.floor(r() * rl.dest.length)], u = find(users, function (x) { return x.rol === d.n; }) || users[Math.floor(r() * users.length)], x = r();
+      var st = ch === 'sms' ? 'Fallido' : x < 0.86 ? 'Entregado' : x < 0.94 ? 'Pendiente' : 'Fallido';
+      var det = st === 'Entregado' ? (ch === 'correo' ? 'Aceptado por el servidor de correo' : 'Entregado en la bandeja') : st === 'Pendiente' ? 'En cola de envío · reintento automático' : ch === 'sms' ? 'Canal sin proveedor configurado (por definir)' : 'Buzón lleno · rebote temporal';
+      hist.push({ id: 'ENV-' + String(2400 - i).padStart(4, '0'), t: new Date(Date.now() - (i * 47 + Math.floor(r() * 40)) * 60000).toISOString(), evento: rl.evento, dest: u.nombre, rol: u.rol, canal: ch, estado: st, det: det, ruleId: rl.id });
+    }
+    seq = 2400;
+  })();
+  var HT = { 'Entregado': 'success', 'Pendiente': 'warning', 'Fallido': 'danger' };
+  var ht = UI.table($('#histTable'), {
+    rows: hist, pageSize: 10, rowKey: 'id', caption: 'Historial de envíos', searchable: { placeholder: 'Buscar por evento o destinatario' }, emptyText: 'No hay envíos con esos filtros.', sort: { key: 't', dir: 'desc' },
+    filters: [{ key: 'estado', label: 'Estado', all: 'Todos los estados', options: ['Entregado', 'Pendiente', 'Fallido'] }, { key: 'evento', label: 'Evento', all: 'Todos los eventos', options: 'auto' }, { key: 'canalN', label: 'Canal', all: 'Todos los canales', options: CH.map(function (c) { return { value: c[1], label: c[1] }; }) }],
+    columns: [
+      { key: 't', label: 'Fecha y hora', value: function (r) { return new Date(r.t).getTime(); }, render: function (r) { return '<span class="nowrap">' + F.fechaHora(r.t) + '</span>'; }, title: true },
+      { key: 'evento', label: 'Evento' },
+      { key: 'dest', label: 'Destinatario', render: function (r) { return esc(r.dest) + '<div class="cell-sub">' + esc(r.rol) + '</div>'; } },
+      { key: 'canalN', label: 'Canal', render: function (r) { return esc(r.canalN); } },
+      { key: 'estado', label: 'Estado', render: function (r) { return UI.chip(r.estado, { tone: HT[r.estado], small: true }); } },
+      { key: 'det', label: 'Detalle', hideMobile: true, render: function (r) { return '<span class="t-13 muted">' + esc(r.det) + '</span>'; } }
+    ],
+    onRowClick: function (r) { histDrawer(r); },
+    actions: function (r) { return [{ label: 'Ver detalle', icon: 'eye', onClick: function () { histDrawer(r); } }, { label: 'Reenviar', icon: 'refresh', disabled: r.estado === 'Entregado', onClick: function () { resend(r); } }]; }
+  });
+  hist.forEach(function (h) { h.canalN = chName(h.canal); });
+  ht.setRows(hist);
+  function histDrawer(r) {
+    var pv = previewOf(R(r.ruleId));
+    var d = UI.drawer({ title: r.id, subtitleHtml: esc(r.evento) + ' · ' + UI.chip(r.estado, { tone: HT[r.estado], small: true }), width: 480,
+      body: '<div class="stack-lg">' + UI.kv([['Enviado', F.fechaHora(r.t)], ['Destinatario', esc(r.dest)], ['Rol', esc(r.rol)], ['Canal', esc(r.canalN)], ['Resultado', esc(r.det)]]) + '<section><h3 class="sec-title" style="font-size:13px;margin:0 0 8px">Mensaje enviado</h3><div class="pv-box"><div class="pv-cap">' + (r.canal === 'correo' ? 'Correo electrónico' : 'Notificación') + '</div><div class="pv-mail"><div class="sub">' + esc(pv.t) + '</div><div class="muted">' + esc(pv.x) + '</div></div></div></section>' +
+        (r.estado === 'Fallido' ? UI.banner({ tone: 'danger', title: 'No se entregó', text: r.det + '.' }) : '') + '</div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, r.estado !== 'Entregado' ? { label: 'Reenviar', kind: 'primary', icon: 'refresh', onClick: function () { resend(r); } } : { label: 'Ir a las reglas', kind: 'secondary', onClick: function () { tabs.select('p-reglas'); } }] });
+  }
+  function resend(r) {
+    if (r.canal === 'sms' || r.canal === 'whatsapp') { UI.toast('No se puede reenviar: el canal ' + r.canalN + ' aún no tiene proveedor configurado.', 'error'); return; }
+    r.estado = 'Entregado'; r.det = 'Reenviado manualmente · aceptado'; ht.setRows(hist); UI.toast('Mensaje reenviado a ' + r.dest + '.', 'success');
+  }
+  function sendTest(r) {
+    if (!r.activo) { UI.toast('Activa la regla para enviar una prueba.', 'warning'); return; }
+    var sel = CH.filter(function (c) { return r.canales[c[0]]; });
+    if (!sel.length) { UI.toast('Selecciona al menos un canal antes de enviar la prueba.', 'error'); return; }
+    var pv = previewOf(r), t0 = Date.now(), fails = [], oks = [];
+    sel.forEach(function (c) {
+      var bad = c[2]; seq++;
+      hist.unshift({ id: 'ENV-' + String(seq).padStart(4, '0'), t: new Date(t0).toISOString(), evento: r.evento + ' (prueba)', dest: me.nombre, rol: me.rol, canal: c[0], canalN: c[1], estado: bad ? 'Fallido' : 'Entregado', det: bad ? 'Canal sin proveedor configurado (por definir)' : c[0] === 'correo' ? 'Aceptado por el servidor de correo' : 'Entregado en la bandeja', ruleId: r.id });
+      (bad ? fails : oks).push(c[1]);
+    });
+    ht.setRows(hist);
+    if (r.canales.app) { A.notificaciones.unshift({ notifId: 'NTF-T' + (++seq), tipo: r.evento, severidad: pv.sev, titulo: '[Prueba] ' + pv.t, texto: pv.x, fechaHora: new Date(t0).toISOString(), leida: false, ref: { tipo: null, id: null }, destino: pv.href }); renderInbox(); }
+    if (oks.length) UI.toast('Prueba enviada por ' + oks.join(' y ') + (r.canales.app ? '. Ya aparece en la campana.' : '.'), 'success', { title: r.evento });
+    if (fails.length) UI.toast(fails.join(' y ') + ' no se entregó: canal por definir.', 'warning');
+  }
+  $('#testBtn').innerHTML = UI.icon('send') + 'Enviar prueba';
+  $('#testBtn').onclick = function () {
+    var m = UI.modal({ title: 'Enviar notificación de prueba', width: 480,
+      body: '<div class="stack"><p class="muted t-13" style="margin:0">La prueba llega solo a ti, por los canales que tenga marcados el evento.</p><div class="field"><label class="label" for="tEv">Evento</label><select class="select" id="tEv">' + rules.map(function (r) { return '<option value="' + r.id + '">' + esc(r.evento) + (r.activo ? '' : ' (inactivo)') + '</option>'; }).join('') + '</select></div><div id="tInfo"></div></div>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Enviar prueba', kind: 'primary', icon: 'send', onClick: function () { var r = R($('#tEv', m.body).value); if (!r.activo) { $('#tInfo', m.body).innerHTML = UI.banner({ tone: 'warning', text: 'Este evento está inactivo. Actívalo en «Reglas por evento» para probarlo.' }); return false; } if (!r.canales.app && !r.canales.correo && !r.canales.sms && !r.canales.whatsapp) { $('#tInfo', m.body).innerHTML = UI.banner({ tone: 'danger', text: 'El evento no tiene canales marcados.' }); return false; } sendTest(r); } }] });
+    function info() { var r = R($('#tEv', m.body).value); $('#tInfo', m.body).innerHTML = '<div class="t-13 muted">Canales: ' + (CH.filter(function (c) { return r.canales[c[0]]; }).map(function (c) { return c[1]; }).join(', ') || 'ninguno') + '</div>'; }
+    $('#tEv', m.body).onchange = info; info();
+  };
+
+  /* ---------- pestañas y arranque ---------- */
+  var tabs = UI.tabs($('#mainTabs')); if (/^#p-(bandeja|reglas|historial)$/.test(location.hash)) tabs.select(location.hash.slice(1)); /* sin hash:true — el navegador saltaba al panel al cargar */
+  renderInbox(); renderRules();
+});
+</script>
+</body>
+</html>

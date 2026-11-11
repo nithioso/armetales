@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reportes e indicadores · Armetales</title>
+<meta name="description" content="OTIF, kilómetros por entrega, utilización, tiempos de cargue y descargue, notas crédito y exactitud de inventario, con filtros y exportación.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de reportes (tokens y componentes viven en app.css) */
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 20px; }
+  .filter-bar .select { width: auto; min-width: 150px; max-width: 100%; }
+  .filter-bar .fb-note { font-size: 12.5px; color: var(--text-2); margin-left: auto; }
+  @media (max-width: 639px) { .filter-bar .select { flex: 1 1 140px; } .filter-bar .fb-note { margin-left: 0; flex-basis: 100%; } }
+
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 1040px) { .hero { grid-template-columns: 400px minmax(0, 1fr); } .hero-left { border-right: 1px solid var(--border); } }
+  .hero-left { padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .hero-right { padding: 16px 20px 18px; min-width: 0; border-top: 1px solid var(--border); }
+  @media (min-width: 1040px) { .hero-right { border-top: 0; } }
+  .hero-label { font-size: 12.5px; font-weight: 500; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+  .hero-value { font-family: var(--font-display); font-weight: 600; font-size: 64px; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 6px; }
+  .hero-value small { font-size: 24px; color: var(--text-2); font-weight: 500; }
+  .hero-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .hero-sentence { color: var(--text-2); font-size: 13.5px; }
+  .decomp { display: grid; gap: 10px; }
+  .decomp-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: end; }
+  .decomp-row .dr-name { font-size: 13px; font-weight: 600; }
+  .decomp-row .dr-val { font-family: var(--font-display); font-weight: 600; font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1; }
+  .decomp-row .meter { grid-column: 1 / -1; }
+  .decomp-row .dr-sub { grid-column: 1 / -1; font-size: 12px; color: var(--text-2); }
+  .decomp-op { text-align: center; color: var(--text-3); font-family: var(--font-display); font-size: 18px; line-height: 1; margin: -2px 0; }
+  .hero-head { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .hero-head h2 { font-size: 15px; font-weight: 600; font-family: var(--font-ui); }
+
+  .cap { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--text-2); margin-top: 8px; }
+  .cap span { display: inline-flex; align-items: center; gap: 6px; }
+  .cap .ln { width: 16px; height: 0; border-top: 2.5px solid var(--cap-c, var(--blue)); border-radius: 2px; }
+  .cap .ln.bar { height: 10px; border: 0; width: 10px; background: var(--cap-c, var(--blue)); border-radius: 3px; }
+  .cap .ln.meta { border-top: 2px dashed var(--steel); }
+
+  .ind-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 700px) { .ind-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1280px) { .ind-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .ind { display: flex; flex-direction: column; }
+  .ind .card-head { align-items: flex-start; flex-wrap: nowrap; }
+  .ind-body { padding: 14px 16px 6px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .ind-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+  .ind-val { font-family: var(--font-display); font-weight: 600; font-size: 34px; line-height: 1; letter-spacing: -.015em; font-variant-numeric: tabular-nums; }
+  .ind-val small { font-size: 15px; color: var(--text-2); font-weight: 500; margin-left: 4px; letter-spacing: 0; }
+  .nc-row { display: grid; gap: 5px; padding: 6px 0; border-bottom: 1px solid var(--border); } .nc-row:last-child { border-bottom: 0; }
+  .nc-t { min-width: 0; } .nc-name .num { white-space: nowrap; }
+  .nc-name { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .ind-note { font-size: 12.5px; color: var(--text-2); }
+  .ind-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 6px 10px 10px 16px; }
+  .ind-foot .btn { margin-left: -8px; }
+
+  .cmp-card .tabs { padding: 0 12px; }
+  .cmp-card .tab-panel { padding-top: 0; }
+  .in-filter td:first-child::after { content: none; }
+  .tag-filter { margin-left: 6px; }
+  .def-formula { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; }
+  .def-ratio { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; text-align: center; }
+  .def-ratio .mini { padding: 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .def-ratio .mini b { display: block; font-family: var(--font-display); font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .def-ratio .mini span { font-size: 12px; color: var(--text-2); }
+  .def-ratio .op { color: var(--text-3); font-family: var(--font-display); font-size: 22px; }
+  @media print { .sidebar, .topbar, .page-actions, .filter-bar, .ind-foot, .shell-scrim { display: none !important; } .shell-main { margin-left: 0 !important; } .card { break-inside: avoid; } }
+  .select.input-sm { padding-right: 30px; }
+  :root[data-theme="dark"] a.btn { color: var(--b-fg); } /* el color de enlace del tema oscuro pisaba el de los botones-enlace */
+</style>
+</head>
+<body data-page="reportes">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Análisis</div>
+      <h1 class="page-title">Reportes e indicadores</h1>
+      <p class="page-desc" id="phDesc">Cumplimiento, eficiencia y calidad de la operación de transporte, con meta y tendencia en cada indicador.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-secondary" id="exportBtn" aria-haspopup="menu" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Exportar</button>
+    </div>
+  </header>
+
+  <div class="filter-bar" role="group" aria-label="Filtros del reporte">
+    <div class="segmented" role="group" aria-label="Periodo" id="periodSeg">
+      <button type="button" data-n="7" aria-pressed="false">7 días</button>
+      <button type="button" data-n="15" aria-pressed="false">15 días</button>
+      <button type="button" data-n="30" aria-pressed="true">30 días</button>
+    </div>
+    <select class="select input-sm" id="fSede" aria-label="Sede"></select>
+    <select class="select input-sm" id="fRuta" aria-label="Ruta"></select>
+    <select class="select input-sm" id="fVeh" aria-label="Vehículo"></select>
+    <button type="button" class="btn btn-ghost btn-sm" id="clearBtn" hidden>Limpiar filtros</button>
+    <span class="fb-note" id="fbNote"></span>
+  </div>
+
+  <div id="report">
+    <section aria-label="OTIF">
+      <div class="card hero" id="hero"></div>
+    </section>
+
+    <section class="section" aria-label="Indicadores operativos">
+      <div class="section-head"><h2 class="section-title">Indicadores operativos</h2><span class="muted t-13" id="indSub"></span></div>
+      <div class="ind-grid" id="indGrid"></div>
+    </section>
+
+    <section class="section" aria-label="Comparativo por ruta y por vehículo">
+      <div class="card cmp-card">
+        <div class="card-head"><div><h2 class="card-title">Comparativo por ruta y por vehículo</h2><p class="card-sub">Toca una fila para filtrar todo el reporte por esa ruta o ese vehículo.</p></div></div>
+        <div class="tabs" role="tablist" aria-label="Comparativo" id="cmpTabs">
+          <button type="button" class="tab" role="tab" id="tabRuta" aria-controls="pnlRuta" aria-selected="true">Por ruta</button>
+          <button type="button" class="tab" role="tab" id="tabVeh" aria-controls="pnlVeh" aria-selected="false">Por vehículo</button>
+        </div>
+        <div class="tab-panel" role="tabpanel" id="pnlRuta" aria-labelledby="tabRuta"><div id="tblRuta"></div></div>
+        <div class="tab-panel" role="tabpanel" id="pnlVeh" aria-labelledby="tabVeh" hidden><div id="tblVeh"></div></div>
+      </div>
+    </section>
+  </div>
+  <div id="emptyHost" hidden></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, K = A.kpis, M = K.metas;
+  var SEDE_DATOS = A.sedes[0].id;
+  var st = { n: 30, sede: SEDE_DATOS, ruta: '', veh: '', metric: 'otifPct' };
+  var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  function dlabel(f) { return f.slice(8) + ' ' + MESES[+f.slice(5, 7) - 1]; }
+  function rutaNom(id) { return A.idx.rutas[id] ? A.idx.rutas[id].nombre : id; }
+
+  /* colores de serie: índices de la paleta del sistema (cambian solos con el tema) */
+  function setSw() { var s = UI.chartColors().series; s.forEach(function (c, i) { document.documentElement.style.setProperty('--sw-' + i, c); }); }
+  setSw(); UI.onTheme(setSw);
+  var SW = ['--sw-0', '--sw-1', '--sw-2', '--sw-3', '--sw-4', '--sw-5'];
+
+  /* ---------- indicadores (definición de cada tarjeta) ---------- */
+  var IND = [
+    { key: 'kmPorEntrega', def: 'kmEntrega', title: 'Kilómetros por entrega', unit: 'km', dec: 1, meta: M.kmPorEntrega, better: 'down', c: 0, link: ['seguimiento.html', 'Ver seguimiento'] },
+    { key: 'kmPorTon', def: 'kmTon', title: 'Kilómetros por tonelada', unit: 'km/t', dec: 1, meta: M.kmPorTon, better: 'down', c: 0, link: ['planeacion.html', 'Ver planeación'] },
+    { key: 'utilizacionPesoPct', def: 'utilizacion', title: 'Utilización de capacidad', unit: '%', dec: 0, meta: M.utilizacionPesoPct, better: 'up', c: 0, link: ['cargue.html', 'Ver cargue'] },
+    { key: 'cargueMin', def: 'cargue', title: 'Tiempo de cargue', unit: 'min', dec: 0, meta: M.cargueMin, better: 'down', c: 5, link: ['cargue.html', 'Ver cargue'] },
+    { key: 'descargueMin', def: 'descargue', title: 'Tiempo de descargue', unit: 'min', dec: 0, meta: M.descargueMin, better: 'down', c: 5, link: ['seguimiento.html', 'Ver seguimiento'] },
+    { key: 'muertoMin', def: 'muerto', title: 'Tiempo muerto', unit: 'min', dec: 0, meta: M.muertoMin, better: 'down', c: 2, link: ['seguimiento.html', 'Ver seguimiento'] },
+    { key: 'fallidasPct', def: 'fallidas', title: 'Entregas fallidas', unit: '%', dec: 1, meta: M.fallidasPct, better: 'down', c: 3, link: ['novedades.html', 'Ver novedades'] },
+    { key: 'ncCausa', def: 'nc', title: 'Notas crédito por causa', unit: 'COP', dec: 0, meta: null, better: 'down', c: 2, bars: true, link: ['novedades.html', 'Ver novedades'] },
+    { key: 'exactitudInvPct', def: 'exactitud', title: 'Exactitud de inventario', unit: '%', dec: 1, meta: M.exactitudInvPct, better: 'up', c: 1, link: ['inventario.html', 'Ver inventario'] }
+  ];
+
+  /* definiciones: las oficiales de ARM.kpis.definiciones + las que faltan, en el mismo formato */
+  var DEFS = {}; K.definiciones.forEach(function (d) { DEFS[d.id] = d; });
+  var nDesp30 = K.serie.reduce(function (a, x) { return a + x.despachados; }, 0);
+  function sumS(k) { return K.serie.reduce(function (a, x) { return a + x[k]; }, 0); }
+  DEFS.cargue = { id: 'cargue', nombre: 'Tiempo promedio de cargue', formula: 'Σ (hora fin de cargue − hora inicio de cargue) ÷ despachos cargados', numerador: sumS('cargueMin') , denominador: K.serie.length, unidad: 'min', fuente: 'Marcas de inicio y cierre en Optimización de cargue', nota: 'Numerador: suma de promedios diarios en minutos; denominador: días del periodo.' };
+  DEFS.descargue = { id: 'descargue', nombre: 'Tiempo de descargue', formula: 'Σ (hora fin de descargue − hora de llegada) ÷ paradas atendidas', numerador: sumS('descargueMin'), denominador: K.serie.length, unidad: 'min', fuente: 'Eventos «Llegué» y «Finalizar descargue» de la app del conductor', nota: 'Numerador: suma de promedios diarios en minutos; denominador: días del periodo.' };
+  DEFS.muerto = { id: 'muerto', nombre: 'Tiempo muerto', formula: 'Σ minutos con vehículo detenido sin cargue ni descargue ÷ viajes', numerador: sumS('muertoMin'), denominador: K.serie.length, unidad: 'min', fuente: 'GPS de vehículos + eventos de la app del conductor', nota: 'Incluye esperas en portería, tráfico detenido y paradas no operativas.' };
+  DEFS.fallidas = { id: 'fallidas', nombre: 'Entregas fallidas y reintentos', formula: 'Entregas fallidas ÷ entregas programadas', numerador: sumS('fallidas'), denominador: nDesp30, unidad: '%', fuente: 'Novedades registradas desde la app del conductor' };
+  DEFS.nc = { id: 'nc', nombre: 'Notas crédito por causa', formula: 'Σ valor de notas crédito emitidas, agrupado por causa de la novedad', numerador: sumS('notasCreditoCOP'), denominador: sumS('notasCredito'), unidad: 'COP', fuente: 'Novedades con nota crédito + facturación en SAP', nota: 'Numerador: valor total en COP; denominador: número de notas crédito.' };
+
+  /* ---------- serie filtrada por periodo / ruta / vehículo ---------- */
+  function avgOf(arr, k) { return arr.length ? arr.reduce(function (a, x) { return a + x[k]; }, 0) / arr.length : 0; }
+  function sumOf(arr, k) { return arr.reduce(function (a, x) { return a + x[k]; }, 0); }
+  var BASE = {}; ['otifPct', 'kmPorEntrega', 'utilizacionPesoPct', 'fallidasPct', 'muertoMin'].forEach(function (k) { BASE[k] = avgOf(K.serie, k); });
+  function ent() { return { r: K.porRuta.filter(function (x) { return x.rutaId === st.ruta; })[0], v: K.porVehiculo.filter(function (x) { return x.placa === st.veh; })[0] }; }
+  function offsets() {
+    var e = ent(), parts = [];
+    if (e.r) parts.push({ otifPct: e.r.otifPct - BASE.otifPct, completasPct: e.r.otifPct - BASE.otifPct, aTiempoPct: e.r.otifPct - BASE.otifPct, kmPorEntrega: e.r.kmPorEntrega - BASE.kmPorEntrega, utilizacionPesoPct: e.r.utilizacionPct - BASE.utilizacionPesoPct, fallidasPct: e.r.fallidasPct - BASE.fallidasPct });
+    if (e.v) parts.push({ otifPct: e.v.otifPct - BASE.otifPct, completasPct: e.v.otifPct - BASE.otifPct, aTiempoPct: e.v.otifPct - BASE.otifPct, utilizacionPesoPct: e.v.utilizacionPct - BASE.utilizacionPesoPct, muertoMin: e.v.tiempoMuertoMin - BASE.muertoMin });
+    var out = {}; parts.forEach(function (p) { Object.keys(p).forEach(function (k) { (out[k] = out[k] || []).push(p[k]); }); });
+    Object.keys(out).forEach(function (k) { out[k] = out[k].reduce(function (a, b) { return a + b; }, 0) / out[k].length; });
+    return out;
+  }
+  var PCT = { otifPct: 1, completasPct: 1, aTiempoPct: 1, utilizacionPesoPct: 1, exactitudInvPct: 1 };
+  function series() {
+    var off = offsets();
+    return K.serie.map(function (x) {
+      var y = {}; Object.keys(x).forEach(function (k) { y[k] = x[k]; });
+      Object.keys(off).forEach(function (k) { var v = x[k] + off[k]; if (PCT[k]) v = Math.min(k === 'otifPct' ? 99.9 : 100, v); y[k] = Math.max(0, Math.round(v * 10) / 10); });
+      return y;
+    });
+  }
+  var S, CUR, DELTA = {};
+  function compute() {
+    S = series(); CUR = S.slice(-st.n);
+    var a, b;
+    if (st.n <= 15) { a = S.slice(-st.n); b = S.slice(-2 * st.n, -st.n); } else { a = S.slice(-15); b = S.slice(0, 15); }
+    DELTA = function (k) { return avgOf(a, k) - avgOf(b, k); };
+  }
+  function val(k) { return avgOf(CUR, k); }
+  function ncCausas() {
+    var tot = K.notasCreditoPorCausa.reduce(function (a, c) { return a + c.valorCOP; }, 0), nTot = K.notasCreditoPorCausa.reduce(function (a, c) { return a + c.n; }, 0);
+    var win = sumOf(CUR, 'notasCreditoCOP'), winN = sumOf(CUR, 'notasCredito');
+    return K.notasCreditoPorCausa.map(function (c) { return { causa: c.causa, valorCOP: Math.round(win * c.valorCOP / tot / 1000) * 1000, n: Math.round(winN * c.n / nTot) }; }).sort(function (x, y) { return y.valorCOP - x.valorCOP; });
+  }
+  function periodoTxt() { return 'últimos ' + st.n + ' días'; }
+  function deltaTxt() { return st.n <= 15 ? 'vs. los ' + st.n + ' días anteriores' : 'últimos 15 días vs. 15 anteriores'; }
+
+  /* ---------- helpers de presentación ---------- */
+  function axis(data, meta, pct) {
+    var all = meta != null ? data.concat([meta]) : data, lo = Math.min.apply(null, all), hi = Math.max.apply(null, all), pad = (hi - lo) * 0.2 || 1;
+    var raw = (hi - lo + 2 * pad) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map(function (k) { return k * mag; }).filter(function (x) { return x >= raw; })[0];
+    var mn = Math.max(0, Math.floor((lo - pad) / step) * step), mx = mn + Math.ceil((hi + pad - mn) / step) * step; if (pct && mx > 100) { mx = 100; }
+    return { min: mn, max: mx, tickDec: step < 1 ? 1 : 0 };
+  }
+  function status(v, meta, better) {
+    var ok = better === 'up' ? v >= meta : v <= meta;
+    return UI.chip('', { tone: ok ? 'success' : 'warning', label: ok ? 'En meta' : (better === 'up' ? 'Bajo la meta' : 'Sobre la meta') });
+  }
+  function unitTxt(u, dec, v) { return u === '%' ? F.num(v, dec) + ' %' : F.num(v, dec) + ' ' + u; }
+  function caption(c, name, metaTxt, bars) {
+    return '<div class="cap"><span style="--cap-c:var(' + SW[c] + ')"><i class="ln' + (bars ? ' bar' : '') + '"></i>' + esc(name) + '</span>' + (metaTxt ? '<span><i class="ln meta"></i>Meta ' + esc(metaTxt) + '</span>' : '') + '</div>';
+  }
+  function lineChart(host, o) {
+    var data = o.data, ax = axis(data, o.meta, o.unit === '%');
+    var ds = { label: o.label, data: data }; Object.defineProperty(ds, 'color', { get: function () { return UI.chartColors().series[o.c]; }, enumerable: true });
+    UI.chart.line(host, { labels: o.labels, datasets: [ds], unit: o.unit, dec: o.dec, tickDec: ax.tickDec, min: ax.min, max: ax.max, beginAtZero: false, target: o.meta != null ? { value: o.meta, label: 'Meta' } : null, maxXTicks: 6 });
+  }
+
+  /* ---------- filtros ---------- */
+  (function () {
+    $('#fSede').innerHTML = A.sedes.map(function (s) { return '<option value="' + s.id + '">' + esc(s.nombre) + '</option>'; }).join('');
+    $('#fRuta').innerHTML = '<option value="">Todas las rutas</option>' + A.rutas.map(function (r) { return '<option value="' + r.rutaId + '">' + esc(r.nombre) + '</option>'; }).join('');
+    $('#fVeh').innerHTML = '<option value="">Todos los vehículos</option>' + A.vehiculos.map(function (v) { return '<option value="' + esc(v.placa) + '">' + esc(v.placa) + ' · ' + esc(v.tipo) + '</option>'; }).join('');
+  })();
+  function syncFilters() {
+    $('#fRuta').value = st.ruta; $('#fVeh').value = st.veh; $('#fSede').value = st.sede;
+    UI.$$('#periodSeg button').forEach(function (b) { b.setAttribute('aria-pressed', +b.dataset.n === st.n); });
+    var any = st.ruta || st.veh || st.sede !== SEDE_DATOS;
+    $('#clearBtn').hidden = !any;
+    $('#fbNote').textContent = (st.ruta || st.veh) ? 'Valores de ejemplo ajustados a ' + [st.ruta ? rutaNom(st.ruta) : '', st.veh || ''].filter(Boolean).join(' · ') : '';
+  }
+  UI.$$('#periodSeg button').forEach(function (b) { b.addEventListener('click', function () { st.n = +b.dataset.n; render(); }); });
+  $('#fSede').addEventListener('change', function (e) { st.sede = e.target.value; render(); });
+  $('#fRuta').addEventListener('change', function (e) { st.ruta = e.target.value; render(); });
+  $('#fVeh').addEventListener('change', function (e) { st.veh = e.target.value; render(); });
+  $('#clearBtn').addEventListener('click', function () { st.ruta = ''; st.veh = ''; st.sede = SEDE_DATOS; render(); UI.toast('Filtros restablecidos.', 'info'); });
+
+  /* ---------- OTIF protagonista (HU-149/150/151) ---------- */
+  var HM = { otifPct: { name: 'OTIF', c: 1, meta: M.otifPct }, completasPct: { name: 'Entregas completas', short: 'Completas', c: 0, meta: M.completasPct }, aTiempoPct: { name: 'Entregas a tiempo', short: 'A tiempo', c: 5, meta: M.aTiempoPct } };
+  function renderHero() {
+    var otif = val('otifPct'), comp = val('completasPct'), att = val('aTiempoPct'), den = sumOf(CUR, 'despachados'), num = Math.round(den * otif / 100);
+    function drow(k, defId) {
+      var v = val(k), m = HM[k].meta, d = DELTA(k);
+      return '<div class="decomp-row"><div class="dr-name">' + HM[k].name + '</div><div class="dr-val">' + F.num(v, 1) + ' %</div>' +
+        UI.meter(v, 100, { level: v >= m ? 'ok' : 'warn', mark: m, showValue: false, label: HM[k].name }) +
+        '<div class="dr-sub">Meta ' + F.num(m, 1) + ' % · ' + (d >= 0 ? '+' : '−') + F.num(Math.abs(d), 1) + ' pts ' + deltaTxt().replace('últimos 15 días vs. 15 anteriores', 'vs. 15 días previos') + ' · <button type="button" class="link-btn" data-def="' + defId + '">¿Cómo se calcula?</button></div></div>';
+    }
+    $('#hero').innerHTML =
+      '<div class="hero-left"><div><div class="hero-label">' + UI.icon('target', 'icon-sm') + 'OTIF · ' + periodoTxt() + '</div>' +
+      '<div class="hero-value" aria-label="OTIF ' + F.num(otif, 1) + ' por ciento">' + F.num(otif, 1) + '<small>%</small></div></div>' +
+      '<div class="hero-meta">' + UI.delta(DELTA('otifPct'), { unit: ' pts', better: 'up', dec: 1 }) + status(otif, M.otifPct, 'up') + '<span class="ind-note">Meta ' + F.num(M.otifPct, 1) + ' %</span></div>' +
+      '<p class="hero-sentence"><strong>' + F.num(num, 0) + '</strong> de <strong>' + F.num(den, 0) + '</strong> entregas llegaron completas y dentro de la ventana horaria del cliente.</p>' +
+      '<div class="decomp" aria-label="Descomposición del OTIF">' + drow('completasPct', 'completas') + '<div class="decomp-op" aria-hidden="true">×</div>' + drow('aTiempoPct', 'aTiempo') + '</div>' +
+      '<div><button type="button" class="btn btn-secondary btn-sm" data-def="otif">¿Cómo se calcula el OTIF?</button></div></div>' +
+      '<div class="hero-right"><div class="hero-head"><h2>Tendencia de ' + st.n + ' días</h2><div class="segmented" role="group" aria-label="Serie a graficar" id="heroSeg">' +
+      Object.keys(HM).map(function (k) { return '<button type="button" data-m="' + k + '" aria-pressed="' + (st.metric === k) + '" aria-label="' + HM[k].name + '">' + (HM[k].short || HM[k].name) + '</button>'; }).join('') + '</div></div>' +
+      '<div class="chart" id="heroChart" style="--h:300px" role="img" aria-label=""></div><div id="heroCap"></div></div>';
+    UI.$$('#heroSeg button').forEach(function (b) { b.addEventListener('click', function () { st.metric = b.dataset.m; UI.$$('#heroSeg button').forEach(function (x) { x.setAttribute('aria-pressed', x === b); }); drawHeroChart(); }); });
+    drawHeroChart();
+  }
+  function drawHeroChart() {
+    var h = HM[st.metric], d = CUR.map(function (x) { return x[st.metric]; });
+    $('#heroChart').setAttribute('aria-label', 'Gráfico de línea de ' + h.name + ' en ' + st.n + ' días, en porcentaje. Promedio ' + F.num(avgOf(CUR, st.metric), 1) + ' %, meta ' + F.num(h.meta, 1) + ' %.');
+    lineChart($('#heroChart'), { labels: CUR.map(function (x) { return dlabel(x.fecha); }), data: d, label: h.name, unit: '%', dec: 1, meta: h.meta, c: h.c });
+    $('#heroCap').innerHTML = caption(h.c, h.name + ' diario (%)', F.num(h.meta, 1) + ' %');
+  }
+
+  /* ---------- rejilla de indicadores ---------- */
+  function renderGrid() {
+    UI.$$('#indGrid .chart').forEach(function (c) { UI.chart.destroy(c); });
+    var causas = ncCausas(), reint = A.novedades.filter(function (n) { return n.reintento && n.reintento.programado; }).length;
+    $('#indSub').textContent = 'Promedio de los ' + periodoTxt() + ' · ' + deltaTxt();
+    $('#indGrid').innerHTML = IND.map(function (m) {
+      var top, note, foot = '';
+      if (m.bars) {
+        var tot = causas.reduce(function (a, c) { return a + c.valorCOP; }, 0), nn = causas.reduce(function (a, c) { return a + c.n; }, 0);
+        top = '<span class="ind-val">' + F.cop(tot) + '</span>' + UI.chip('', { tone: 'neutral', label: nn + ' notas crédito', noDot: true });
+        note = 'Mayor causa: <strong>' + esc(causas[0].causa) + '</strong> (' + F.pct(causas[0].valorCOP / tot * 100) + ' del valor).';
+      } else {
+        var v = val(m.key), d = DELTA(m.key);
+        top = '<span class="ind-val">' + F.num(v, m.dec) + '<small>' + (m.unit === '%' ? '%' : m.unit) + '</small></span>' + UI.delta(d, { unit: m.unit === '%' ? ' pts' : ' ' + m.unit, better: m.better, dec: m.dec ? 1 : 0 }) + status(v, m.meta, m.better);
+        note = m.key === 'fallidasPct' ? '<strong>' + sumOf(CUR, 'fallidas') + '</strong> fallidas en ' + F.num(sumOf(CUR, 'despachados'), 0) + ' entregas · <strong>' + reint + '</strong> reintentos programados.' : (m.better === 'down' ? 'Menos es mejor.' : 'Más es mejor.') + ' Meta ' + unitTxt(m.unit, m.dec, m.meta) + '.';
+      }
+      return '<article class="card ind" aria-labelledby="t-' + m.key + '"><div class="card-head"><div><h3 class="card-title" id="t-' + m.key + '">' + m.title + '</h3></div></div>' +
+        '<div class="ind-body"><div class="ind-top">' + top + '</div><div class="ind-note">' + note + '</div><div class="chart" id="ck-' + m.key + '" style="--h:' + (m.bars ? 230 : 170) + 'px" role="img" aria-label=""></div><div id="cc-' + m.key + '"></div></div>' +
+        '<div class="ind-foot"><button type="button" class="btn btn-ghost btn-sm" data-def="' + m.def + '">¿Cómo se calcula?</button><a class="btn btn-ghost btn-sm" href="' + m.link[0] + '">' + m.link[1] + UI.icon('arrow-right') + '</a></div></article>';
+    }).join('');
+    IND.forEach(function (m) {
+      var host = $('#ck-' + m.key), labels = CUR.map(function (x) { return dlabel(x.fecha); });
+      if (m.bars) {
+        var mx = causas[0].valorCOP || 1;
+        host.style.height = 'auto'; host.setAttribute('role', 'list'); host.removeAttribute('aria-label');
+        host.innerHTML = causas.map(function (c) { return '<div class="nc-row" role="listitem"><div class="nc-name"><span class="nc-t">' + esc(c.causa) + '<span class="muted" title="' + c.n + (c.n === 1 ? ' nota crédito' : ' notas crédito') + '"> (' + c.n + ')</span></span><span class="num">' + F.cop(c.valorCOP) + '</span></div>' + UI.meter(c.valorCOP, mx, { level: 'warn', showValue: false, label: c.causa + ', ' + F.cop(c.valorCOP) }) + '</div>'; }).join('');
+        $('#cc-' + m.key).innerHTML = '<div class="cap"><span>Entre paréntesis, número de notas · barra proporcional a la causa mayor</span></div>';
+      } else {
+        var d = CUR.map(function (x) { return x[m.key]; });
+        host.setAttribute('aria-label', 'Gráfico de línea de ' + m.title + ' en ' + st.n + ' días, en ' + (m.unit === '%' ? 'porcentaje' : m.unit) + '. Promedio ' + unitTxt(m.unit, m.dec, val(m.key)) + ', meta ' + unitTxt(m.unit, m.dec, m.meta) + '.');
+        lineChart(host, { labels: labels, data: d, label: m.title, unit: m.unit, dec: m.dec, meta: m.meta, c: m.c });
+        $('#cc-' + m.key).innerHTML = caption(m.c, m.title + ' (' + m.unit + ')', unitTxt(m.unit, m.dec, m.meta));
+      }
+    });
+  }
+  function wrap(s, n) { var w = s.split(' '), out = [], cur = ''; w.forEach(function (x) { if ((cur + ' ' + x).trim().length > n && cur) { out.push(cur); cur = x; } else cur = (cur + ' ' + x).trim(); }); if (cur) out.push(cur); return out; }
+
+  /* ---------- «¿Cómo se calcula?» ---------- */
+  function defDrawer(id) {
+    var d = DEFS[id]; if (!d) return;
+    var m = IND.filter(function (x) { return x.def === id; })[0], key = m ? m.key : { otif: 'otifPct', completas: 'completasPct', aTiempo: 'aTiempoPct' }[id];
+    var cur = key === 'ncCausa' ? sumOf(CUR, 'notasCreditoCOP') : val(key), meta = key === 'ncCausa' ? null : (m ? m.meta : HM[key].meta);
+    var unit = d.unidad, curTxt = key === 'ncCausa' ? F.cop(cur) : unitTxt(unit, unit === '%' ? 1 : (m ? m.dec : 1), cur);
+    var numTxt = unit === 'COP' ? F.cop(d.numerador) : F.num(d.numerador, 0), denTxt = F.num(d.denominador, 0);
+    UI.drawer({ title: d.nombre, subtitle: 'Definición del indicador', width: 520,
+      body: '<div class="stack-lg">' +
+        '<section><h3 class="mb-2">Fórmula</h3><div class="def-formula">' + esc(d.formula) + '</div></section>' +
+        '<section><h3 class="mb-2">Componentes (referencia de 30 días)</h3><div class="def-ratio"><div class="mini"><b>' + numTxt + '</b><span>Numerador</span></div><span class="op" aria-hidden="true">÷</span><div class="mini"><b>' + denTxt + '</b><span>Denominador</span></div></div>' + (d.nota ? '<p class="hint mt-2">' + esc(d.nota) + '</p>' : '') + '</section>' +
+        '<section><h3 class="mb-2">Con los filtros actuales</h3>' + UI.kv([['Valor', '<strong>' + curTxt + '</strong>'], ['Periodo', periodoTxt()], ['Meta', meta == null ? 'Sin meta definida' : unitTxt(unit, unit === '%' ? 1 : (m ? m.dec : 1), meta)], ['Alcance', esc([A.sedes.filter(function (s) { return s.id === st.sede; })[0].nombre, st.ruta ? rutaNom(st.ruta) : 'todas las rutas', st.veh || 'todos los vehículos'].join(' · '))], ['Fuente de datos', esc(d.fuente)]]) + '</section>' +
+        UI.banner({ tone: 'info', text: 'Las fórmulas y fuentes oficiales están pendientes de validar con el negocio (pregunta 14 de definiciones).' }) + '</div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }] });
+  }
+  $('#app').addEventListener('click', function (e) { var b = e.target.closest('[data-def]'); if (b) defDrawer(b.dataset.def); });
+
+  /* ---------- comparativos (por ruta / por vehículo) ---------- */
+  function dot(ok) { return '<i class="dot ' + (ok ? 'ok' : 'warn') + '" aria-hidden="true"></i> '; }
+  var tRuta = UI.table($('#tblRuta'), {
+    rows: [], pageSize: 8, dense: true, rowKey: 'rutaId', caption: 'Indicadores por ruta', searchable: { placeholder: 'Buscar ruta' }, emptyText: 'No hay rutas que coincidan.',
+    columns: [
+      { key: 'nombre', label: 'Ruta', title: true, render: function (r) { return '<span class="cell-main">' + esc(r.nombre) + '</span>' + (st.ruta === r.rutaId ? '<span class="chip chip-info chip-sm tag-filter">En filtro</span>' : '') + '<div class="cell-sub mono">' + r.rutaId + '</div>'; } },
+      { key: 'entregas', label: 'Entregas', num: true, render: function (r) { return F.num(r.entregas, 0); } },
+      { key: 'otifPct', label: 'OTIF', num: true, render: function (r) { return dot(r.otifPct >= M.otifPct) + F.num(r.otifPct, 1) + ' %'; } },
+      { key: 'kmPorEntrega', label: 'Km por entrega', num: true, render: function (r) { return dot(r.kmPorEntrega <= M.kmPorEntrega) + F.num(r.kmPorEntrega, 1) + ' km'; } },
+      { key: 'utilizacionPct', label: 'Utilización', render: function (r) { return UI.meter(r.utilizacionPct, 100, { label: 'Utilización ' + r.nombre, mark: M.utilizacionPesoPct }); } },
+      { key: 'fallidasPct', label: 'Fallidas', num: true, render: function (r) { return dot(r.fallidasPct <= M.fallidasPct) + F.num(r.fallidasPct, 1) + ' %'; } },
+      { key: 'notasCredito', label: 'Notas crédito', num: true, hideMobile: true }
+    ],
+    onRowClick: function (r) { st.ruta = st.ruta === r.rutaId ? '' : r.rutaId; render(); UI.toast(st.ruta ? 'Reporte filtrado por ' + r.nombre + '.' : 'Se quitó el filtro de ruta.', 'info'); },
+    actions: function (r) { return [{ label: st.ruta === r.rutaId ? 'Quitar filtro' : 'Filtrar el reporte', icon: 'filter', onClick: function () { st.ruta = st.ruta === r.rutaId ? '' : r.rutaId; render(); } }, { label: 'Ver la ruta', icon: 'route', href: 'rutas.html?id=' + encodeURIComponent(r.rutaId) }]; }
+  });
+  var tVeh = UI.table($('#tblVeh'), {
+    rows: [], pageSize: 8, dense: true, rowKey: 'placa', caption: 'Indicadores por vehículo', searchable: { placeholder: 'Buscar placa o tipo' }, emptyText: 'No hay vehículos que coincidan.',
+    filters: [{ key: 'tipo', label: 'Tipo', all: 'Todos los tipos', options: 'auto' }],
+    columns: [
+      { key: 'placa', label: 'Vehículo', title: true, render: function (r) { return UI.plate(r.placa) + (st.veh === r.placa ? '<span class="chip chip-info chip-sm tag-filter">En filtro</span>' : '') + '<div class="cell-sub">' + esc(r.tipo) + '</div>'; } },
+      { key: 'viajes', label: 'Viajes', num: true },
+      { key: 'km', label: 'Km', num: true, render: function (r) { return F.num(r.km, 0); } },
+      { key: 'utilizacionPct', label: 'Utilización', render: function (r) { return UI.meter(r.utilizacionPct, 100, { label: 'Utilización ' + r.placa, mark: M.utilizacionPesoPct }); } },
+      { key: 'otifPct', label: 'OTIF', num: true, render: function (r) { return dot(r.otifPct >= M.otifPct) + F.num(r.otifPct, 1) + ' %'; } },
+      { key: 'tiempoMuertoMin', label: 'Tiempo muerto', num: true, render: function (r) { return dot(r.tiempoMuertoMin <= M.muertoMin) + r.tiempoMuertoMin + ' min'; } }
+    ],
+    onRowClick: function (r) { st.veh = st.veh === r.placa ? '' : r.placa; render(); UI.toast(st.veh ? 'Reporte filtrado por ' + r.placa + '.' : 'Se quitó el filtro de vehículo.', 'info'); },
+    actions: function (r) { return [{ label: st.veh === r.placa ? 'Quitar filtro' : 'Filtrar el reporte', icon: 'filter', onClick: function () { st.veh = st.veh === r.placa ? '' : r.placa; render(); } }, { label: 'Ver el vehículo', icon: 'truck', href: 'vehiculos.html?placa=' + encodeURIComponent(r.placa) }]; }
+  });
+
+  UI.tabs($('#cmpTabs'));
+
+  /* ---------- exportación (HU-161) ---------- */
+  function exportRows() {
+    var sede = A.sedes.filter(function (s) { return s.id === st.sede; })[0].nombre, rt = st.ruta ? rutaNom(st.ruta) : 'Todas', vh = st.veh || 'Todos';
+    var head = ['Fecha', 'Sede', 'Ruta', 'Vehículo', 'Entregas despachadas', 'Entregas completas %', 'Entregas a tiempo %', 'OTIF %', 'Km por entrega', 'Km por tonelada', 'Utilización de peso %', 'Utilización de volumen %', 'Tiempo de cargue min', 'Tiempo de descargue min', 'Tiempo muerto min', 'Entregas fallidas', 'Fallidas %', 'Notas crédito', 'Notas crédito COP', 'Exactitud de inventario %'];
+    var rows = CUR.map(function (x) { return [x.fecha, sede, rt, vh, x.despachados, x.completasPct, x.aTiempoPct, x.otifPct, x.kmPorEntrega, x.kmPorTon, x.utilizacionPesoPct, x.utilizacionVolPct, x.cargueMin, x.descargueMin, x.muertoMin, x.fallidas, x.fallidasPct, x.notasCredito, x.notasCreditoCOP, x.exactitudInvPct]; });
+    return { head: head, rows: rows };
+  }
+  function cell(v) { if (typeof v === 'number') return String(v).replace('.', ','); return /[;"\n]/.test(v) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v); }
+  function download(name, mime, text) {
+    var blob = new Blob(['﻿' + text], { type: mime + ';charset=utf-8' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  function stamp() { return A.ymd(0) + '-' + st.n + 'd'; }
+  function doExport(kind) {
+    var d = exportRows();
+    if (kind === 'csv') {
+      download('armetales-reportes-' + stamp() + '.csv', 'text/csv', [d.head.map(cell).join(';')].concat(d.rows.map(function (r) { return r.map(cell).join(';'); })).join('\r\n'));
+      UI.toast('CSV generado con ' + d.rows.length + ' filas del periodo filtrado.', 'success', { title: 'Exportación lista' });
+    } else if (kind === 'xls') {
+      var h = '<html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>' + d.head.map(function (x) { return '<th>' + esc(x) + '</th>'; }).join('') + '</tr></thead><tbody>' + d.rows.map(function (r) { return '<tr>' + r.map(function (v) { return '<td>' + esc(typeof v === 'number' ? String(v).replace('.', ',') : v) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></body></html>';
+      download('armetales-reportes-' + stamp() + '.xls', 'application/vnd.ms-excel', h);
+      UI.toast('Libro de Excel generado con ' + d.rows.length + ' filas.', 'success', { title: 'Exportación lista' });
+    } else { UI.toast('Abriendo la vista de impresión: elige «Guardar como PDF».', 'info'); setTimeout(function () { window.print(); }, 350); }
+  }
+  $('#exportBtn').addEventListener('click', function () {
+    UI.menu(this, [{ heading: 'Vista filtrada · ' + periodoTxt() }, { label: 'CSV (.csv)', icon: 'file-text', onClick: function () { doExport('csv'); } }, { label: 'Excel (.xls)', icon: 'database', onClick: function () { doExport('xls'); } }, { label: 'PDF (imprimir)', icon: 'download', onClick: function () { doExport('pdf'); } }], { align: 'end' });
+  });
+
+  /* ---------- render general ---------- */
+  function render() {
+    syncFilters();
+    var sinDatos = st.sede !== SEDE_DATOS;
+    $('#report').hidden = sinDatos; $('#emptyHost').hidden = !sinDatos; $('#exportBtn').disabled = sinDatos;
+    if (sinDatos) {
+      var nm = A.sedes.filter(function (s) { return s.id === st.sede; })[0].nombre;
+      $('#emptyHost').innerHTML = '<div class="card"><div class="card-body">' + UI.empty({ icon: 'bar-chart', title: nm + ' aún no tiene entregas en el periodo', text: 'Los indicadores se calculan con los despachos cerrados de cada sede. Cuando ' + nm + ' empiece a despachar, aparecerán aquí.', action: { label: 'Ver CEDI Bogotá', id: 'back' } }) + '</div></div>';
+      $('#emptyHost [data-empty-action]').addEventListener('click', function () { st.sede = SEDE_DATOS; render(); });
+      return;
+    }
+    compute(); renderHero(); renderGrid();
+    var rr = K.porRuta.map(function (r) { return r; }), vv = K.porVehiculo.map(function (v) { return v; });
+    tRuta.setRows(rr); tVeh.setRows(vv);
+  }
+  render();
+});
+</script>
+</body>
+</html>

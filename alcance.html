@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alcance de la propuesta · Armetales</title>
+<meta name="description" content="Alcance de la propuesta: 27 módulos, 241 historias de usuario, el flujo de punta a punta y las decisiones pendientes.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout propio de «Alcance» (tokens y componentes viven en app.css) */
+  .al-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .al-stat { padding: 18px 20px; }
+  .al-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 40px; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .al-stat .l { margin-top: 6px; font-size: 13px; color: var(--text-2); }
+  @media (max-width: 639px) { .al-stat { padding: 14px; } .al-stat .v { font-size: 30px; } .al-stat .l { font-size: 12px; } }
+  .flow { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0; list-style: none; margin: 0; padding: 0; counter-reset: fl; }
+  .flow li { position: relative; }
+  .flow a { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 6px 12px; text-align: center; color: var(--text); border-radius: var(--r-ctl); font-weight: 600; font-size: 13px; text-decoration: none; transition: background .12s; }
+  .flow a:hover { background: var(--surface-3); text-decoration: none; }
+  .flow .fl-ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--surface-3); border: 1px solid var(--border); color: var(--text); position: relative; z-index: 1; }
+  .flow a:hover .fl-ico { border-color: var(--red); color: var(--red-fg); }
+  .flow .fl-n { font: 500 11px/1 var(--font-mono); color: var(--text-3); }
+  .flow .fl-m { font-weight: 400; font-size: 11.5px; color: var(--text-2); line-height: 1.3; }
+  .flow li:not(:last-child)::after { content: ""; position: absolute; top: 36px; left: calc(50% + 28px); right: calc(-50% + 28px); height: 2px; background-image: repeating-linear-gradient(90deg, var(--border-strong) 0 6px, transparent 6px 10px); }
+  @media (max-width: 899px) { .flow { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 6px; } .flow li:nth-child(4)::after { display: none; } }
+  @media (max-width: 479px) { .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } .flow li::after { display: none !important; } }
+  .al-tools { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; margin-bottom: 14px; }
+  @media (max-width: 639px) { .al-tools .btn, .al-tools .segmented button { min-height: 40px; } }
+  .al-tools .search { flex: 1 1 280px; max-width: 460px; }
+  .grp { margin-top: 22px; }
+  .grp-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  .grp-head .eyebrow { color: var(--text-2); }
+  .grp-head .cnt { font-size: 12px; color: var(--text-3); }
+  .mod { border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow-1); }
+  .mod + .mod { margin-top: 8px; }
+  .mod > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto 20px; gap: 12px; align-items: center; padding: 12px 14px; border-radius: var(--r-card); }
+  .mod > summary::-webkit-details-marker { display: none; }
+  .mod > summary:hover { background: var(--surface-2); }
+  .mod > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .mod[open] > summary { border-bottom: 1px solid var(--border); border-radius: var(--r-card) var(--r-card) 0 0; }
+  .m-num { font-family: var(--font-display); font-weight: 600; font-size: 20px; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; background: var(--surface-3); font-variant-numeric: tabular-nums; }
+  .m-name { font-weight: 600; font-size: 14.5px; line-height: 1.3; }
+  .m-sub { font-size: 12.5px; color: var(--text-2); margin-top: 1px; }
+  .m-hu { font: 500 12px/1 var(--font-mono); color: var(--text-2); white-space: nowrap; }
+  .m-chev { color: var(--text-3); transition: transform .15s; display: grid; }
+  .mod[open] .m-chev { transform: rotate(90deg); }
+  .mod-body { padding: 6px 14px 14px; }
+  .mod-body .mb-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 8px 0 4px; }
+  .mod-hu { list-style: none; margin: 0; padding: 0; }
+  .mod-hu li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; line-height: 1.4; }
+  .mod-hu li:last-child { border-bottom: 0; }
+  .mod-hu .id { font-family: var(--font-mono); font-size: 12px; color: var(--text-2); padding-top: 1px; }
+  .mod-hu mark { background: var(--amber-bg); color: var(--amber-fg); border-radius: 3px; padding: 0 1px; }
+  @media (max-width: 719px) {
+    .mod > summary { grid-template-columns: 34px minmax(0, 1fr) auto 16px; gap: 10px; padding: 10px 12px; min-height: 56px; }
+    .mod > summary .chip { display: none; }
+    .m-num { width: 34px; height: 34px; font-size: 18px; }
+    .m-name { font-size: 14px; }
+    .m-sub { font-size: 12px; }
+  }
+  .q-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); }
+  .q-card { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .q-top { display: flex; align-items: center; gap: 10px; }
+  .q-n { font-family: var(--font-display); font-weight: 600; font-size: 18px; min-width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--amber-bg); color: var(--amber-fg); font-variant-numeric: tabular-nums; }
+  .q-q { font-weight: 600; font-size: 14.5px; line-height: 1.4; }
+  .q-ctx { font-size: 13px; color: var(--text-2); line-height: 1.5; }
+  .q-mods { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; padding-top: 4px; }
+  .q-mods a { font: 500 12px/1 var(--font-ui); padding: 5px 7px; border-radius: 6px; background: var(--surface-3); color: var(--text-2); text-decoration: none; border: 1px solid transparent; }
+  .q-mods a:hover { border-color: var(--border-strong); color: var(--text); }
+  .about { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+  .about .card { padding: 16px; }
+  .about h3 { font-size: 14px; font-family: var(--font-ui); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .about p { font-size: 13px; color: var(--text-2); margin-top: 6px; line-height: 1.5; }
+  .al-count { font-size: 13px; color: var(--text-2); }
+  :root[data-theme="dark"] a.btn { color: var(--b-fg); } /* el color de enlace del tema oscuro pisaba el de los botones-enlace */
+</style>
+</head>
+<body data-page="alcance">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Propuesta</div>
+      <h1 class="page-title">Alcance de la propuesta</h1>
+      <p class="page-desc">Qué cubre la plataforma logística de Armetales, de la recepción del pedido a la evidencia de entrega, y qué decisiones necesitamos de ustedes.</p>
+    </div>
+    <div class="page-actions"><a class="btn btn-primary" href="panel.html" id="goPanel"></a></div>
+  </header>
+
+  <section aria-label="Cifras del alcance">
+    <div class="al-stats" id="stats"></div>
+  </section>
+
+  <section class="section" aria-labelledby="flowT">
+    <div class="section-head"><h2 class="section-title" id="flowT">El flujo de punta a punta</h2><span class="al-count">Cada paso abre la pantalla que lo cubre</span></div>
+    <div class="card card-pad"><ol class="flow" id="flow"></ol></div>
+  </section>
+
+  <section class="section" aria-labelledby="modT">
+    <div class="section-head"><h2 class="section-title" id="modT">Módulos e historias de usuario</h2><span class="al-count" id="modCount"></span></div>
+    <div class="al-tools">
+      <div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="input" type="search" id="q" placeholder="Buscar entre las 241 historias" aria-label="Buscar historias de usuario" autocomplete="off"></div>
+      <div class="segmented" role="group" aria-label="Procedencia" id="procSeg"></div>
+      <button type="button" class="btn btn-ghost btn-sm" id="toggleAll">Expandir todo</button>
+    </div>
+    <div id="mods"></div>
+    <div id="modsEmpty" hidden></div>
+  </section>
+
+  <section class="section" aria-labelledby="qT">
+    <div class="section-head"><h2 class="section-title" id="qT">Decisiones pendientes</h2><span class="al-count" id="qCount"></span></div>
+    <div class="q-grid" id="qs"></div>
+  </section>
+
+  <section class="section" aria-labelledby="abT">
+    <div class="section-head"><h2 class="section-title" id="abT">Qué es este demo</h2></div>
+    <div class="about" id="about"></div>
+  </section>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(function () {
+  var A = window.ARM, esc = UI.esc, $ = UI.$, mods = A.modulos, byN = {};
+  mods.forEach(function (m) { byN[m.numero] = m; });
+  var SCR = { 'index.html': 'Inicio de sesión', 'alcance.html': 'Alcance de la propuesta' };
+  UI.nav.forEach(function (g) { g.items.forEach(function (i) { SCR[i.href] = i.label; }); });
+  function scr(f) { return SCR[String(f).split(/[?#]/)[0]] || String(f).replace('.html', ''); }
+  var totalHU = mods.reduce(function (a, m) { return a + m.hu.length; }, 0);
+  $('#goPanel').innerHTML = UI.icon('layout-dashboard') + 'Ir al panel de control';
+
+  /* cifras */
+  $('#stats').innerHTML = [[mods.length, 'módulos funcionales'], [totalHU, 'historias de usuario'], [A.roles.length, 'roles de usuario']].map(function (s) { return '<div class="card al-stat"><div class="v">' + s[0] + '</div><div class="l">' + s[1] + '</div></div>'; }).join('');
+
+  /* flujo */
+  var FLOW = [['Pedido', 'package', 'pedidos.html', '08'], ['Reserva', 'lock', 'reservas.html', '09'], ['Planeación', 'calendar', 'planeacion.html', '10'], ['Ruta', 'route', 'motor-rutas.html', '11'], ['Cargue', 'layers', 'cargue.html', '12'], ['Despacho', 'clipboard-list', 'despachos.html', '13'], ['Seguimiento', 'navigation', 'seguimiento.html', '14'], ['Entrega', 'camera', 'evidencias.html', '15 · 16']];
+  $('#flow').innerHTML = FLOW.map(function (f, i) { return '<li><a href="' + f[2] + '"><span class="fl-ico">' + UI.icon(f[1]) + '</span><span>' + f[0] + '</span><span class="fl-n">Módulo ' + f[3] + '</span></a></li>'; }).join('');
+
+  /* módulos por grupo */
+  var GROUPS = [['Operación', [8, 9, 10, 11, 12, 13, 14, 15, 16, 25, 18]], ['Bodega (WMS)', [22, 23, 24]], ['Análisis', [17, 21]], ['Maestros', [4, 5, 6, 7]], ['Administración e integraciones', [1, 2, 3, 19, 20, 26, 27]]];
+  var TONO = { 'Fuente directa': 'info', 'Propuesta transversal': 'neutral', 'Fuente directa contextual': 'warning' };
+  var PROCS = ['Todas', 'Fuente directa', 'Propuesta transversal', 'Fuente directa contextual'];
+  var proc = 'Todas', query = '', allOpen = false;
+  $('#procSeg').innerHTML = PROCS.map(function (p) { return '<button type="button" data-p="' + esc(p) + '" aria-pressed="' + (p === proc) + '">' + esc(p === 'Fuente directa contextual' ? 'Contextual' : p === 'Propuesta transversal' ? 'Transversal' : p === 'Fuente directa' ? 'Directa' : p) + '</button>'; }).join('');
+  function hl(t) { if (!query) return esc(t); var n = UI.norm(t), q = UI.norm(query), i = n.indexOf(q); if (i < 0) return esc(t); return esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>' + esc(t.slice(i + q.length)); }
+  var openState = {};
+  function render() {
+    var q = UI.norm(query), shown = 0, hus = 0, html = '';
+    GROUPS.forEach(function (g) {
+      var items = g[1].map(function (n) { return byN[n]; }).filter(function (m) {
+        if (proc !== 'Todas' && m.procedencia !== proc) return false;
+        if (!q) return true;
+        return UI.norm(m.nombre).indexOf(q) > -1 || m.hu.some(function (h) { return UI.norm(h.id + ' ' + h.titulo).indexOf(q) > -1; });
+      });
+      if (!items.length) return;
+      html += '<div class="grp"><div class="grp-head"><span class="eyebrow">' + esc(g[0]) + '</span><span class="cnt">' + items.length + (items.length === 1 ? ' módulo' : ' módulos') + '</span></div>' + items.map(function (m) {
+        var list = q ? m.hu.filter(function (h) { return UI.norm(h.id + ' ' + h.titulo).indexOf(q) > -1; }) : m.hu;
+        if (q && !list.length) list = m.hu; shown++; hus += q ? m.hu.filter(function (h) { return UI.norm(h.id + ' ' + h.titulo).indexOf(q) > -1; }).length : m.hu.length;
+        var open = q ? true : (allOpen || openState[m.numero]);
+        return '<details class="mod" data-n="' + m.numero + '"' + (open ? ' open' : '') + '><summary><span class="m-num">' + String(m.numero).padStart(2, '0') + '</span><span><span class="m-name">' + esc(m.nombre) + '</span><span class="m-sub" style="display:block">' + esc(scr(m.pantalla)) + '</span></span>' + UI.chip(m.procedencia, { tone: TONO[m.procedencia] || 'neutral', small: true }) + '<span class="m-hu">' + m.cantidadHU + ' HU</span><span class="m-chev">' + UI.icon('chevron-right', 'icon-sm') + '</span></summary>' +
+          '<div class="mod-body"><div class="mb-top"><span class="al-count">' + (q ? list.length + ' de ' + m.cantidadHU + ' historias coinciden' : m.cantidadHU + ' historias de usuario') + '</span><a class="btn btn-secondary btn-sm" href="' + esc(m.pantalla) + '" aria-label="Ver pantalla ' + esc(scr(m.pantalla)) + '">Ver pantalla' + UI.icon('arrow-right') + '</a></div><ul class="mod-hu">' + list.map(function (h) { return '<li><span class="id">' + esc(h.id.replace('ARM-', '')) + '</span><span>' + hl(h.titulo) + '</span></li>'; }).join('') + '</ul></div></details>';
+      }).join('') + '</div>';
+    });
+    $('#mods').innerHTML = html;
+    var e = $('#modsEmpty'); e.hidden = shown > 0; e.innerHTML = shown ? '' : UI.empty({ icon: 'search', title: 'Ninguna historia coincide', text: 'Prueba con otra palabra, por ejemplo «reserva», «firma» o «SAP», o quita el filtro de procedencia.', action: { label: 'Limpiar búsqueda', id: 'clr' } });
+    var c = $('#clr'); if (c) c.addEventListener('click', function () { query = ''; proc = 'Todas'; $('#q').value = ''; sync(); render(); });
+    $('#modCount').textContent = q || proc !== 'Todas' ? shown + ' módulos · ' + hus + ' historias' : mods.length + ' módulos · ' + totalHU + ' historias';
+    UI.$$('.mod', $('#mods')).forEach(function (d) { d.addEventListener('toggle', function () { if (!query) openState[d.dataset.n] = d.open; }); });
+  }
+  function sync() { UI.$$('#procSeg button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.p === proc); }); }
+  $('#q').addEventListener('input', function () { query = this.value.trim(); render(); });
+  $('#procSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; proc = b.dataset.p; sync(); render(); });
+  $('#toggleAll').addEventListener('click', function () { allOpen = !allOpen; mods.forEach(function (m) { openState[m.numero] = allOpen; }); this.textContent = allOpen ? 'Contraer todo' : 'Expandir todo'; render(); });
+  render();
+
+  /* decisiones pendientes */
+  var qs = A.preguntas || [];
+  $('#qCount').textContent = qs.length + ' preguntas por definir';
+  $('#qs').innerHTML = qs.map(function (p) { return '<article class="card q-card"><div class="q-top"><span class="q-n">' + p.n + '</span><span class="chip chip-neutral chip-sm no-dot">' + esc(p.tema) + '</span><span class="ml-auto">' + UI.chip(p.estado || 'Pendiente', { tone: 'warning', small: true }) + '</span></div><h3 class="q-q">' + esc(p.pregunta) + '</h3><p class="q-ctx">' + esc(p.contexto) + '</p><div class="q-mods" aria-label="Módulos afectados">' + p.modulos.map(function (n) { var m = byN[n]; return m ? '<a href="' + esc(m.pantalla) + '" title="' + esc(m.nombre) + '">' + String(n).padStart(2, '0') + ' · ' + esc(scr(m.pantalla)) + '</a>' : ''; }).join('') + '</div></article>'; }).join('');
+
+  /* qué es este demo */
+  var ABOUT = [['database', 'Datos de ejemplo', 'Clientes, pedidos, vehículos y rutas son ficticios, con formato colombiano. Los cambios que hagas viven solo en tu navegador.'], ['plug', 'Sin integraciones reales', 'SAP, Data Lake y Easy Sales se simulan: no se conecta ni se envía nada a sistemas externos.'], ['file-text', 'Cifras no contractuales', 'Tiempos, costos, kilómetros y porcentajes ilustran el comportamiento esperado y no constituyen compromiso de resultados.'], ['layout-dashboard', 'Hecho para recorrer', 'Navega por el menú lateral o con la búsqueda (Ctrl K). En cada pantalla, el botón «HU» lista las historias que demuestra.']];
+  $('#about').innerHTML = ABOUT.map(function (a) { return '<div class="card"><h3>' + UI.icon(a[0], 'icon-sm') + esc(a[1]) + '</h3><p>' + esc(a[2]) + '</p></div>'; }).join('');
+})();
+</script>
+</body>
+</html>

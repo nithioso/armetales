@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Despachos · Armetales</title>
+<meta name="description" content="Gestión de despachos de Armetales: órdenes de despacho, salida de vehículos, reprogramación y cierre con resultado por pedido.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  select.select.input-sm { padding-right: 32px; }
+
+  /* Layout específico de despachos */
+  .kpi-row { display: grid; gap: 12px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  @media (max-width: 1099px) { .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi-row > :last-child:nth-child(odd) { grid-column: span 2; } .kpi .kpi-value { font-size: 26px; } .kpi { padding: 12px; } }
+  .kpi.is-active { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+  :root[data-theme="dark"] .kpi.is-active { border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
+  .view-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; margin: 20px 0 12px; }
+  .board { display: grid; gap: 12px; grid-template-columns: repeat(5, minmax(220px, 1fr)); overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+  .b-col { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-card); min-width: 0; display: flex; flex-direction: column; }
+  .b-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; font-weight: 600; font-size: 13.5px; }
+  .b-list { display: grid; gap: 8px; padding: 0 8px 8px; align-content: start; min-height: 80px; }
+  .b-card { text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-ctl); padding: 10px 12px; display: grid; gap: 6px; box-shadow: var(--shadow-1); transition: border-color .12s; }
+  .b-card:hover { border-color: var(--border-strong); }
+  .b-card .bc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .b-card .bc-sub { font-size: 12.5px; color: var(--text-2); }
+  .b-empty { font-size: 12.5px; color: var(--text-3); padding: 14px 6px; text-align: center; }
+  .head-block { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .link-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .mini-stat { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .mini-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; } .mini-stat .l { font-size: 12px; color: var(--text-2); }
+  .wiz-steps { margin-bottom: 18px; }
+  .wiz-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 16px; margin-top: 18px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+  .pick { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); cursor: pointer; }
+  .pick:hover { background: var(--surface-2); } .pick:has(input:checked) { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 7%, var(--surface)); }
+  .pick.is-dup { background: var(--surface-2); }
+  .pick .o-sub { font-size: 12.5px; color: var(--text-2); }
+  .chk { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .chk:last-child { border-bottom: 0; }
+  .chk-ico { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; }
+  .chk-ico .icon { width: 14px; height: 14px; }
+  .chk-ico.ok { background: var(--green-bg); color: var(--green-fg); } .chk-ico.warn { background: var(--amber-bg); color: var(--amber-fg); } .chk-ico.block { background: var(--red-bg); color: var(--red-fg); }
+  .chk .c-t { font-weight: 500; } .chk .c-s { font-size: 12.5px; color: var(--text-2); margin-top: 1px; }
+  .res-row { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 8px 12px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .res-row:last-child { border-bottom: 0; }
+  @media (max-width: 559px) { .res-row { grid-template-columns: minmax(0, 1fr); } }
+  .res-row .r-sub { font-size: 12.5px; color: var(--text-2); }
+  .doc-sheet { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px; padding: 24px; font-size: 13px; }
+  .doc-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; border-bottom: 2px solid var(--ink); padding-bottom: 14px; flex-wrap: wrap; }
+  :root[data-theme="dark"] .doc-head { border-color: var(--text); }
+  .doc-head img { height: 34px; width: auto; }
+  .doc-title { font-family: var(--font-display); font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .doc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px; margin: 14px 0; }
+  .doc-grid div span { display: block; font-size: 11.5px; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+  .doc-sheet table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .doc-sheet th, .doc-sheet td { border: 1px solid var(--border-strong); padding: 6px 8px; text-align: left; vertical-align: top; }
+  .doc-sheet th { background: var(--surface-3); font-weight: 600; }
+  .doc-sign { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 40px; }
+  .doc-sign div { border-top: 1px solid var(--text-2); padding-top: 6px; font-size: 12px; color: var(--text-2); text-align: center; }
+  @media (max-width: 559px) { .doc-sheet { padding: 14px; } .doc-grid, .doc-sign { grid-template-columns: minmax(0, 1fr); gap: 14px; } .doc-sheet .tbl-scroll { overflow-x: auto; } }
+  @media print {
+    body * { visibility: hidden !important; }
+    .doc-sheet, .doc-sheet * { visibility: visible !important; }
+    .doc-sheet { position: absolute; left: 0; top: 0; width: 100%; border: 0; }
+    .overlay { background: none !important; }
+  }
+</style>
+</head>
+<body data-page="despachos">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Operación</div>
+      <h1 class="page-title">Gestión de despachos</h1>
+      <p class="page-desc">Genera órdenes de despacho desde los viajes confirmados, registra la salida de cada vehículo y cierra con el resultado por pedido.</p>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-secondary" href="seguimiento.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 19-9-9 19-2-8z"/></svg>Seguimiento</a>
+      <button type="button" class="btn btn-primary" id="newBtn"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Generar orden de despacho</button>
+    </div>
+  </header>
+
+  <section aria-label="Resumen por estado"><div class="kpi-row" id="kpiRow"></div></section>
+
+  <div class="view-bar">
+    <h2 class="section-title" id="listTitle">Todos los despachos</h2>
+    <div class="segmented" role="group" aria-label="Vista" id="viewSeg"><button type="button" data-v="tabla" aria-pressed="true">Tabla</button><button type="button" data-v="tablero" aria-pressed="false">Tablero</button></div>
+  </div>
+  <div id="tableHost"></div>
+  <div id="boardHost" hidden></div>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$, ic = UI.icon;
+  var HOY = A.ymd(0), MANANA = A.ymd(1);
+  var ESTADOS = ['Programado', 'En cargue', 'En ruta', 'Cerrado', 'Reprogramado'];
+  var TONE = { 'Programado': 'neutral', 'En cargue': 'warning', 'En ruta': 'info', 'Cerrado': 'success', 'Reprogramado': 'danger' };
+  var PREF = A.despachos[0].despachoId.slice(0, 8), nextNum = Math.max.apply(null, A.despachos.map(function (d) { return +d.despachoId.slice(9); })) + 1;
+  var MOTIVOS = ['Falla mecánica del vehículo', 'Cierre vial en la ruta', 'Pico y placa de carga', 'Cliente solicita aplazar la entrega', 'Preparación sin certificar', 'Otro motivo'];
+  function chipE(e) { return UI.chip(e, { tone: TONE[e] }); }
+  function ped(id) { return A.idx.pedidos[id]; }
+  function veh(pl) { return A.idx.vehiculos[pl]; }
+  function cond(id) { return A.idx.conductores[id]; }
+  function plural(n, s, p) { return n + ' ' + (n === 1 ? s : p); }
+  function dtLocal(d) { var p = function (n) { return ('0' + n).slice(-2); }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()); }
+  function errTxt(el, msg) { el.hidden = false; el.innerHTML = ic('alert-circle', 'icon-sm') + esc(msg); }
+
+  /* ---------- datos: despachos reales + órdenes ya generadas desde el plan ---------- */
+  var rows = A.despachos.map(function (d) { return { id: d.despachoId, estado: d.estado === 'Cargando' ? 'En cargue' : d.estado, placa: d.vehiculoId, rutaId: d.rutaId, conductorId: d.conductorId, pedidoIds: d.pedidoIds.slice(), kg: d.pesoKg, m3: d.volumenM3, util: d.utilizacionPesoPct, utilVol: d.utilizacionVolPct, salida: d.fechaSalida || d.salidaPrevista, fecha: d.fecha, paradas: d.paradas, entregadas: d.entregadas, km: d.kmEstimados, viajeId: null, fechaCierre: d.fechaCierre, real: true }; });
+  var ordenDe = {};
+  function fromViaje(vj, estado, extra) {
+    var v = veh(vj.vehiculoId), id = PREF + '-' + ('00' + (nextNum++)).slice(-3), r = { id: id, estado: estado, placa: vj.vehiculoId, rutaId: vj.rutaId, conductorId: v.conductorId, pedidoIds: vj.pedidoIds.slice(), kg: pesoDe(vj.pedidoIds), m3: volDe(vj.pedidoIds), salida: vj.salidaPrevista, fecha: HOY, paradas: vj.pedidoIds.length, entregadas: 0, km: vj.kmEstimados, viajeId: vj.viajeId, real: false };
+    r.util = Math.round(r.kg / v.pesoMaxKg * 100); r.utilVol = Math.round(r.m3 / v.volumenMaxM3 * 100); for (var k in extra) r[k] = extra[k]; ordenDe[vj.viajeId] = id; rows.push(r); return r;
+  }
+  function pesoDe(ids) { return Math.round(ids.reduce(function (s, i) { return s + ped(i).pesoKg; }, 0) * 10) / 10; }
+  function volDe(ids) { return Math.round(ids.reduce(function (s, i) { return s + ped(i).volumenM3; }, 0) * 100) / 100; }
+  var PV = {}; A.plan.viajes.forEach(function (v) { PV[v.viajeId] = v; });
+  fromViaje(PV['VJ-2'], 'Programado'); fromViaje(PV['VJ-3'], 'Programado');
+  fromViaje(PV['VJ-5'], 'Reprogramado', { fecha: MANANA, nuevaFecha: MANANA + 'T06:00', motivo: 'Cierre vial en la ruta', detalleMotivo: 'Cierre por derrumbe en la vía Bogotá – Tunja; se reprograma para mañana a primera hora.' });
+  function byId(id) { return rows.filter(function (r) { return r.id === id; })[0]; }
+  function pendCargue(r) { return A.cargue.filter(function (c) { return c.despachoId === r.id && c.estado === 'Pendiente'; }).length; }
+
+  /* ---------- KPIs por estado y tabla ---------- */
+  var filtroE = '';
+  function renderKpis() {
+    var icons = { 'Programado': 'calendar', 'En cargue': 'layers', 'En ruta': 'truck', 'Cerrado': 'check-circle', 'Reprogramado': 'refresh' };
+    $('#kpiRow').innerHTML = ESTADOS.map(function (e) { var n = rows.filter(function (r) { return r.estado === e; }).length, kg = rows.filter(function (r) { return r.estado === e; }).reduce(function (s, r) { return s + r.kg; }, 0); return UI.kpi({ id: e, label: e, icon: icons[e], value: n, note: n ? F.ton(kg) : 'Sin despachos', onClick: true }); }).join('');
+    $$('#kpiRow .kpi').forEach(function (k) { var on = k.dataset.kpi === filtroE; k.classList.toggle('is-active', on); k.setAttribute('aria-pressed', on); });
+  }
+  $('#kpiRow').addEventListener('click', function (e) { var k = e.target.closest('[data-kpi]'); if (!k) return; setFiltro(filtroE === k.dataset.kpi ? '' : k.dataset.kpi); });
+  function setFiltro(v) { filtroE = v; tbl.setFilter('estado', v); renderKpis(); renderBoard(); $('#listTitle').textContent = v ? 'Despachos · ' + v : 'Todos los despachos'; }
+
+  var tbl = UI.table($('#tableHost'), {
+    rows: rows, rowKey: 'id', pageSize: 8, caption: 'Despachos', emptyText: 'No hay despachos con estos filtros.', searchable: { placeholder: 'Buscar por despacho, placa, ruta o conductor' }, sort: { key: 'salida', dir: 'desc' },
+    searchKeys: ['id', 'placa', 'rutaId'],
+    filters: [{ key: 'estado', label: 'Estado', all: 'Todos los estados', options: ESTADOS }, { key: 'rutaId', label: 'Ruta', all: 'Todas las rutas', options: A.rutas.map(function (r) { return { value: r.rutaId, label: r.nombre }; }) }],
+    columns: [
+      { key: 'id', label: 'Despacho', mono: true },
+      { key: 'placa', label: 'Vehículo', title: true, render: function (r) { return UI.plate(r.placa) + '<div class="cell-sub">' + esc(veh(r.placa).tipo) + ' · ' + esc(cond(r.conductorId).nombre) + '</div>'; } },
+      { key: 'rutaId', label: 'Ruta', value: function (r) { return A.idx.rutas[r.rutaId].nombre; }, render: function (r) { return esc(A.idx.rutas[r.rutaId].nombre) + '<div class="cell-sub">' + r.rutaId + '</div>'; } },
+      { key: 'paradas', label: 'Pedidos', num: true, hideMobile: true, render: function (r) { return r.estado === 'En ruta' ? r.entregadas + ' / ' + r.paradas : r.paradas; } },
+      { key: 'kg', label: 'Carga', num: true, render: function (r) { return F.kg(r.kg) + '<div class="cell-sub">' + r.util + ' % de la capacidad</div>'; } },
+      { key: 'salida', label: 'Salida', render: function (r) { var d = r.estado === 'Reprogramado' ? r.nuevaFecha : r.salida; return '<span class="nowrap">' + (String(d).slice(0, 10) === HOY ? 'Hoy' : F.fecha(d)) + ' · ' + F.hora(d) + '</span>' + (r.estado === 'Programado' || r.estado === 'En cargue' ? '<div class="cell-sub">prevista</div>' : ''); } },
+      { key: 'estado', label: 'Estado', render: function (r) { return chipE(r.estado); } }
+    ],
+    onRowClick: function (r) { openDsp(r.id); },
+    actions: function (r) { return [{ label: 'Ver detalle', icon: 'eye', onClick: function () { openDsp(r.id); } }, { label: 'Ver orden de despacho', icon: 'file-text', onClick: function () { orderDoc(r.id); } }, { sep: true }, { label: 'Seguimiento', icon: 'navigation', href: 'seguimiento.html', disabled: r.estado !== 'En ruta' }, { label: 'Cargue', icon: 'layers', href: 'cargue.html' }, { label: 'Evidencias', icon: 'camera', href: 'evidencias.html' }]; }
+  });
+
+  /* ---------- tablero (HU-117) ---------- */
+  function renderBoard() {
+    $('#boardHost').innerHTML = '<div class="board">' + ESTADOS.map(function (e) {
+      var l = rows.filter(function (r) { return r.estado === e; });
+      return '<section class="b-col" aria-label="' + e + '"><div class="b-head"><span>' + chipE(e) + '</span><span class="muted">' + l.length + '</span></div><div class="b-list">' + (l.length ? l.map(function (r) {
+        return '<button type="button" class="b-card" data-open="' + r.id + '"><span class="bc-top">' + UI.plate(r.placa) + '<span class="mono t-12 muted">' + r.id.slice(5) + '</span></span><span class="strong">' + esc(A.idx.rutas[r.rutaId].nombre) + '</span><span class="bc-sub">' + esc(cond(r.conductorId).nombre) + '</span>' + (e === 'En ruta' ? UI.meter(r.entregadas, r.paradas, { level: 'info', text: r.entregadas + ' / ' + r.paradas, label: 'Paradas' }) : UI.meter(r.util, 100, { label: 'Utilización' })) + '<span class="bc-sub">' + F.kg(r.kg) + ' · ' + plural(r.paradas, 'pedido', 'pedidos') + '</span></button>'; }).join('') : '<div class="b-empty">Sin despachos en este estado</div>') + '</div></section>'; }).join('') + '</div>';
+  }
+  $('#boardHost').addEventListener('click', function (e) { var b = e.target.closest('[data-open]'); if (b) openDsp(b.dataset.open); });
+  $('#viewSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; $$('button', this).forEach(function (x) { x.setAttribute('aria-pressed', x === b); }); $('#tableHost').hidden = b.dataset.v !== 'tabla'; $('#boardHost').hidden = b.dataset.v !== 'tablero'; });
+  function refreshAll() { tbl.setRows(rows); if (filtroE) tbl.setFilter('estado', filtroE); renderKpis(); renderBoard(); }
+
+  /* ---------- detalle (HU-114/116/118/119) ---------- */
+  function openDsp(id) {
+    var r = byId(id); if (!r) return; var v = veh(r.placa), c = cond(r.conductorId), rt = A.idx.rutas[r.rutaId], pend = pendCargue(r);
+    var step = function (l, k) { var order = { 'Programado': 0, 'En cargue': 1, 'En ruta': 2, 'Cerrado': 3, 'Reprogramado': 0 }, cur = order[r.estado]; return { label: l, state: r.estado === 'Reprogramado' && k === 0 ? 'error' : k < cur ? 'done' : k === cur ? (r.estado === 'Cerrado' ? 'done' : 'current') : 'pending' }; };
+    var pedRows = r.pedidoIds.map(function (pid, i) {
+      var p = ped(pid), pa = A.paradas.filter(function (x) { return x.pedidoId === pid && x.despachoId === r.id; })[0], st = r.resultados && r.resultados[pid] ? r.resultados[pid] : pa ? ({ Entregada: 'Entregado', Parcial: 'Entrega parcial', Fallida: 'Fallido' }[pa.estado] || pa.estado) : p.estado;
+      return '<tr><td class="num">' + (i + 1) + '</td><td><a class="mono" href="pedidos.html?id=' + encodeURIComponent(pid) + '">' + pid + '</a><div class="cell-sub"><a href="clientes.html?id=' + p.clienteId + '">' + esc(p.cliente) + '</a></div></td><td class="num">' + F.kg(p.pesoKg) + '</td><td>' + UI.chip(st, { small: true, tone: st === 'Pendiente' || st === 'En camino' ? 'neutral' : undefined }) + '</td></tr>'; }).join('');
+    var body = '<div class="stack-lg">' +
+      '<div class="head-block">' + UI.plate(r.placa, { large: true }) + '<div><div class="strong">' + esc(v.tipo + ' · ' + v.marca + ' ' + v.modelo) + '</div><div class="muted t-13">' + esc(v.carroceria) + ' · ' + F.kg(v.pesoMaxKg) + ' · ' + F.m3(v.volumenMaxM3, 0) + '</div></div></div>' +
+      UI.kv([['Ruta', '<a href="rutas.html">' + esc(rt.nombre) + '</a>&nbsp; <span class="mono muted">' + rt.rutaId + '</span>'], ['Conductor', esc(c.nombre) + ' · ' + esc(c.telefono)], ['Licencia', c.licencia + ' · vence ' + F.fecha(c.licenciaVence)], ['Vehículo', '<a href="vehiculos.html?placa=' + encodeURIComponent(r.placa) + '">Ver ficha de ' + esc(r.placa) + '</a>'], [r.estado === 'Programado' || r.estado === 'En cargue' ? 'Salida prevista' : r.estado === 'Reprogramado' ? 'Reprogramado para' : 'Salida', F.fecha(r.estado === 'Reprogramado' ? r.nuevaFecha : r.salida) + ' · ' + F.hora(r.estado === 'Reprogramado' ? r.nuevaFecha : r.salida)]].concat(r.precinto ? [['Precinto', '<span class="mono">' + esc(r.precinto) + '</span>'], ['Kilometraje de salida', F.num(r.kmSalida) + ' km']] : []).concat(r.viajeId ? [['Viaje de origen', '<a href="planeacion.html">' + r.viajeId + '</a>']] : [])) +
+      '<div>' + UI.stepper([step('Programado', 0), step('En cargue', 1), step('En ruta', 2), step('Cerrado', 3)]) + '</div>' +
+      (r.estado === 'Reprogramado' ? UI.banner({ tone: 'warning', title: 'Reprogramado · ' + r.motivo, text: (r.detalleMotivo || '') + ' Nueva salida: ' + F.fecha(r.nuevaFecha) + ' ' + F.hora(r.nuevaFecha) + '.' }) : '') +
+      (r.estado === 'En cargue' && pend ? UI.banner({ tone: 'warning', title: plural(pend, 'pedido sin', 'pedidos sin') + ' confirmar en el cargue', text: 'Confirma el cargue antes de registrar la salida o autoriza la salida con excepción.' }) : '') +
+      (r.estado === 'Cerrado' && r.cierreObs ? UI.banner({ tone: 'success', title: 'Despacho cerrado', text: r.cierreObs }) : '') +
+      '<div class="grid c2 gap-3"><div><div class="meter-cap mb-1"><span>Peso ' + F.kg(r.kg) + '</span></div>' + UI.meter(r.kg, v.pesoMaxKg, { size: 'lg', label: 'Peso' }) + '</div><div><div class="meter-cap mb-1"><span>Volumen ' + F.m3(r.m3, 1) + '</span></div>' + UI.meter(r.m3, v.volumenMaxM3, { size: 'lg', low: 30, label: 'Volumen' }) + '</div></div>' +
+      '<section><h3 class="mb-2">Pedidos del despacho</h3><div class="table-wrap"><table class="table is-dense"><thead><tr><th class="num">#</th><th>Pedido y cliente</th><th class="num">Peso</th><th>Estado</th></tr></thead><tbody>' + pedRows + '</tbody></table></div></section>' +
+      '<section><h3 class="mb-2">Flujo relacionado</h3><div class="link-row"><a class="btn btn-secondary btn-sm" href="planeacion.html">' + ic('route', 'icon-sm') + 'Planeación</a><a class="btn btn-secondary btn-sm" href="cargue.html">' + ic('layers', 'icon-sm') + 'Cargue</a><a class="btn btn-secondary btn-sm" href="seguimiento.html">' + ic('navigation', 'icon-sm') + 'Seguimiento</a><a class="btn btn-secondary btn-sm" href="evidencias.html">' + ic('camera', 'icon-sm') + 'Evidencias</a></div></section></div>';
+    var foot = [{ label: 'Ver orden', kind: 'ghost', icon: 'file-text', keepOpen: true, onClick: function () { orderDoc(id); return false; } }];
+    if (r.estado === 'Programado' || r.estado === 'En cargue') foot.push({ label: 'Reprogramar', kind: 'secondary', onClick: function () { setTimeout(function () { reprogramar(id); }, 200); } });
+    var pr = { 'Programado': ['Iniciar cargue', function () { r.estado = 'En cargue'; refreshAll(); UI.toast(id + ' pasó a cargue. Confirma cada pedido en la pantalla de cargue.', 'success'); setTimeout(function () { openDsp(id); }, 200); }], 'En cargue': ['Registrar salida', function () { setTimeout(function () { salida(id); }, 200); }], 'En ruta': ['Cerrar despacho', function () { setTimeout(function () { cerrar(id); }, 200); }], 'Cerrado': ['Ver evidencias', function () { location.href = 'evidencias.html'; }], 'Reprogramado': ['Reactivar como programado', function () { r.estado = 'Programado'; r.salida = r.nuevaFecha; r.fecha = r.nuevaFecha.slice(0, 10); refreshAll(); UI.toast(id + ' volvió a «Programado» para ' + F.fecha(r.salida) + '.', 'success'); setTimeout(function () { openDsp(id); }, 200); }] }[r.estado];
+    foot.push({ label: pr[0], kind: 'primary', onClick: pr[1] });
+    UI.drawer({ title: id, subtitleHtml: esc(rt.nombre) + ' · ' + chipE(r.estado), width: 560, body: body, footer: foot });
+  }
+
+  /* ---------- registrar salida (HU-116) ---------- */
+  function salida(id) {
+    var r = byId(id), v = veh(r.placa), pend = pendCargue(r);
+    UI.modal({ title: 'Registrar salida', subtitleHtml: UI.plate(r.placa) + ' · ' + esc(A.idx.rutas[r.rutaId].nombre), width: 500,
+      body: '<div class="stack-lg">' + (pend ? UI.banner({ tone: 'danger', title: plural(pend, 'pedido sin', 'pedidos sin') + ' confirmar en el cargue', html: 'Lo normal es cerrar el cargue antes de que salga el vehículo. <a href="cargue.html">Ir a cargue</a>' }) : '') +
+        '<div class="form-grid c2"><div class="field span-2"><label class="label" for="sfFecha">Fecha y hora de salida</label><input class="input" id="sfFecha" type="datetime-local" value="' + dtLocal(new Date()) + '"><span class="error-text" id="sfFechaE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="sfPre">Número de precinto</label><input class="input mono" id="sfPre" inputmode="numeric" placeholder="Ej. 0048213" autocomplete="off"><span class="hint">De 6 a 8 dígitos.</span><span class="error-text" id="sfPreE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="sfKm">Kilometraje de salida</label><input class="input" id="sfKm" type="number" min="0" placeholder="' + F.num(v.kmOdometro) + '"><span class="hint">Último registrado: ' + F.num(v.kmOdometro) + ' km.</span><span class="error-text" id="sfKmE" hidden></span></div></div>' +
+        (pend ? '<div class="field"><label class="check"><input type="checkbox" id="sfExc"> Autorizo la salida con el cargue sin confirmar</label><span class="error-text" id="sfExcE" hidden></span></div>' : '') + '</div>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Registrar salida', kind: 'primary', onClick: function (api) {
+        var b = api.body, ok = true; $$('.error-text', b).forEach(function (x) { x.hidden = true; }); $$('[aria-invalid]', b).forEach(function (x) { x.removeAttribute('aria-invalid'); });
+        function bad(i, e, m) { errTxt($('#' + e, b), m); $('#' + i, b).setAttribute('aria-invalid', 'true'); ok = false; }
+        var f = $('#sfFecha', b).value, pre = $('#sfPre', b).value.trim(), km = $('#sfKm', b).value;
+        if (!f) bad('sfFecha', 'sfFechaE', 'Indica la fecha y hora de salida.'); else if (new Date(f) > new Date(Date.now() + 15 * 60000)) bad('sfFecha', 'sfFechaE', 'La salida no puede quedar en el futuro.');
+        if (!/^\d{6,8}$/.test(pre)) bad('sfPre', 'sfPreE', pre ? 'El precinto debe tener entre 6 y 8 dígitos.' : 'Ingresa el número de precinto.');
+        if (km === '') bad('sfKm', 'sfKmE', 'Ingresa el kilometraje de salida.'); else if (+km < v.kmOdometro) bad('sfKm', 'sfKmE', 'No puede ser menor al último registrado (' + F.num(v.kmOdometro) + ' km).');
+        if (pend && !$('#sfExc', b).checked) { errTxt($('#sfExcE', b), 'Confirma el cargue o autoriza la excepción para continuar.'); ok = false; }
+        if (!ok) return false;
+        r.estado = 'En ruta'; r.salida = new Date(f).toISOString(); r.precinto = pre; r.kmSalida = +km; v.kmOdometro = +km; refreshAll(); UI.toast(id + ' salió a ruta con el precinto ' + pre + '. Ya se sigue en la torre de control.', 'success', { title: 'Salida registrada' }); setTimeout(function () { openDsp(id); }, 200); } }] });
+  }
+
+  /* ---------- reprogramar (HU-118) ---------- */
+  function reprogramar(id) {
+    var r = byId(id);
+    UI.modal({ title: 'Reprogramar despacho', subtitleHtml: id + ' · ' + UI.plate(r.placa), width: 500,
+      body: '<div class="stack-lg"><div class="form-grid c2"><div class="field"><label class="label" for="rpF">Nueva fecha</label><input class="input" id="rpF" type="date" min="' + HOY + '" value="' + MANANA + '"><span class="error-text" id="rpFE" hidden></span></div><div class="field"><label class="label" for="rpH">Hora de salida</label><input class="input" id="rpH" type="time" value="06:00"><span class="error-text" id="rpHE" hidden></span></div>' +
+        '<div class="field span-2"><label class="label" for="rpM">Motivo</label><select class="select" id="rpM"><option value="">Selecciona un motivo</option>' + MOTIVOS.map(function (m) { return '<option>' + m + '</option>'; }).join('') + '</select><span class="error-text" id="rpME" hidden></span></div>' +
+        '<div class="field span-2"><label class="label" for="rpD">Detalle <span class="opt" id="rpOpt">(opcional)</span></label><textarea class="textarea" id="rpD" placeholder="Qué ocurrió y qué se acordó con los clientes"></textarea><span class="error-text" id="rpDE" hidden></span></div></div>' +
+        '<label class="check"><input type="checkbox" id="rpN" checked> Avisar a los asesores comerciales de los ' + r.paradas + ' pedidos</label></div>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Reprogramar', kind: 'primary', onClick: function (api) {
+        var b = api.body, ok = true; $$('.error-text', b).forEach(function (x) { x.hidden = true; });
+        var f = $('#rpF', b).value, h = $('#rpH', b).value, m = $('#rpM', b).value, d = $('#rpD', b).value.trim();
+        if (!f || f < HOY) { errTxt($('#rpFE', b), 'Elige hoy o una fecha posterior.'); ok = false; } else if (f === HOY && h && new Date(f + 'T' + h) < new Date()) { errTxt($('#rpHE', b), 'Esa hora ya pasó hoy.'); ok = false; }
+        if (!h) { errTxt($('#rpHE', b), 'Indica la hora.'); ok = false; }
+        if (!m) { errTxt($('#rpME', b), 'El motivo es obligatorio para reprogramar.'); ok = false; } else if (m === 'Otro motivo' && d.length < 10) { errTxt($('#rpDE', b), 'Describe el motivo (mínimo 10 caracteres).'); ok = false; }
+        if (!ok) return false;
+        r.estado = 'Reprogramado'; r.nuevaFecha = f + 'T' + h; r.motivo = m; r.detalleMotivo = d; r.fecha = f; refreshAll(); UI.toast(id + ' reprogramado para ' + F.fecha(r.nuevaFecha) + ' ' + h + '.' + ($('#rpN', b).checked ? ' Se avisó a los asesores.' : ''), 'success'); setTimeout(function () { openDsp(id); }, 200); } }] });
+    $('#rpM').addEventListener('change', function () { $('#rpOpt').textContent = this.value === 'Otro motivo' ? '(obligatorio)' : '(opcional)'; });
+  }
+
+  /* ---------- cerrar con resultado por pedido (HU-119) ---------- */
+  function cerrar(id) {
+    var r = byId(id), RES = ['Entregado', 'Entrega parcial', 'Fallido', 'Reprogramar'];
+    function evid(pid) { var e = A.evidencias.filter(function (x) { return x.pedidoId === pid; }); return { firma: e.some(function (x) { return x.tipo === 'Firma del receptor'; }), n: e.length }; }
+    var pre = {}; r.pedidoIds.forEach(function (pid) { var pa = A.paradas.filter(function (x) { return x.pedidoId === pid && x.despachoId === id; })[0]; pre[pid] = pa ? ({ Entregada: 'Entregado', Parcial: 'Entrega parcial', Fallida: 'Fallido' }[pa.estado] || '') : ''; });
+    UI.modal({ title: 'Cerrar despacho', subtitleHtml: id + ' · ' + plural(r.pedidoIds.length, 'pedido', 'pedidos'), width: 620,
+      body: '<div class="stack-lg"><p class="muted t-13">Registra el resultado de cada pedido. Para cerrar como entregado se requiere la firma del receptor como evidencia.</p><div id="resList">' + r.pedidoIds.map(function (pid) { var p = ped(pid), e = evid(pid); return '<div class="res-row"><div><span class="mono">' + pid + '</span> · <strong>' + esc(p.cliente) + '</strong><div class="r-sub">' + F.kg(p.pesoKg) + ' · ' + (e.firma ? '<span style="color:var(--green-fg)">Firma del receptor registrada</span>' : e.n ? e.n + ' evidencia(s), falta la firma' : 'Sin evidencias') + '</div><span class="error-text" data-e="' + pid + '" hidden></span></div><div class="field"><label class="label sr-only" for="rs' + pid + '">Resultado de ' + pid + '</label><select class="select" id="rs' + pid + '" data-pid="' + pid + '" data-firma="' + (e.firma ? 1 : 0) + '"><option value="">Selecciona resultado</option>' + RES.map(function (x) { return '<option' + (pre[pid] === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></div></div>'; }).join('') + '</div>' +
+        '<div class="field"><label class="label" for="cdObs">Observaciones del cierre <span class="opt">(opcional)</span></label><textarea class="textarea" id="cdObs" placeholder="Novedades del recorrido, tiempos de espera, etc."></textarea></div></div>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Cerrar despacho', kind: 'primary', onClick: function (api) {
+        var b = api.body, ok = true, res = {}; $$('[data-e]', b).forEach(function (x) { x.hidden = true; });
+        $$('select[data-pid]', b).forEach(function (s) { var v = s.value, pid = s.dataset.pid, er = $('[data-e="' + pid + '"]', b); s.removeAttribute('aria-invalid');
+          if (!v) { errTxt(er, 'Selecciona el resultado de este pedido.'); s.setAttribute('aria-invalid', 'true'); ok = false; }
+          else if ((v === 'Entregado' || v === 'Entrega parcial') && s.dataset.firma !== '1') { er.hidden = false; er.innerHTML = ic('alert-circle', 'icon-sm') + 'Falta la firma del receptor: no se puede cerrar como entregado. <a href="evidencias.html">Adjuntar evidencia</a>'; s.setAttribute('aria-invalid', 'true'); ok = false; }
+          res[pid] = v; });
+        if (!ok) { UI.toast('Hay pedidos sin resultado válido. Revisa los avisos en la lista.', 'warning'); return false; }
+        var ent = Object.keys(res).filter(function (k) { return res[k] === 'Entregado'; }).length; r.resultados = {}; Object.keys(res).forEach(function (k) { r.resultados[k] = res[k] === 'Reprogramar' ? 'Fallido' : res[k]; });
+        r.estado = 'Cerrado'; r.entregadas = ent; r.fechaCierre = new Date().toISOString(); r.cierreObs = ent + ' de ' + r.pedidoIds.length + ' pedidos entregados completos. ' + ($('#cdObs', b).value.trim() || ''); refreshAll(); UI.toast(id + ' cerrado: ' + ent + ' de ' + r.pedidoIds.length + ' entregas completas.', 'success'); setTimeout(function () { openDsp(id); }, 200); } }] });
+  }
+
+  /* ---------- vista imprimible de la orden ---------- */
+  function orderDoc(id) {
+    var r = byId(id), v = veh(r.placa), c = cond(r.conductorId), rt = A.idx.rutas[r.rutaId];
+    UI.modal({ title: 'Orden de despacho', subtitleHtml: id, width: 760,
+      body: '<div class="doc-sheet" id="docSheet"><div class="doc-head"><div><img src="assets/img/logo.png" alt="Armetales"><div class="muted t-12 mt-1">' + esc(A.sedes[0].nombre) + ' · ' + esc(A.sedes[0].direccion) + '</div></div><div style="text-align:right"><div class="doc-title">Orden de despacho</div><div class="mono">' + id + '</div><div class="muted t-12">Generada el ' + F.fechaHora(new Date()) + '</div></div></div>' +
+        '<div class="doc-grid"><div><span>Vehículo</span>' + esc(r.placa) + ' · ' + esc(v.tipo) + ' (' + F.kg(v.pesoMaxKg) + ')</div><div><span>Conductor</span>' + esc(c.nombre) + ' · C.C. ' + esc(c.cedula) + '</div><div><span>Ruta</span>' + esc(rt.nombre) + ' (' + rt.rutaId + ')</div><div><span>Salida prevista</span>' + F.fecha(r.estado === 'Reprogramado' ? r.nuevaFecha : r.salida) + ' · ' + F.hora(r.estado === 'Reprogramado' ? r.nuevaFecha : r.salida) + '</div><div><span>Carga total</span>' + F.kg(r.kg) + ' · ' + F.m3(r.m3, 1) + '</div><div><span>Estado</span>' + esc(r.estado) + (r.precinto ? ' · Precinto ' + esc(r.precinto) : '') + '</div></div>' +
+        '<div class="tbl-scroll"><table><thead><tr><th>#</th><th>Pedido</th><th>Cliente y dirección</th><th>Ventana</th><th>Peso</th><th>Firma de recibo</th></tr></thead><tbody>' + r.pedidoIds.map(function (pid, i) { var p = ped(pid), cl = A.idx.clientes[p.clienteId]; return '<tr><td>' + (i + 1) + '</td><td class="mono">' + pid + '</td><td><strong>' + esc(p.cliente) + '</strong><br>' + esc(cl.direccionEntrega || '') + ', ' + esc(p.municipio) + '</td><td>' + esc(cl.ventanaInicio) + '–' + esc(cl.ventanaFin) + '</td><td>' + F.kg(p.pesoKg) + '</td><td style="min-width:90px"></td></tr>'; }).join('') + '</tbody></table></div>' +
+        '<div class="doc-sign"><div>Despachador</div><div>Conductor</div><div>Vigilancia / portería</div></div></div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Imprimir', kind: 'primary', icon: 'file-text', keepOpen: true, onClick: function () { window.print(); return false; } }] });
+  }
+
+  /* ---------- generar orden de despacho (HU-113/114/115/120) ---------- */
+  function wizard(preId) {
+    var st = { step: 0, vj: preId || '', excl: false, notif: true };
+    var m = UI.modal({ title: 'Generar orden de despacho', width: 640, body: '<div id="wz"></div>' });
+    var host = $('#wz', m.body);
+    function validar(vj) {
+      var v = veh(vj.vehiculoId), c = cond(v.conductorId), items = [], habil = [], bloq = [];
+      items.push(v.estado === 'Disponible' ? { s: 'ok', t: 'Vehículo disponible', d: vj.vehiculoId + ' · ' + v.tipo } : { s: 'block', t: 'Vehículo no disponible', d: vj.vehiculoId + ' está en estado «' + v.estado + '»' });
+      items.push(c.licenciaVence > HOY ? { s: 'ok', t: 'Conductor con licencia vigente', d: c.nombre + ' · ' + c.licencia + ' vence ' + F.fecha(c.licenciaVence) } : { s: 'block', t: 'Licencia vencida', d: c.nombre });
+      items.push(v.soat > HOY && v.tecnomecanica > HOY ? { s: 'ok', t: 'SOAT y tecnomecánica vigentes', d: 'SOAT ' + F.fecha(v.soat) + ' · Tecnomecánica ' + F.fecha(v.tecnomecanica) } : { s: 'block', t: 'Documentos del vehículo vencidos', d: 'Renueva SOAT o tecnomecánica antes de despachar' });
+      if (v.restricciones.picoPlacaCarga.aplicaHoy) items.push({ s: 'warn', t: 'Pico y placa de carga hoy', d: v.restricciones.picoPlacaCarga.horario + '. Programa la salida fuera de esa franja.' });
+      vj.pedidoIds.forEach(function (pid) { var p = ped(pid); if (p.estado === 'Listo para despacho') habil.push(pid); else bloq.push(pid); });
+      return { items: items, habil: habil, bloq: bloq, hardBlock: items.some(function (i) { return i.s === 'block'; }) };
+    }
+    function render() {
+      var vj = PV[st.vj], stepper = UI.stepper([{ label: 'Viaje', state: st.step > 0 ? 'done' : 'current' }, { label: 'Validación', state: st.step > 1 ? 'done' : st.step === 1 ? 'current' : 'pending' }, { label: 'Confirmación', state: st.step === 2 ? 'current' : 'pending' }]);
+      var h = '<div class="wiz-steps">' + stepper + '</div>', actions;
+      if (st.step === 0) {
+        var dup = vj && ordenDe[vj.viajeId] ? byId(ordenDe[vj.viajeId]) : null;
+        h += '<p class="muted t-13 mb-3">Elige un viaje del plan confirmado de hoy. Cada viaje admite una sola orden de despacho.</p><div class="stack-sm" role="radiogroup" aria-label="Viajes del plan">' + A.plan.viajes.map(function (x) { var o = ordenDe[x.viajeId]; return '<label class="pick' + (o ? ' is-dup' : '') + '"><input type="radio" name="vj" value="' + x.viajeId + '"' + (st.vj === x.viajeId ? ' checked' : '') + '><div><div class="row gap-2"><strong class="mono">' + x.viajeId + '</strong>' + UI.plate(x.vehiculoId) + '<span>' + esc(A.idx.rutas[x.rutaId].nombre) + '</span></div><div class="o-sub">' + plural(x.paradas, 'pedido', 'pedidos') + ' · ' + F.kg(x.pesoKg) + ' · salida prevista ' + F.hora(x.salidaPrevista) + '</div></div>' + (o ? UI.chip(o, { tone: 'neutral', noDot: true, small: true, label: 'Ya tiene orden' }) : '') + '</label>'; }).join('') + '</div>' +
+          '<span class="error-text mt-2" id="wzE" hidden></span>' + (dup ? '<div class="mt-3">' + UI.banner({ tone: 'danger', title: 'Ya existe la orden ' + dup.id + ' para ' + vj.viajeId, html: 'Estado: ' + esc(dup.estado) + '. No se puede generar un despacho duplicado. <a href="#" id="wzOpen">Abrir la orden existente</a>' }) + '</div>' : '');
+        actions = '<button type="button" class="btn btn-ghost" data-x="cancel">Cancelar</button><button type="button" class="btn btn-primary" data-x="next"' + (dup ? ' disabled' : '') + '>Validar pedidos ' + ic('arrow-right') + '</button>';
+      } else if (st.step === 1) {
+        var val = validar(vj);
+        h += '<div class="head-block mb-3">' + UI.plate(vj.vehiculoId, { large: true }) + '<div><div class="strong">' + esc(A.idx.rutas[vj.rutaId].nombre) + '</div><div class="muted t-13">' + esc(cond(veh(vj.vehiculoId).conductorId).nombre) + ' · ' + vj.viajeId + '</div></div></div><h3 class="mb-1">Vehículo y conductor</h3>' +
+          val.items.map(function (i) { return '<div class="chk"><span class="chk-ico ' + i.s + '">' + ic(i.s === 'ok' ? 'check' : i.s === 'warn' ? 'alert-triangle' : 'x') + '</span><div><div class="c-t">' + esc(i.t) + '</div><div class="c-s">' + esc(i.d) + '</div></div></div>'; }).join('') +
+          '<h3 class="mt-4 mb-1">Pedidos habilitados para despacho</h3>' + vj.pedidoIds.map(function (pid) { var p = ped(pid), ok = val.habil.indexOf(pid) > -1; return '<div class="chk"><span class="chk-ico ' + (ok ? 'ok' : 'block') + '">' + ic(ok ? 'check' : 'lock') + '</span><div><div class="c-t"><span class="mono">' + pid + '</span> · ' + esc(p.cliente) + '</div><div class="c-s">' + (ok ? 'Preparación certificada · ' + F.kg(p.pesoKg) : 'Preparación sin certificar (' + esc(p.estado.toLowerCase()) + '): no se puede despachar. <a href="preparacion.html">Ir a preparación</a>') + '</div></div>' + UI.chip(ok ? 'Habilitado' : 'Bloqueado', { tone: ok ? 'success' : 'danger', small: true }) + '</div>'; }).join('') +
+          (val.bloq.length ? '<div class="mt-3">' + UI.banner({ tone: 'warning', title: plural(val.bloq.length, 'pedido bloqueado', 'pedidos bloqueados'), text: val.habil.length ? 'Puedes generar la orden solo con los ' + val.habil.length + ' habilitados; los bloqueados quedan pendientes en el plan.' : 'Ningún pedido del viaje está habilitado: no se puede generar la orden.' }) + (val.habil.length ? '<div class="field mt-2"><label class="check"><input type="checkbox" id="wzExcl"' + (st.excl ? ' checked' : '') + '> Generar la orden solo con los pedidos habilitados</label><span class="error-text" id="wzE" hidden></span></div>' : '') + '</div>' : '');
+        actions = '<button type="button" class="btn btn-ghost" data-x="back">' + ic('arrow-left') + 'Atrás</button><button type="button" class="btn btn-primary" data-x="next">Continuar ' + ic('arrow-right') + '</button>';
+      } else {
+        var vv = validar(vj), ids = vv.habil, v2 = veh(vj.vehiculoId);
+        h += UI.banner({ tone: 'info', text: 'Revisa el resumen. Al generar la orden, el viaje queda asociado a este vehículo y ruta, y pasa a «Programado».' }) + '<div class="mt-3">' + UI.kv([['Viaje', vj.viajeId], ['Vehículo', UI.plate(vj.vehiculoId) + ' · ' + esc(v2.tipo)], ['Conductor', esc(cond(v2.conductorId).nombre)], ['Ruta', esc(A.idx.rutas[vj.rutaId].nombre)], ['Pedidos incluidos', plural(ids.length, 'pedido', 'pedidos') + (vv.bloq.length ? ' · ' + vv.bloq.length + ' pendientes' : '')], ['Carga', F.kg(pesoDe(ids)) + ' · ' + F.m3(volDe(ids), 1)], ['Salida prevista', F.hora(vj.salidaPrevista)]]) + '</div><label class="check mt-3"><input type="checkbox" id="wzNot"' + (st.notif ? ' checked' : '') + '> Avisar a bodega y al conductor</label>';
+        actions = '<button type="button" class="btn btn-ghost" data-x="back">' + ic('arrow-left') + 'Atrás</button><button type="button" class="btn btn-primary" data-x="gen">' + ic('check-circle') + 'Generar orden</button>';
+      }
+      host.innerHTML = h + '<div class="wiz-actions">' + actions + '</div>';
+      var o = $('#wzOpen', host); if (o) o.addEventListener('click', function (e) { e.preventDefault(); var id = ordenDe[st.vj]; m.close(); setTimeout(function () { openDsp(id); }, 200); });
+    }
+    host.addEventListener('change', function (e) { if (e.target.name === 'vj') { st.vj = e.target.value; render(); } else if (e.target.id === 'wzExcl') st.excl = e.target.checked; else if (e.target.id === 'wzNot') st.notif = e.target.checked; });
+    host.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-x]'); if (!b) return; var x = b.dataset.x;
+      if (x === 'cancel') m.close();
+      else if (x === 'back') { st.step--; render(); }
+      else if (x === 'next') {
+        if (st.step === 0) { if (!st.vj) { var er = $('#wzE', host); er.hidden = false; er.innerHTML = ic('alert-circle', 'icon-sm') + 'Selecciona el viaje para el que se genera la orden.'; return; } st.step = 1; render(); }
+        else { var val = validar(PV[st.vj]), er2 = $('#wzE', host);
+          if (val.hardBlock) { UI.toast('Hay validaciones que bloquean la orden. Resuélvelas en vehículos o conductores.', 'error'); return; }
+          if (!val.habil.length) { UI.toast('Ningún pedido del viaje está habilitado todavía.', 'error'); return; }
+          if (val.bloq.length && !st.excl) { er2.hidden = false; er2.innerHTML = ic('alert-circle', 'icon-sm') + 'Confirma que generas la orden solo con los pedidos habilitados.'; return; }
+          st.step = 2; render(); }
+      } else if (x === 'gen') {
+        var vj = PV[st.vj]; if (ordenDe[vj.viajeId]) { UI.toast('Ese viaje ya tiene una orden. No se genera un duplicado.', 'error'); return; }
+        var ids = validar(vj).habil, copy = { viajeId: vj.viajeId, vehiculoId: vj.vehiculoId, rutaId: vj.rutaId, pedidoIds: ids, salidaPrevista: vj.salidaPrevista, kmEstimados: vj.kmEstimados };
+        var r = fromViaje(copy, 'Programado'); m.close(); refreshAll(); UI.toast('Orden ' + r.id + ' generada con ' + plural(ids.length, 'pedido', 'pedidos') + '.', 'success', { title: 'Despacho programado' }); setTimeout(function () { openDsp(r.id); }, 250);
+      }
+    });
+    render();
+  }
+  $('#newBtn').addEventListener('click', function () { wizard(); });
+
+  /* arranque */
+  renderKpis(); renderBoard();
+  var pid = UI.param('id');
+  if (pid) { if (byId(pid)) openDsp(pid); else UI.toast('No se encontró el despacho ' + pid + '. Revisa el identificador.', 'warning'); }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ingresar · Armetales</title>
+<meta name="description" content="Acceso a la plataforma logística de Armetales.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  .logo-pill { display: inline-flex; background: #fff; border-radius: 12px; padding: 6px 14px; border: 1px solid var(--border); }
+  :root[data-theme="dark"] .logo-pill { border-color: transparent; }
+  .logo-pill img { height: 56px; width: auto; }
+  .auth-card h1 { font-size: 32px; margin-top: 32px; }
+  .auth-card .lead { color: var(--text-2); margin-top: 6px; }
+  .auth-view[hidden] { display: none; }
+  .auth-view h1:focus { outline: none; }
+  .auth-view { animation: view-in .22s var(--ease); }
+  @keyframes view-in { from { opacity: 0; transform: translateY(6px); } }
+  .pw-meter { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 4px; }
+  .pw-meter i { height: 4px; border-radius: 2px; background: var(--border-strong); transition: background .15s; }
+  .pw-meter[data-s="1"] i:nth-child(-n+1) { background: var(--red); } .pw-meter[data-s="2"] i:nth-child(-n+2) { background: var(--amber); } .pw-meter[data-s="3"] i:nth-child(-n+3) { background: var(--green); } .pw-meter[data-s="4"] i { background: var(--green); }
+  .auth-foot { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+  .auth-foot .row { gap: 8px; flex-wrap: nowrap; align-items: flex-start; }
+  .link-sm { font-size: 13px; }
+  /* panel de marca */
+  .brand-copy { position: relative; z-index: 2; max-width: 440px; }
+  .brand-copy h2 { font-size: 40px; line-height: 1.05; font-weight: 600; letter-spacing: -.015em; }
+  .brand-copy p { color: #A9B3BC; margin-top: 14px; font-size: 15px; max-width: 38ch; }
+  .brand-flow { position: relative; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px 10px; font: 500 12px/1 var(--font-mono); letter-spacing: .04em; color: #8E99A3; text-transform: uppercase; }
+  .brand-flow span::after { content: "→"; margin-left: 10px; color: #4B555F; } .brand-flow span:last-child::after { content: ""; margin: 0; }
+  .tri { position: absolute; right: -90px; bottom: 40px; width: 600px; height: 460px; opacity: .95; -webkit-mask-image: linear-gradient(200deg, transparent 6%, #000 55%); mask-image: linear-gradient(200deg, transparent 6%, #000 55%); }
+  .tri .h { position: absolute; inset: 0; }
+  .tri .l { clip-path: polygon(0 100%, 50% 0, 50% 100%); background-image: repeating-linear-gradient(112deg, #D4122D 0 26px, transparent 26px 56px); }
+  .tri .r { clip-path: polygon(50% 0, 100% 100%, 50% 100%); background-image: repeating-linear-gradient(68deg, #56616B 0 26px, transparent 26px 56px); }
+  .auth-brand::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 120px; z-index: 1; pointer-events: none; background: linear-gradient(to top, #12161B 45%, rgba(18,22,27,0)); }
+  .brand-flow { padding-top: 8px; }
+  @media (max-width: 1199px) { .brand-copy h2 { font-size: 34px; } .auth-brand { padding: 40px 32px; } .brand-flow { gap: 6px 8px; font-size: 11px; } .brand-flow span::after { margin-left: 8px; } }
+  @media (max-width: 1199px) and (min-width: 900px) { .tri { width: 380px; height: 290px; right: -60px; bottom: 60px; } }
+  /* en pantallas angostas el panel de marca pasa a una franja superior */
+  @media (max-width: 899px) {
+    .auth { grid-template-rows: auto 1fr; position: relative; }
+    .auth-form { position: static; }
+    .auth-brand { display: flex; order: -1; min-height: 0; padding: 20px 20px 22px; gap: 22px; }
+    .auth-brand::after { height: 60px; }
+    .brand-copy { max-width: 560px; }
+    .brand-copy h2 { font-size: 26px; max-width: 16em; }
+    .brand-copy p { display: none; }
+    .brand-flow { font-size: 10.5px; gap: 6px 8px; }
+    .brand-flow span::after { margin-left: 8px; }
+    .tri { width: 300px; height: 230px; right: -70px; bottom: 6px; opacity: .8; }
+    .auth-form { min-height: 0; justify-content: flex-start; padding: 32px 20px 40px; }
+    .auth-theme { top: 10px; right: 10px; z-index: 3; color: #F2F4F6; }
+    .brand-top .brand-tag:last-child { display: none; }
+    .brand-top { padding-right: 44px; }
+  }
+  @media (max-width: 599px) { .brand-flow { display: none; } .auth-brand { gap: 14px; } .tri { opacity: .5; width: 240px; height: 190px; right: -60px; } .brand-copy h2 { font-size: 24px; } }
+  .brand-grid { position: absolute; inset: 0; background-image: linear-gradient(#ffffff08 1px, transparent 1px), linear-gradient(90deg, #ffffff08 1px, transparent 1px); background-size: 48px 48px; }
+  .brand-top { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; }
+  .brand-tag { font: 500 12px/1 var(--font-mono); letter-spacing: .08em; color: #8E99A3; text-transform: uppercase; }
+  .countdown { font-family: var(--font-mono); font-weight: 500; }
+</style>
+</head>
+<body data-page="login" data-shell="none">
+<main id="app" class="auth">
+  <section class="auth-form" aria-labelledby="authTitle">
+    <button type="button" class="btn btn-ghost btn-icon auth-theme" id="themeBtn" aria-label="Cambiar tema"></button>
+    <div class="auth-card">
+      <a class="logo-pill" href="index.html" aria-label="Armetales"><img src="assets/img/logo.png" alt="Armetales · Construimos confianza" width="259" height="56"></a>
+
+      <!-- Vista: iniciar sesión -->
+      <div class="auth-view" id="vLogin">
+        <h1 id="authTitle">Ingresa a tu cuenta</h1>
+        <p class="lead">Plataforma logística de pedidos, rutas y despachos.</p>
+        <div id="lockBanner" class="mt-4" hidden></div>
+        <div id="errBanner" class="mt-4" hidden></div>
+        <form id="loginForm" class="stack mt-5" novalidate>
+          <div class="field">
+            <label class="label" for="email">Correo corporativo</label>
+            <div class="input-group"><svg class="icon input-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg><input class="input" id="email" type="email" autocomplete="username" value="laura.restrepo@armetales.com.co" required></div>
+            <div class="error-text" id="emailErr" hidden></div>
+          </div>
+          <div class="field">
+            <div class="row between"><label class="label" for="pw">Contraseña</label><a href="#" class="link-btn link-sm" id="goForgot">¿Olvidaste tu contraseña?</a></div>
+            <div class="input-group has-end"><svg class="icon input-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input class="input" id="pw" type="password" autocomplete="current-password" value="Armetales2026" required>
+              <button type="button" class="btn btn-ghost btn-icon btn-sm input-end" id="pwToggle" aria-label="Mostrar contraseña" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+            <div class="error-text" id="pwErr" hidden></div>
+          </div>
+          <label class="check"><input type="checkbox" id="remember" checked> Recordarme en este equipo</label>
+          <button class="btn btn-primary btn-lg btn-block" type="submit" id="loginBtn">Ingresar</button>
+        </form>
+        <div class="auth-foot">
+          <div class="row"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true" style="margin-top:2px"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><span>Por seguridad, la sesión se cierra tras <strong>20 minutos</strong> de inactividad y el acceso se bloquea después de <strong>5 intentos fallidos</strong>.</span></div>
+          <div class="row"><span>Demo con datos de ejemplo. <a href="#" class="link-btn" id="showLock">Ver estado de bloqueo</a> · <a href="alcance.html">Alcance de la propuesta</a></span></div>
+        </div>
+      </div>
+
+      <!-- Vista: recuperar contraseña -->
+      <div class="auth-view" id="vForgot" hidden>
+        <h1>Recupera tu contraseña</h1>
+        <p class="lead">Te enviaremos un enlace temporal, válido por 30 minutos, para crear una contraseña nueva.</p>
+        <form id="forgotForm" class="stack mt-5" novalidate>
+          <div class="field"><label class="label" for="fEmail">Correo corporativo</label><input class="input" id="fEmail" type="email" autocomplete="username" value="laura.restrepo@armetales.com.co" required><div class="error-text" id="fErr" hidden></div></div>
+          <button class="btn btn-primary btn-lg btn-block" type="submit" id="forgotBtn">Enviar enlace</button>
+          <button class="btn btn-ghost btn-block" type="button" data-go="vLogin">Volver a ingresar</button>
+        </form>
+      </div>
+
+      <!-- Vista: enlace enviado -->
+      <div class="auth-view" id="vSent" hidden>
+        <h1>Revisa tu correo</h1>
+        <p class="lead">Enviamos un enlace a <strong id="sentTo"></strong>. Vence en <span class="countdown" id="sentCd">30:00</span>.</p>
+        <div class="mt-5">
+          <div class="banner" role="status"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div class="b-body">En la demo no se envía ningún correo. Usa el botón para abrir el enlace de ejemplo.</div></div>
+        </div>
+        <div class="stack mt-4">
+          <button class="btn btn-primary btn-lg btn-block" type="button" id="openReset">Abrir enlace de ejemplo</button>
+          <button class="btn btn-ghost btn-block" type="button" data-go="vLogin">Volver a ingresar</button>
+        </div>
+      </div>
+
+      <!-- Vista: nueva contraseña -->
+      <div class="auth-view" id="vReset" hidden>
+        <h1>Crea una contraseña nueva</h1>
+        <p class="lead">Usa mínimo 10 caracteres, con mayúsculas, números y un símbolo.</p>
+        <form id="resetForm" class="stack mt-5" novalidate>
+          <div class="field"><label class="label" for="np1">Contraseña nueva</label><input class="input" id="np1" type="password" autocomplete="new-password" required>
+            <div class="pw-meter" id="pwMeter" data-s="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="hint" id="pwHint">Escribe una contraseña para ver su nivel de seguridad.</div></div>
+          <div class="field"><label class="label" for="np2">Confirma la contraseña</label><input class="input" id="np2" type="password" autocomplete="new-password" required><div class="error-text" id="npErr" hidden></div></div>
+          <button class="btn btn-primary btn-lg btn-block" type="submit">Guardar contraseña</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <aside class="auth-brand" aria-hidden="true">
+    <div class="brand-grid"></div>
+    <div class="tri"><div class="h l"></div><div class="h r"></div></div>
+    <div class="brand-top"><span class="brand-tag">Logística · Armetales</span><span class="brand-tag">Demo</span></div>
+    <div class="brand-copy"><h2 class="display">Construimos confianza, de la bodega a la obra.</h2><p>Cada pedido de acero, con su ruta, su carga y su evidencia de entrega, en una sola plataforma.</p></div>
+    <div class="brand-flow"><span>Pedido</span><span>Reserva</span><span>Ruta</span><span>Cargue</span><span>Despacho</span><span>Entrega</span></div>
+  </aside>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(function () {
+  var $ = UI.$, esc = UI.esc, DEMO_PW = 'Armetales2026', MAX = 5, fails = 0, lockTimer = null, lockLeft = 0, sentTimer = null;
+  function themeBtn() { var b = $('#themeBtn'), d = UI.theme() === 'dark'; b.innerHTML = UI.icon(d ? 'sun' : 'moon'); b.setAttribute('aria-label', d ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'); }
+  themeBtn(); $('#themeBtn').addEventListener('click', function () { UI.theme(UI.theme() === 'dark' ? 'light' : 'dark'); themeBtn(); });
+  function show(id) { UI.$$('.auth-view').forEach(function (v) { v.hidden = v.id !== id; }); var t = $('#' + id + ' h1'); if (t) { t.setAttribute('tabindex', '-1'); t.focus({ preventScroll: true }); } }
+  UI.$$('[data-go]').forEach(function (b) { b.addEventListener('click', function () { show(b.dataset.go); }); });
+  function err(id, msg) { var e = $(id); e.hidden = !msg; e.innerHTML = msg ? UI.icon('alert-circle', 'icon-sm') + esc(msg) : ''; }
+  var emailOk = function (v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); };
+  /* mostrar contraseña */
+  $('#pwToggle').addEventListener('click', function () { var i = $('#pw'), s = i.type === 'password'; i.type = s ? 'text' : 'password'; this.setAttribute('aria-pressed', s); this.setAttribute('aria-label', s ? 'Ocultar contraseña' : 'Mostrar contraseña'); });
+  /* bloqueo */
+  function fmtT(s) { return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+  function lock(demo) {
+    lockLeft = 14 * 60 + 32; clearInterval(lockTimer); show('vLogin'); $('#errBanner').hidden = true;
+    var b = $('#lockBanner'); b.hidden = false; b.innerHTML = UI.banner({ tone: 'danger', title: 'Cuenta bloqueada temporalmente', html: 'Superaste los ' + MAX + ' intentos fallidos. Podrás intentar de nuevo en <span class="countdown" id="lockCd">' + fmtT(lockLeft) + '</span>. También puedes <a href="#" id="lockReset">recuperar tu contraseña</a>' + ' o <a href="#" id="lockOff">desbloquear la demo</a>' + '.' });
+    ['#email', '#pw', '#loginBtn'].forEach(function (s) { $(s).disabled = true; });
+    lockTimer = setInterval(function () { lockLeft--; var c = $('#lockCd'); if (c) c.textContent = fmtT(lockLeft); if (lockLeft <= 0) unlock(); }, 1000);
+    var r = $('#lockReset'); if (r) r.addEventListener('click', function (e) { e.preventDefault(); show('vForgot'); }); var o = $('#lockOff'); if (o) o.addEventListener('click', function (e) { e.preventDefault(); unlock(); });
+  }
+  function unlock(silent) { clearInterval(lockTimer); lockLeft = 0; fails = 0; $('#lockBanner').hidden = true; ['#email', '#pw', '#loginBtn'].forEach(function (s) { $(s).disabled = false; }); $('#pw').value = DEMO_PW; if (silent !== true) UI.toast('Acceso restablecido.', 'success'); }
+  $('#showLock').addEventListener('click', function (e) { e.preventDefault(); lock(true); });
+  /* login */
+  $('#loginForm').addEventListener('submit', function (e) {
+    e.preventDefault(); var em = $('#email').value.trim(), pw = $('#pw').value, bad = false; err('#emailErr', ''); err('#pwErr', ''); $('#errBanner').hidden = true;
+    if (!emailOk(em)) { err('#emailErr', 'Escribe un correo válido, por ejemplo nombre.apellido@armetales.com.co'); bad = true; } if (!pw) { err('#pwErr', 'Escribe tu contraseña.'); bad = true; } if (bad) return;
+    var btn = $('#loginBtn'); btn.disabled = true; btn.innerHTML = '<span class="spin" aria-hidden="true"></span>Verificando…';
+    setTimeout(function () {
+      if (pw === DEMO_PW) { UI.toast('Bienvenida, Laura. Entrando al panel…', 'success', { duration: 1200 }); setTimeout(function () { location.href = 'panel.html'; }, 600); return; }
+      fails++; btn.disabled = false; btn.textContent = 'Ingresar';
+      if (fails >= MAX) { lock(true); return; }
+      var b = $('#errBanner'); b.hidden = false; b.innerHTML = UI.banner({ tone: 'danger', title: 'Correo o contraseña incorrectos', text: 'Te quedan ' + (MAX - fails) + ' intento' + (MAX - fails === 1 ? '' : 's') + ' antes de que se bloquee el acceso.' });
+      $('#pw').focus(); $('#pw').select();
+    }, 650);
+  });
+  /* recuperar */
+  $('#goForgot').addEventListener('click', function (e) { e.preventDefault(); $('#fEmail').value = $('#email').value; show('vForgot'); });
+  $('#forgotForm').addEventListener('submit', function (e) {
+    e.preventDefault(); var v = $('#fEmail').value.trim(); if (!emailOk(v)) { err('#fErr', 'Escribe un correo válido.'); return; } err('#fErr', '');
+    var b = $('#forgotBtn'); b.disabled = true; b.innerHTML = '<span class="spin" aria-hidden="true"></span>Enviando…';
+    setTimeout(function () { b.disabled = false; b.textContent = 'Enviar enlace'; $('#sentTo').textContent = v; var s = 30 * 60; clearInterval(sentTimer); $('#sentCd').textContent = fmtT(s); sentTimer = setInterval(function () { s--; $('#sentCd').textContent = fmtT(Math.max(0, s)); if (s <= 0) clearInterval(sentTimer); }, 1000); show('vSent'); }, 700);
+  });
+  $('#openReset').addEventListener('click', function () { show('vReset'); });
+  function strength(v) { var s = 0; if (v.length >= 10) s++; if (/[A-Z]/.test(v) && /[a-z]/.test(v)) s++; if (/\d/.test(v)) s++; if (/[^A-Za-z0-9]/.test(v)) s++; return v ? Math.max(1, s) : 0; }
+  $('#np1').addEventListener('input', function () { var s = strength(this.value); $('#pwMeter').dataset.s = s; $('#pwHint').textContent = ['Escribe una contraseña para ver su nivel de seguridad.', 'Débil: agrega longitud, mayúsculas, números y símbolos.', 'Aceptable: puedes reforzarla.', 'Buena contraseña.', 'Excelente contraseña.'][s]; });
+  $('#resetForm').addEventListener('submit', function (e) {
+    e.preventDefault(); var a = $('#np1').value, b = $('#np2').value; if (strength(a) < 3 || a.length < 10) { err('#npErr', 'La contraseña debe tener 10 caracteres o más, con mayúsculas, números y un símbolo.'); return; } if (a !== b) { err('#npErr', 'Las contraseñas no coinciden.'); return; } err('#npErr', '');
+    if (lockLeft > 0) unlock(true); UI.toast('Contraseña actualizada. Ya puedes ingresar.', 'success'); $('#pw').value = DEMO_PW; show('vLogin');
+  });
+})();
+</script>
+</body>
+</html>

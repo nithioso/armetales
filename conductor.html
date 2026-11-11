@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App de conductores · Armetales</title>
+<meta name="description" content="Prototipo funcional de la aplicación móvil del conductor: ruta asignada, paradas, descargue, entrega y evidencias.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de la página y de la app dentro del marco (solo tokens del sistema) */
+  .cond-layout { display: grid; gap: 28px; grid-template-columns: minmax(0, 1fr); justify-items: center; align-items: start; }
+  .cond-side { width: 100%; max-width: 620px; display: grid; gap: 16px; min-width: 0; }
+  @media (min-width: 1040px) { .cond-layout { grid-template-columns: 360px minmax(0, 580px); justify-content: center; gap: 48px; justify-items: stretch; } .cond-layout .phone-stage { position: sticky; top: 76px; } }
+  .phone-screen { position: relative; }
+  .phone-status .ps-r { display: inline-flex; align-items: center; gap: 6px; }
+  .ps-net { font-weight: 600; font-size: 11px; }
+  .ps-net.is-off { color: var(--red-fg); } .ps-net.is-sync { color: var(--amber-fg); }
+  .ps-bat { width: 20px; height: 10px; border: 1.5px solid var(--text); border-radius: 3px; position: relative; padding: 1px; } .ps-bat::after { content: ""; position: absolute; right: -4px; top: 2px; width: 2px; height: 4px; background: var(--text); border-radius: 0 1px 1px 0; } .ps-bat i { display: block; height: 100%; width: 78%; background: var(--text); border-radius: 1px; }
+  .phone-appbar { min-height: 56px; }
+  .phone-appbar .pa-title { min-width: 0; flex: 1; } .phone-appbar .pa-title strong { display: block; font-size: 15px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .phone-appbar .pa-title span { display: block; font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .phone-appbar .btn-icon { width: 44px; height: 44px; flex: none; margin-left: -8px; }
+  .pa-off { flex: none; padding: 8px 14px; font-size: 12.5px; background: var(--amber-bg); color: var(--amber-fg); border-bottom: 1px solid var(--amber-line); display: flex; gap: 8px; align-items: flex-start; } .pa-off .icon { margin-top: 1px; flex: none; }
+  .phone-body { padding-bottom: 18px; position: relative; scroll-behavior: smooth; }
+  .phone-nav button { min-height: 52px; justify-content: center; }
+  .phone-nav button .nb { position: relative; display: inline-flex; } .phone-nav .badge { position: absolute; top: -4px; right: -9px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--red); color: #fff; font-size: 10px; display: grid; place-items: center; font-weight: 600; }
+  .pa-hello { font-family: var(--font-display); font-size: 26px; font-weight: 600; line-height: 1.1; } .pa-date { font-size: 12.5px; color: var(--text-2); margin-bottom: 2px; }
+  .pa-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .pa-h { font-size: 12px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .05em; }
+  .pa-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .pa-stat { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-ctl); padding: 8px 10px; } .pa-stat b { display: block; font-family: var(--font-display); font-size: 20px; line-height: 1.1; font-weight: 600; font-variant-numeric: tabular-nums; } .pa-stat span { font-size: 11.5px; color: var(--text-2); }
+  .pa-stop { display: flex; gap: 12px; align-items: flex-start; text-align: left; width: 100%; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); min-height: 64px; color: inherit; cursor: pointer; }
+  .pa-stop:hover { border-color: var(--border-strong); } .pa-stop.is-next { border-color: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 12%, transparent); } .pa-stop.is-done { background: var(--surface-2); }
+  .pa-num { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: 13px; background: var(--surface-3); color: var(--text); border: 2px solid var(--border-strong); }
+  .is-next .pa-num { background: var(--red); border-color: var(--red); color: #fff; } .is-done .pa-num.ok { background: var(--green); border-color: var(--green); color: #fff; } .is-done .pa-num.warn { background: var(--amber); border-color: var(--amber); color: #fff; } .is-done .pa-num.bad { background: var(--red); border-color: var(--red); color: #fff; }
+  .pa-stop .ps-main { min-width: 0; flex: 1; } .pa-stop .ps-name { font-weight: 600; font-size: 14px; line-height: 1.3; } .pa-stop .ps-meta { font-size: 12.5px; color: var(--text-2); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 2px 10px; }
+  .pa-late { color: var(--red-fg); font-weight: 600; }
+  .pa-prog { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; } .pa-prog i { height: 4px; border-radius: 2px; background: var(--border-strong); } .pa-prog i.on { background: var(--green); } .pa-prog i.cur { background: var(--red); }
+  .pa-prog-l { font-size: 12px; color: var(--text-2); display: flex; justify-content: space-between; margin-top: 4px; }
+  .pa-act { position: sticky; bottom: -18px; margin: 4px -14px -18px; padding: 12px 14px 16px; background: var(--surface); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; z-index: 3; }
+  .pa-opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px; min-height: 64px; border-radius: var(--r-card); border: 1px solid var(--border-strong); background: var(--surface); color: inherit; cursor: pointer; }
+  .pa-opt:hover { border-color: var(--steel); } .pa-opt .oi { flex: none; width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; } .pa-opt .oi.ok { background: var(--green-bg); color: var(--green-fg); } .pa-opt .oi.warn { background: var(--amber-bg); color: var(--amber-fg); } .pa-opt .oi.bad { background: var(--red-bg); color: var(--red-fg); }
+  .pa-opt strong { display: block; font-size: 14.5px; } .pa-opt span.s { font-size: 12.5px; color: var(--text-2); }
+  .pa-timer { font-family: var(--font-display); font-size: 52px; font-weight: 600; text-align: center; line-height: 1; font-variant-numeric: tabular-nums; padding: 6px 0; }
+  .pa-item { display: flex; gap: 10px; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; } .pa-item:last-child { border-bottom: 0; } .pa-item .q { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+  .pa-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; } .pa-list li { display: flex; gap: 8px; font-size: 13.5px; align-items: flex-start; } .pa-list .icon { flex: none; margin-top: 2px; color: var(--amber); }
+  .pa-qty { display: inline-flex; align-items: center; gap: 4px; flex: none; } .pa-qty .btn { width: 44px; padding: 0; } .pa-qty input { width: 56px; height: 44px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .pa-line { display: flex; flex-direction: column; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); } .pa-line:last-child { border-bottom: 0; } .pa-line .top { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+  .pa-cam { border: 1.5px dashed var(--border-strong); border-radius: var(--r-card); background: var(--surface-2); min-height: 150px; display: grid; place-items: center; text-align: center; padding: 14px; position: relative; overflow: hidden; }
+  .pa-cam .icon { display: block; margin: 0 auto; width: 28px; height: 28px; }
+  .pa-cam.has { border-style: solid; padding: 0; background: var(--surface-3); } .pa-cam svg.photo { width: 100%; height: auto; display: block; }
+  .pa-flash { position: absolute; inset: 0; background: var(--surface); opacity: 0; pointer-events: none; } .pa-flash.go { animation: paFlash .45s ease-out; } @keyframes paFlash { 0% { opacity: .95; } 100% { opacity: 0; } }
+  .pa-sig { position: relative; border: 1px solid var(--border-strong); border-radius: var(--r-card); background: var(--surface); height: 150px; touch-action: none; } .pa-sig canvas { width: 100%; height: 100%; display: block; touch-action: none; border-radius: var(--r-card); cursor: crosshair; }
+  .pa-sig .hintx { position: absolute; left: 14px; right: 14px; bottom: 26px; border-bottom: 1px dashed var(--border-strong); pointer-events: none; } .pa-sig .hintx span { position: absolute; left: 0; bottom: -20px; font-size: 11.5px; color: var(--text-3); } .pa-sig .ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-3); font-size: 13px; pointer-events: none; }
+  .pa-sig[aria-invalid="true"], .pa-cam[aria-invalid="true"] { border-color: var(--red); }
+  .pa-ok { width: 72px; height: 72px; border-radius: 50%; background: var(--green-bg); color: var(--green-fg); display: grid; place-items: center; margin: 4px auto; } .pa-ok .icon { width: 36px; height: 36px; }
+  .pa-center { text-align: center; }
+  .pa-snack { position: absolute; left: 12px; right: 12px; top: 8px; z-index: 30; padding: 10px 12px; border-radius: var(--r-ctl); background: var(--ink); color: #fff; font-size: 13px; display: flex; gap: 8px; align-items: center; box-shadow: var(--shadow-pop); animation: paIn .2s var(--ease); } @keyframes paIn { from { opacity: 0; transform: translateY(-6px); } }
+  .pa-sheet-bg { position: absolute; inset: 0; z-index: 20; background: var(--scrim); display: flex; align-items: flex-end; animation: paBg .18s; } @keyframes paBg { from { opacity: 0; } }
+  .pa-sheet { width: 100%; max-height: 92%; overflow-y: auto; background: var(--surface); border-radius: 22px 22px 0 0; padding: 8px 16px 18px; display: flex; flex-direction: column; gap: 12px; animation: paUp .22s var(--ease); } @keyframes paUp { from { transform: translateY(40px); opacity: .6; } }
+  .pa-sheet .grab { width: 40px; height: 4px; border-radius: 2px; background: var(--border-strong); align-self: center; margin-bottom: 4px; } .pa-sheet h3 { font-size: 18px; }
+  .pa-chk { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; min-height: 52px; border: 1px solid var(--border); border-radius: var(--r-ctl); font-size: 14px; cursor: pointer; } .pa-chk input { margin-top: 2px; flex: none; }
+  .pa-map { --h: 150px; border-radius: var(--r-ctl); } .pa-map .leaflet-control-attribution { display: none; }
+  .pa-spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border-strong); border-top-color: var(--blue); border-radius: 50%; animation: paSp .8s linear infinite; vertical-align: -2px; } @keyframes paSp { to { transform: rotate(360deg); } }
+  .phone .field .input, .phone .field .select, .phone .field .textarea { min-height: 44px; font-size: 15px; }
+  .phone .radio, .phone .check { min-height: 44px; }
+  /* panel lateral */
+  .flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: fl; }
+  .flow li { display: flex; gap: 12px; align-items: flex-start; padding: 8px 10px; border-radius: var(--r-ctl); counter-increment: fl; color: var(--text-2); font-size: 13.5px; }
+  .flow li::before { content: counter(fl); flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: var(--surface-3); color: var(--text-2); }
+  .flow li b { display: block; color: var(--text); font-weight: 600; } .flow li.is-on { background: var(--surface-2); color: var(--text); } .flow li.is-on::before { background: var(--red); color: #fff; } .flow li.is-done::before { content: "✓"; background: var(--green); color: #fff; }
+  .ev-log { max-height: 340px; overflow-y: auto; display: grid; gap: 0; }
+  .ev-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; padding: 9px 16px; border-bottom: 1px solid var(--border); align-items: start; font-size: 13px; } .ev-row:last-child { border-bottom: 0; }
+  .ev-row .t { font-family: var(--font-mono); font-size: 12px; color: var(--text-2); padding-top: 1px; } .ev-row .m { color: var(--text-2); font-size: 12px; margin-top: 1px; overflow-wrap: anywhere; }
+  .ev-row.is-new { animation: evNew 1.4s ease-out; } @keyframes evNew { from { background: var(--blue-bg); } }
+  @media (max-width: 639px) {
+    #app { padding: 0; } .page-head, .cond-side { display: none; }
+    .cond-layout { display: block; }
+    .phone-stage { padding: 0; }
+    .phone { position: fixed; inset: 0; z-index: 60; width: auto; max-width: none; height: auto; border-radius: 0; padding: 0; box-shadow: none; background: var(--bg); }
+    .phone::before, .phone-status { display: none; } .phone-screen { border-radius: 0; }
+    .phone-appbar { padding-top: max(10px, env(safe-area-inset-top)); } .phone-nav { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+  }
+  @media (prefers-reduced-motion: reduce) { .pa-flash.go, .pa-snack, .pa-sheet, .pa-sheet-bg, .ev-row.is-new { animation: none; } }
+</style>
+</head>
+<body data-page="conductor">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Operación · Campo</div>
+      <h1 class="page-title">App de conductores</h1>
+      <p class="page-desc">Prototipo funcional de la aplicación móvil. Recorre una jornada completa: iniciar recorrido, llegar, descargar, entregar y enviar evidencias. Cada acción llega a la torre de control.</p>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-secondary" href="seguimiento.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>Ver en seguimiento</a>
+      <button type="button" class="btn btn-secondary" id="resetBtn"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5"/></svg>Reiniciar jornada</button>
+    </div>
+  </header>
+
+  <div class="cond-layout">
+    <div class="phone-stage">
+      <div class="phone" role="application" aria-label="Aplicación del conductor">
+        <div class="phone-screen" id="scr">
+          <div class="phone-status"><span id="clk">9:41</span><span class="ps-r"><span class="ps-net" id="net">4G</span><span class="ps-bat" aria-hidden="true"><i></i></span></span></div>
+          <div class="phone-appbar" id="bar"></div>
+          <div id="offBar"></div>
+          <div class="phone-body" id="pbody" tabindex="-1"></div>
+          <nav class="phone-nav" aria-label="Secciones de la app" id="pnav"></nav>
+        </div>
+      </div>
+    </div>
+
+    <aside class="cond-side" aria-label="Panel explicativo">
+      <section class="card">
+        <div class="card-head"><div><h2 class="card-title">Recorrido de la jornada</h2><p class="card-sub" id="flowSub">Sigue los pasos en el teléfono.</p></div></div>
+        <div class="card-body"><ol class="flow" id="flow"></ol></div>
+      </section>
+      <section class="card">
+        <div class="card-head"><div><h2 class="card-title">Eventos enviados a la torre de control</h2><p class="card-sub" id="evSub">Aún no hay eventos. Inicia el recorrido en el teléfono.</p></div><span class="chip chip-success" id="evChip">En línea</span></div>
+        <div class="ev-log" id="evLog" aria-live="polite"></div>
+        <div class="card-foot row between">
+          <label class="switch"><input type="checkbox" id="offSw"> Simular pérdida de señal</label>
+          <span class="row"><a class="btn btn-ghost btn-sm" href="seguimiento.html">Seguimiento</a><a class="btn btn-ghost btn-sm" href="evidencias.html">Evidencias</a></span>
+        </div>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, ic = UI.icon;
+  var DSP = A.get('despachos', 'DSP-2611-019') || A.despachos.filter(function (d) { return d.estado === 'Cargando'; })[0] || A.despachos[A.despachos.length - 1];
+  var COND = A.get('conductores', DSP.conductorId), VEH = A.get('vehiculos', DSP.vehiculoId), RUTA = A.get('rutas', DSP.rutaId);
+  var MOT_NOV = A.motivos.fallida.concat(['Otro motivo']);
+  var NAV = [['ruta', 'Ruta', 'route'], ['paradas', 'Paradas', 'list'], ['novs', 'Novedades', 'alert-triangle'], ['perfil', 'Perfil', 'user']];
+  var CHECK = ['Documentos del vehículo y planilla de despacho a bordo', 'Carga asegurada con zunchos y protegida con carpa', 'Remisiones y cantidades coinciden con la planilla', 'Elementos de protección personal puestos', 'Celular con batería y datos activos'];
+  var S, bodyEl = $('#pbody'), mapApi = null, timerId = null, sigState = null;
+
+  /* ---------- estado ---------- */
+  function fresh() {
+    var par = A.paradas.filter(function (p) { return p.despachoId === DSP.despachoId; }).sort(function (a, b) { return a.secuencia - b.secuencia; });
+    return {
+      online: true, view: 'home', cur: null, started: false, closed: false, startMs: null, events: [], novs: [], tab: 'ruta', prevView: null, hist: [],
+      stops: par.map(function (p, i) {
+        var ped = A.get('pedidos', p.pedidoId), cli = A.get('clientes', p.clienteId);
+        var prev = par[i - 1];
+        return { p: p, ped: ped, cli: cli, i: i, phase: 'pending', result: null, motivo: '', obs: '', qty: null, foto: null, firma: null, receptor: '', unloadSec: 0, unloadAt: null, etaMs: null, doneMs: null,
+          planLeg: prev ? (new Date(p.eta) - (new Date(prev.eta).getTime() + prev.descargueMin * 60000)) : (new Date(p.eta) - new Date(DSP.salidaPrevista)), planOffset: new Date(p.eta) - new Date(DSP.salidaPrevista), coords: null };
+      })
+    };
+  }
+  S = fresh();
+  function stopsDone() { return S.stops.filter(function (s) { return s.phase === 'done'; }).length; }
+  function nextIdx() { for (var i = 0; i < S.stops.length; i++) if (S.stops[i].phase !== 'done') return i; return -1; }
+  function anchorMs() { return S.startMs || Math.max(new Date(DSP.salidaPrevista).getTime(), Date.now() + 10 * 60000); }
+  function recomputeEta() {
+    var prevEnd = null;
+    S.stops.forEach(function (s, i) {
+      if (s.phase === 'done') { prevEnd = s.doneMs; s.etaMs = s.arriveMs || s.etaMs; return; }
+      if (prevEnd == null) s.etaMs = anchorMs() + s.planLeg; else s.etaMs = prevEnd + s.planLeg;
+      prevEnd = s.etaMs + s.p.descargueMin * 60000;
+    });
+  }
+  function vent(s) { var f = s.cli.ventanaFin.split(':'), d = new Date(); d.setHours(+f[0], +f[1], 0, 0); return d.getTime(); }
+  function isLate(s) { return s.phase !== 'done' && s.etaMs && s.etaMs > vent(s); }
+  function jitter(lat, lng) { return { lat: +(lat + (Math.random() - .5) * .0006).toFixed(5), lng: +(lng + (Math.random() - .5) * .0006).toFixed(5) }; }
+  function hhmm(ms) { return F.hora(new Date(ms)); }
+  function fmtT(sec) { var m = Math.floor(sec / 60), s = sec % 60; return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s; }
+  function kgTxt(n) { return F.kg(n); }
+
+  /* ---------- eventos hacia la torre de control ---------- */
+  function emit(evento, st, extra) {
+    var pos = st ? (st.coords || (st.coords = jitter(st.p.latitud, st.p.longitud))) : jitter(RUTA.secuencia[0].lat, RUTA.secuencia[0].lng);
+    var ev = { ms: Date.now(), evento: evento, parada: st ? 'Parada ' + (st.i + 1) + ' · ' + st.p.cliente : 'Recorrido ' + DSP.despachoId, pedido: st ? st.p.pedidoId : null, ubic: pos.lat + ', ' + pos.lng, obs: extra || '', estado: S.online ? 'Enviado' : 'En cola', isNew: true };
+    S.events.unshift(ev); renderSide(); return ev;
+  }
+  function flush() {
+    var q = S.events.filter(function (e) { return e.estado === 'En cola'; });
+    if (!q.length) { updateNet(); return; }
+    q.forEach(function (e) { e.estado = 'Sincronizando'; }); updateNet(); renderSide();
+    setTimeout(function () { q.forEach(function (e) { e.estado = 'Enviado'; e.isNew = true; }); updateNet(); renderSide(); snack('Se enviaron ' + q.length + ' eventos pendientes.'); }, 1100);
+  }
+  function setOnline(b) {
+    S.online = b; $('#offSw').checked = !b; updateNet(); renderOff();
+    if (b) flush(); else snack('Sin conexión. Los eventos se guardarán en el teléfono.');
+  }
+  function updateNet() {
+    var q = S.events.filter(function (e) { return e.estado === 'En cola'; }).length, sy = S.events.some(function (e) { return e.estado === 'Sincronizando'; }), n = $('#net');
+    n.className = 'ps-net' + (!S.online ? ' is-off' : sy ? ' is-sync' : '');
+    n.innerHTML = !S.online ? 'Sin conexión' + (q ? ' · ' + q : '') : sy ? '<span class="pa-spin"></span> Sincronizando' : '4G';
+    var chip = $('#evChip'); chip.className = 'chip ' + (!S.online ? 'chip-danger' : sy ? 'chip-warning' : 'chip-success'); chip.textContent = !S.online ? 'Sin conexión' : sy ? 'Sincronizando' : 'En línea';
+  }
+  function renderOff() {
+    var q = S.events.filter(function (e) { return e.estado === 'En cola'; }).length;
+    $('#offBar').innerHTML = S.online ? '' : '<div class="pa-off" role="status">' + ic('alert-triangle', 'icon-sm') + '<span><strong>Sin conexión.</strong> Sigue trabajando: ' + (q ? q + ' evento' + (q > 1 ? 's' : '') + ' en cola, se enviarán' : 'los eventos se enviarán') + ' al recuperar señal.</span></div>';
+  }
+  function renderSide() {
+    var evs = S.events, ul = $('#evLog');
+    $('#evSub').textContent = evs.length ? evs.length + ' evento' + (evs.length > 1 ? 's' : '') + ' en esta jornada · el último ' + F.relativo(evs[0].ms) : 'Aún no hay eventos. Inicia el recorrido en el teléfono.';
+    ul.innerHTML = evs.length ? evs.map(function (e) {
+      var tone = e.estado === 'Enviado' ? 'success' : e.estado === 'En cola' ? 'warning' : 'info';
+      var h = '<div class="ev-row' + (e.isNew ? ' is-new' : '') + '"><span class="t">' + hhmm(e.ms) + '</span><div><strong>' + esc(e.evento) + '</strong><div class="m">' + esc(e.parada) + (e.pedido ? ' · <span class="mono">' + esc(e.pedido) + '</span>' : '') + '</div><div class="m mono">' + esc(e.ubic) + (e.obs ? '</div><div class="m">' + esc(e.obs) : '') + '</div></div>' + UI.chip(e.estado, { tone: tone, small: true }) + '</div>';
+      e.isNew = false; return h;
+    }).join('') : UI.empty({ icon: 'send', title: 'Sin eventos todavía', text: 'Cada llegada, descargue, entrega y evidencia aparecerá aquí con hora y ubicación.' });
+    /* flujo */
+    var steps = [['Revisar la ruta asignada', 'Vehículo, paradas, horarios y carga del día.'], ['Iniciar recorrido', 'Lista de verificación previa a la salida.'], ['Llegar al cliente', 'Registra la llegada con hora y ubicación.'], ['Descargar', 'Cronómetro de inicio y fin del descargue.'], ['Cerrar la entrega', 'Completa, parcial con cantidades o novedad con motivo.'], ['Enviar evidencias', 'Foto, firma del receptor y coordenadas.'], ['Pasar a la siguiente parada', 'La torre de control recibe todo en tiempo real.']];
+    var cur = 0, n = nextIdx(), st = n >= 0 ? S.stops[n] : null;
+    if (S.closed) cur = 7; else if (!S.started) cur = S.view === 'home' ? 0 : 1; else if (!st) cur = 6; else { var ph = st.phase; cur = ph === 'enroute' ? 2 : ph === 'arrived' ? 3 : ph === 'unloading' ? 3 : ph === 'unloaded' ? 4 : 5; if (ph === 'enroute' && stopsDone() > 0) cur = 2; }
+    $('#flow').innerHTML = steps.map(function (s, i) { return '<li class="' + (i < cur ? 'is-done' : i === cur ? 'is-on' : '') + '"' + (i === cur ? ' aria-current="step"' : '') + '><span><b>' + esc(s[0]) + '</b>' + esc(s[1]) + '</span></li>'; }).join('');
+    $('#flowSub').textContent = S.closed ? 'Jornada cerrada.' : 'Paso actual: ' + (steps[Math.min(cur, 6)][0]).toLowerCase() + '.';
+  }
+
+  /* ---------- miniaturas generadas (foto y firma) ---------- */
+  var pid = 0;
+  function rng(seed) { var h = 2166136261; for (var i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); } return function () { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 10000) / 10000; }; }
+  function photoSVG(o) {
+    var r = rng(o.seed || 'x'), id = 'pt' + (++pid), W = 320, H = 240, blocks = '', i, x = 20, ground = 150;
+    for (i = 0; i < 5; i++) { var w = 40 + r() * 46, h = 24 + r() * 50, y = ground - h; blocks += '<rect x="' + x.toFixed(0) + '" y="' + y.toFixed(0) + '" width="' + w.toFixed(0) + '" height="' + h.toFixed(0) + '" rx="2" fill="var(--steel)" opacity=".9"/><rect x="' + x.toFixed(0) + '" y="' + y.toFixed(0) + '" width="' + w.toFixed(0) + '" height="' + h.toFixed(0) + '" rx="2" fill="url(#' + id + ')"/>'; x += w + 6; if (x > 270) break; }
+    var tx = 14 + r() * 20;
+    return '<svg class="photo" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Foto de la entrega (marcador de posición)"><defs><pattern id="' + id + '" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="8" fill="rgba(255,255,255,.42)"/></pattern></defs>' +
+      '<rect width="' + W + '" height="' + H + '" fill="var(--surface-3)"/><rect y="' + ground + '" width="' + W + '" height="' + (H - ground) + '" fill="var(--border-strong)" opacity=".7"/><rect x="0" y="40" width="' + W + '" height="' + (ground - 40) + '" fill="var(--surface-2)" opacity=".6"/>' +
+      '<path d="M0 ' + (ground + 14) + ' H' + W + '" stroke="var(--steel)" stroke-width="1" opacity=".35" stroke-dasharray="14 10"/>' + blocks +
+      '<rect x="' + tx.toFixed(0) + '" y="' + (ground + 20) + '" width="70" height="8" rx="2" fill="var(--steel)" opacity=".5"/>' +
+      '<g fill="none" stroke="rgba(255,255,255,.7)" stroke-width="1.5"><path d="M12 24v-10h10M308 14h-10v10M12 ' + (H - 54) + 'v-10h10"/></g>' +
+      '<rect y="' + (H - 44) + '" width="' + W + '" height="44" fill="rgba(10,12,14,.66)"/>' +
+      '<text x="12" y="' + (H - 27) + '" fill="#fff" font-family="IBM Plex Mono, monospace" font-size="11.5">' + esc(o.fecha) + '</text>' +
+      '<text x="12" y="' + (H - 12) + '" fill="#fff" font-family="IBM Plex Mono, monospace" font-size="11" opacity=".9">' + esc(o.coords) + '</text></svg>';
+  }
+
+  /* ---------- utilidades de interfaz ---------- */
+  var snackT = null;
+  function snack(msg) { var s = $('#scr'), old = $('.pa-snack', s); if (old) old.remove(); var n = UI.el('div', { class: 'pa-snack', role: 'status' }, ic('check-circle', 'icon-sm') + '<span>' + esc(msg) + '</span>'); s.appendChild(n); clearTimeout(snackT); snackT = setTimeout(function () { n.remove(); }, 2800); }
+  function sheet(html, mount) {
+    closeSheet(); var bg = UI.el('div', { class: 'pa-sheet-bg' }, '<div class="pa-sheet" role="dialog" aria-modal="true"><span class="grab"></span>' + html + '</div>'); $('#scr').appendChild(bg);
+    bg.addEventListener('click', function (e) { if (e.target === bg) closeSheet(); }); if (mount) mount($('.pa-sheet', bg)); var f = $('button, input', bg); if (f) f.focus({ preventScroll: true }); return bg;
+  }
+  function closeSheet() { var o = $('.pa-sheet-bg', $('#scr')); if (o) o.remove(); }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
+  function btn(act, label, o) { o = o || {}; return '<button type="button" class="btn ' + (o.kind || 'btn-primary') + ' btn-block" data-act="' + act + '"' + (o.i != null ? ' data-i="' + o.i + '"' : '') + (o.dis ? ' disabled' : '') + '>' + (o.icon ? ic(o.icon) : '') + label + '</button>'; }
+  function chipFor(s) {
+    var m = { pending: ['Pendiente', 'neutral'], enroute: ['En camino', 'info'], arrived: ['En sitio', 'warning'], unloading: ['Descargando', 'warning'], unloaded: ['Descargado', 'info'] };
+    if (s.phase === 'done') return UI.chip(s.result === 'completa' ? 'Entregada' : s.result === 'parcial' ? 'Parcial' : 'Fallida', { small: true });
+    var c = m[s.phase] || m.pending; return UI.chip(c[0], { tone: c[1], small: true });
+  }
+  function stopCard(s) {
+    var n = nextIdx(), cls = (s.i === n ? ' is-next' : '') + (s.phase === 'done' ? ' is-done' : ''), tone = s.result === 'completa' ? 'ok' : s.result === 'parcial' ? 'warn' : 'bad';
+    return '<button type="button" class="pa-stop' + cls + '" data-act="openStop" data-i="' + s.i + '" aria-label="Parada ' + (s.i + 1) + ', ' + esc(s.p.cliente) + '"><span class="pa-num ' + (s.phase === 'done' ? tone : '') + '">' + (s.phase === 'done' ? '✓' : s.i + 1) + '</span><span class="ps-main"><span class="ps-name">' + esc(s.p.cliente) + '</span>' +
+      '<span class="ps-meta" style="align-items:center">' + chipFor(s) + '<span>' + esc(s.p.municipio) + '</span><span>' + kgTxt(s.ped.pesoKg) + '</span><span>Ventana ' + esc(s.p.ventana) + '</span></span>' +
+      '<span class="ps-meta"><span' + (isLate(s) ? ' class="pa-late"' : '') + '>' + (s.phase === 'done' ? 'Atendida ' + hhmm(s.doneMs) : 'ETA ' + hhmm(s.etaMs) + (isLate(s) ? ' · fuera de ventana' : '')) + '</span></span></span></button>';
+  }
+  function bar(title, sub, back) { $('#bar').innerHTML = (back ? '<button type="button" class="btn btn-ghost btn-icon" data-act="back" aria-label="Volver">' + ic('arrow-left') + '</button>' : '') + '<div class="pa-title"><strong>' + esc(title) + '</strong>' + (sub ? '<span>' + esc(sub) + '</span>' : '') + '</div>' + UI.plate(VEH.placa); }
+  function renderNav() {
+    var np = S.novs.length;
+    $('#pnav').innerHTML = NAV.map(function (n) { return '<button type="button" data-tab="' + n[0] + '"' + (S.tab === n[0] ? ' aria-current="page"' : '') + '><span class="nb">' + ic(n[2]) + (n[0] === 'novs' && np ? '<span class="badge">' + np + '</span>' : '') + '</span>' + n[1] + '</button>'; }).join('');
+  }
+
+  /* ---------- vistas ---------- */
+  var V = {};
+  V.home = function () {
+    var nx = nextIdx(), dn = stopsDone(), tot = S.stops.length, totKg = DSP.pesoKg, h = new Date().getHours(), me = COND.nombre.split(' ')[0];
+    bar('Ruta ' + RUTA.nombre, 'Despacho ' + DSP.despachoId);
+    var html = '<div><div class="pa-date">' + esc(cap(new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' }))) + '</div><div class="pa-hello">' + (h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches') + ', ' + esc(me) + '</div></div>';
+    if (S.closed) {
+      html += '<div class="pa-card pa-center"><div class="pa-ok">' + ic('check-circle') + '</div><h3>Recorrido cerrado</h3><p class="muted t-13">Entregaste ' + tot + ' paradas: ' + S.stops.filter(function (s) { return s.result === 'completa'; }).length + ' completas, ' + S.stops.filter(function (s) { return s.result === 'parcial'; }).length + ' parciales y ' + S.stops.filter(function (s) { return s.result === 'novedad'; }).length + ' con novedad. Regresa al CEDI para el cierre del despacho.</p></div>';
+      return { html: html };
+    }
+    html += '<div class="pa-card"><div class="row between"><span class="pa-h">Ruta asignada</span>' + UI.chip(S.started ? 'En ruta' : 'Cargando', { tone: S.started ? 'info' : 'warning', small: true, label: S.started ? 'En ruta' : 'Lista para salir' }) + '</div>' +
+      '<div><div class="t-16 strong">' + esc(RUTA.nombre) + ' · ' + esc(RUTA.zona) + '</div><div class="muted t-13">Sale de ' + esc(RUTA.origen) + ' · ' + esc(RUTA.municipios.slice(0, 3).join(', ')) + (RUTA.municipios.length > 3 ? '…' : '') + '</div></div>' +
+      '<div class="pa-stats"><div class="pa-stat"><b>' + tot + '</b><span>paradas</span></div><div class="pa-stat"><b>' + F.num(DSP.pesoKg) + '</b><span>kg a bordo</span></div><div class="pa-stat"><b>' + F.num(DSP.kmEstimados, 1) + '</b><span>km</span></div></div>' +
+      UI.kv([['Vehículo', UI.plate(VEH.placa) + ' <span class="muted t-13" style="margin-left:6px">' + esc(VEH.tipo) + '</span>'], [S.started ? 'Salida' : 'Salida prevista', hhmm(S.started ? S.startMs : anchorMs())], ['Volumen', F.m3(DSP.volumenM3)], ['Utilización', F.pct(DSP.utilizacionPesoPct) + ' del peso']]) + '</div>';
+    if (S.started && nx >= 0) {
+      var s = S.stops[nx];
+      html += '<div class="pa-card"><div class="row between"><span class="pa-h">Progreso</span><span class="t-13 strong">' + dn + ' de ' + tot + ' paradas</span></div>' + prog() + '</div><div class="pa-h">Siguiente parada</div>' + stopCard(s) + btn('openStop', 'Continuar con la parada ' + (nx + 1), { i: nx, icon: 'navigation' });
+    } else if (S.started) {
+      html += '<div class="pa-card pa-center"><div class="pa-ok">' + ic('check-circle') + '</div><h3>Todas las paradas atendidas</h3><p class="muted t-13">Cierra el recorrido para avisar a la torre de control.</p></div>' + btn('closeRoute', 'Cerrar recorrido', { icon: 'flag' });
+    } else {
+      html += '<div class="pa-h">Primera parada</div>' + stopCard(S.stops[0]) + '<div class="pa-act">' + btn('startRoute', 'Iniciar recorrido', { icon: 'play' }) + '<span class="hint pa-center">Antes de salir confirmarás una lista de verificación.</span></div>';
+    }
+    return { html: html };
+  };
+  function prog() { return '<div><div class="pa-prog">' + S.stops.map(function (s, i) { return '<i class="' + (s.phase === 'done' ? 'on' : (i === nextIdx() ? 'cur' : '')) + '"></i>'; }).join('') + '</div></div>'; }
+  function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
+
+  V.stops = function () {
+    bar('Paradas del día', stopsDone() + ' de ' + S.stops.length + ' atendidas');
+    var html = prog() + (S.started ? '' : UI.banner({ tone: 'info', text: 'Inicia el recorrido en la pestaña Ruta para habilitar las paradas.' }));
+    html += '<div class="stack-sm">' + S.stops.map(stopCard).join('') + '</div><p class="hint pa-center">Los horarios se recalculan con cada parada atendida.</p>';
+    return { html: html };
+  };
+
+  var PH = { enroute: 0, arrived: 1, unloading: 2, unloaded: 3, evidence: 4, done: 5 };
+  var PHN = ['En camino', 'Llegada', 'Descargue', 'Resultado', 'Evidencias'];
+  V.stop = function () {
+    var s = S.stops[S.cur], n = nextIdx(), locked = s.phase === 'pending', c = s.cli, ped = s.ped, items = ped.lineas;
+    bar('Parada ' + (s.i + 1) + ' de ' + S.stops.length, c.municipio === 'Bogotá' ? (c.localidad || c.barrio) : c.municipio, true);
+    var phIdx = PH[s.phase] != null ? PH[s.phase] : -1, html = '';
+    if (!locked) html += '<div><div class="pa-prog">' + PHN.map(function (_, i) { return '<i class="' + (i < phIdx ? 'on' : i === phIdx ? 'cur' : '') + '"></i>'; }).join('') + '</div><div class="pa-prog-l"><span>' + (s.phase === 'done' ? 'Parada terminada' : 'Paso ' + (phIdx + 1) + ' de 5 · ' + PHN[Math.min(phIdx, 4)]) + '</span>' + chipFor(s) + '</div></div>';
+    html += '<div class="pa-card"><div><div class="t-16 strong">' + esc(s.p.cliente) + '</div><div class="muted t-13">' + esc(c.direccionEntrega) + '</div><div class="muted t-13">' + esc(c.municipio) + (c.localidad ? ' · ' + esc(c.localidad) : '') + '</div></div>' +
+      '<div id="miniMap" class="pa-map" role="img" aria-label="Mapa con la ubicación del cliente"></div>' +
+      '<div class="row"><button type="button" class="btn btn-secondary" style="flex:1" data-act="call" data-i="' + s.i + '">' + ic('phone') + 'Llamar</button><button type="button" class="btn btn-secondary" style="flex:1" data-act="nav" data-i="' + s.i + '">' + ic('navigation') + 'Cómo llegar</button></div>' +
+      UI.kv([['Ventana', esc(s.p.ventana)], ['Llegada estimada', '<span' + (isLate(s) ? ' class="pa-late"' : '') + '>' + (s.phase === 'done' ? 'Atendida ' + hhmm(s.doneMs) : hhmm(s.etaMs)) + (isLate(s) ? ' · fuera de ventana' : '') + '</span>'], ['Descargue estimado', s.p.descargueMin + ' min'], ['Pedido', '<span class="mono">' + esc(ped.pedidoId) + '</span>']]) + '</div>';
+    /* instrucciones */
+    var instr = [];
+    c.restricciones.forEach(function (r) { instr.push(r); });
+    if (ped.observaciones) instr.push(ped.observaciones);
+    var seen = {}; items.forEach(function (l) { var pr = A.get('productos', l.sku); if (pr && pr.restricciones && pr.restricciones.length) pr.restricciones.forEach(function (cd) { if (!seen[cd]) { seen[cd] = 1; instr.push(l.descripcion.split(' x ')[0] + ': ' + A.restriccionesProducto[cd]); } }); });
+    html += '<div class="pa-card"><span class="pa-h">Instrucciones de entrega</span>' + (instr.length ? '<ul class="pa-list">' + instr.map(function (t) { return '<li>' + ic('alert-triangle', 'icon-sm') + '<span>' + esc(t) + '</span></li>'; }).join('') + '</ul>' : '<p class="muted t-13">Sin restricciones especiales. Entrega en el punto de recibo indicado por el cliente.</p>') +
+      '<div class="row" style="align-items:flex-start;gap:12px"><span class="avatar">' + esc((c.contacto.nombre || '?').split(' ').map(function (x) { return x[0]; }).slice(0, 2).join('')) + '</span><div><div class="strong t-13">' + esc(c.contacto.nombre) + '</div><div class="muted t-12">' + esc(c.contacto.cargo) + ' · <span class="mono">' + esc(c.contacto.telefono) + '</span></div></div></div></div>';
+    html += '<div class="pa-card"><div class="row between"><span class="pa-h">Mercancía a entregar</span><span class="t-13 strong">' + kgTxt(ped.pesoKg) + '</span></div><div>' + items.map(function (l, li) {
+      var q = s.result && s.qty ? s.qty[li] : null; return '<div class="pa-item"><span>' + esc(l.descripcion) + '<div class="muted t-12 mono">' + esc(l.sku) + '</div></span><span class="q">' + (q != null && q !== l.cantidad ? '<span class="pa-late">' + q + '</span> / ' : '') + l.cantidad + ' ' + esc(l.unidad.toLowerCase()) + '</span></div>'; }).join('') + '</div></div>';
+    /* acciones por fase */
+    var act = '';
+    if (locked) act = (n >= 0 && S.started ? UI.banner({ tone: 'info', text: 'Primero termina la parada ' + (n + 1) + '. Esta se habilitará después.' }) : UI.banner({ tone: 'info', text: 'Inicia el recorrido para habilitar las paradas.' }));
+    else if (s.phase === 'enroute') act = btn('arrive', 'Llegué al cliente', { icon: 'map-pin' });
+    else if (s.phase === 'arrived') act = '<div class="muted t-13 pa-center">Llegada registrada a las ' + hhmm(s.arriveMs) + ' · a ' + s.distM + ' m del punto de entrega</div>' + btn('startUnload', 'Iniciar descargue', { icon: 'play' });
+    else if (s.phase === 'unloading') act = '<div class="pa-timer" id="timer" role="timer" aria-label="Tiempo de descargue">' + fmtT(Math.round((Date.now() - s.unloadAt) / 1000)) + '</div><div class="pa-center muted t-13" style="margin-top:-6px">Descargue en curso · estimado ' + s.p.descargueMin + ' min</div>' + btn('endUnload', 'Finalizar descargue', { icon: 'check-circle' });
+    else if (s.phase === 'unloaded') act = '<div class="strong t-14">¿Cómo terminó la entrega?</div><div class="muted t-13" style="margin-top:-4px">Descargue de ' + fmtT(s.unloadSec) + '. Elige el resultado.</div>' +
+      '<button type="button" class="pa-opt" data-act="resComplete"><span class="oi ok">' + ic('check-circle') + '</span><span><strong>Entrega completa</strong><span class="s">Se recibió todo lo del pedido</span></span></button>' +
+      '<button type="button" class="pa-opt" data-act="resPartial"><span class="oi warn">' + ic('box') + '</span><span><strong>Entrega parcial</strong><span class="s">Indica las cantidades que recibió</span></span></button>' +
+      '<button type="button" class="pa-opt" data-act="resNov"><span class="oi bad">' + ic('alert-triangle') + '</span><span><strong>Reportar novedad</strong><span class="s">No se pudo entregar: elige el motivo</span></span></button>';
+    else if (s.phase === 'evidence') act = btn('toEvidence', 'Continuar con las evidencias', { icon: 'camera' });
+    else if (s.phase === 'done') act = UI.banner({ tone: s.result === 'completa' ? 'success' : 'warning', title: s.result === 'completa' ? 'Entrega completa' : s.result === 'parcial' ? 'Entrega parcial' : 'Entrega no realizada', text: (s.motivo ? s.motivo + '. ' : '') + 'Atendida a las ' + hhmm(s.doneMs) + '. Evidencias enviadas.' }) + (n >= 0 ? btn('openStop', 'Ir a la parada ' + (n + 1), { i: n, icon: 'arrow-right' }) : btn('home', 'Ver resumen de la jornada', { icon: 'flag' }));
+    html += act ? (locked ? '<div>' + act + '</div>' : '<div class="pa-act">' + act + '</div>') : '';
+    return { html: html, after: function () { drawMini(s); if (s.phase === 'unloading') startTimer(s); } };
+  };
+
+  V.partial = function () {
+    var s = S.stops[S.cur]; bar('Entrega parcial', 'Parada ' + (s.i + 1) + ' · ' + s.p.cliente, true);
+    if (!s.qty) s.qty = s.ped.lineas.map(function (l) { return l.cantidad; });
+    var html = UI.banner({ tone: 'warning', text: 'Indica la cantidad que el cliente recibió en cada ítem.' }) + '<div class="pa-card">' + s.ped.lineas.map(function (l, li) {
+      return '<div class="pa-line"><div class="top"><div><div class="strong t-13">' + esc(l.descripcion) + '</div><div class="muted t-12">Pedido: ' + l.cantidad + ' ' + esc(l.unidad.toLowerCase()) + ' · ' + kgTxt(l.pesoKg) + '</div></div>' +
+        '<div class="pa-qty"><button type="button" class="btn btn-secondary" data-act="qm" data-l="' + li + '" aria-label="Disminuir ' + esc(l.descripcion) + '">' + ic('minus') + '</button><input class="input" inputmode="numeric" id="q' + li + '" data-l="' + li + '" value="' + s.qty[li] + '" aria-label="Cantidad entregada de ' + esc(l.descripcion) + '"><button type="button" class="btn btn-secondary" data-act="qp" data-l="' + li + '" aria-label="Aumentar ' + esc(l.descripcion) + '">' + ic('plus') + '</button></div></div><span class="error-text" id="qe' + li + '" hidden></span></div>'; }).join('') +
+      '<div class="row between t-13"><span class="muted">Peso entregado</span><strong id="qkg">—</strong></div></div>' +
+      '<div class="field"><label class="label" for="pmot">Motivo de la diferencia</label><select class="select" id="pmot"><option value="">Selecciona un motivo</option>' + A.motivos.parcial.map(function (m) { return '<option' + (s.motivo === m ? ' selected' : '') + '>' + esc(m) + '</option>'; }).join('') + '</select><span class="error-text" id="pmotE" hidden>' + ic('alert-circle', 'icon-sm') + 'Selecciona el motivo.</span></div>' +
+      '<div class="field"><label class="label" for="pobs">Observaciones <span class="opt">(opcional)</span></label><textarea class="textarea" id="pobs" placeholder="Ej.: el cliente solo recibió la varilla">' + esc(s.obs) + '</textarea></div>' +
+      '<div class="pa-act">' + btn('partialNext', 'Continuar con las evidencias', { icon: 'camera' }) + '</div>';
+    return { html: html, after: function () { qtyTotals(s); } };
+  };
+  function qtyTotals(s) { var kg = 0; s.ped.lineas.forEach(function (l, li) { kg += l.pesoKg * (s.qty[li] / l.cantidad); }); var e = $('#qkg'); if (e) e.textContent = kgTxt(kg); }
+
+  V.novedad = function () {
+    var s = S.stops[S.cur]; bar('Reportar novedad', 'Parada ' + (s.i + 1) + ' · ' + s.p.cliente, true);
+    var html = UI.banner({ tone: 'danger', text: 'La mercancía regresa en el vehículo. La torre de control programará el reintento.' }) +
+      '<fieldset class="fieldset" style="padding:10px 12px"><legend>Motivo</legend><div class="stack-sm">' + MOT_NOV.map(function (m, i) { return '<label class="radio"><input type="radio" name="nm" value="' + esc(m) + '"' + (s.motivo === m ? ' checked' : '') + '> ' + esc(m) + '</label>'; }).join('') + '</div><span class="error-text" id="nmE" hidden>' + ic('alert-circle', 'icon-sm') + 'Elige el motivo de la novedad.</span></fieldset>' +
+      '<div class="field"><label class="label" for="nobs">Observaciones</label><textarea class="textarea" id="nobs" placeholder="Cuenta qué pasó en el sitio">' + esc(s.obs) + '</textarea><span class="error-text" id="nobsE" hidden>' + ic('alert-circle', 'icon-sm') + 'Describe el motivo en pocas palabras.</span></div>' +
+      '<div class="pa-act">' + btn('novNext', 'Continuar con las evidencias', { icon: 'camera' }) + '</div>';
+    return { html: html };
+  };
+
+  V.evidence = function () {
+    var s = S.stops[S.cur], nov = s.result === 'novedad'; bar('Evidencias', 'Parada ' + (s.i + 1) + ' · ' + s.p.cliente, true);
+    if (!s.coords) s.coords = jitter(s.p.latitud, s.p.longitud);
+    var dist = s.distM || 18, html = '';
+    html += '<div class="pa-card"><div class="row between"><span class="pa-h">Foto ' + (nov ? 'de la novedad' : 'de la entrega') + '</span>' + UI.chip('Obligatoria', { tone: 'neutral', small: true, noDot: true }) + '</div>' +
+      '<div class="pa-cam' + (s.foto ? ' has' : '') + '" id="cam">' + (s.foto ? s.foto.svg : '<div class="muted t-13">' + ic('camera', 'icon-lg') + '<div style="margin-top:6px">Aún no hay foto. Encuadra la mercancía descargada o el sitio.</div></div>') + '<span class="pa-flash" id="flash"></span></div>' +
+      '<span class="error-text" id="camE" hidden>' + ic('alert-circle', 'icon-sm') + 'Toma la foto para poder enviar las evidencias.</span>' +
+      '<button type="button" class="btn btn-secondary btn-block" data-act="shot">' + ic('camera') + (s.foto ? 'Repetir foto' : 'Tomar foto') + '</button></div>';
+    html += '<div class="pa-card"><div class="row between"><span class="pa-h">Firma del receptor</span>' + UI.chip(nov ? 'Opcional' : 'Obligatoria', { tone: 'neutral', small: true, noDot: true }) + '</div>' +
+      '<div class="field"><label class="label" for="rec">Nombre de quien recibe</label><input class="input" id="rec" autocomplete="off" value="' + esc(s.receptor || (nov ? '' : s.cli.contacto.nombre)) + '" placeholder="Nombre y apellido"><span class="error-text" id="recE" hidden>' + ic('alert-circle', 'icon-sm') + 'Escribe el nombre de quien recibe.</span></div>' +
+      '<div class="pa-sig" id="sigBox"><canvas id="sig" aria-label="Área para firmar con el dedo"></canvas><div class="ph" id="sigPh">Firma aquí con el dedo</div><div class="hintx"><span>Firma del receptor</span></div></div>' +
+      '<span class="error-text" id="sigE" hidden>' + ic('alert-circle', 'icon-sm') + 'Falta la firma del receptor.</span>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-act="sigClear" style="align-self:flex-start;min-height:44px">' + ic('undo') + 'Borrar firma</button></div>';
+    html += '<div class="pa-card"><span class="pa-h">Ubicación y hora</span>' + UI.kv([['Coordenadas', '<span class="mono">' + s.coords.lat + ', ' + s.coords.lng + '</span>'], ['Precisión', '± ' + (s.precision || 8) + ' m'], ['Distancia al cliente', dist + ' m'], ['Fecha y hora', F.fechaHora(new Date())]]) + '</div>';
+    html += '<div class="pa-act">' + btn('sendEv', S.online ? 'Enviar evidencias' : 'Guardar y enviar al reconectar', { icon: 'send' }) + '</div>';
+    return { html: html, after: function () { initSig(s); } };
+  };
+
+  V.confirm = function () {
+    var s = S.stops[S.cur], n = nextIdx(), t = s.result === 'completa' ? 'Entrega completa registrada' : s.result === 'parcial' ? 'Entrega parcial registrada' : 'Novedad registrada';
+    bar('Parada terminada', 'Parada ' + (s.i + 1) + ' de ' + S.stops.length);
+    var html = '<div class="pa-card pa-center"><div class="pa-ok">' + ic('check-circle') + '</div><h3>' + t + '</h3><p class="muted t-13">' + (S.online ? 'La torre de control ya recibió las evidencias.' : 'Guardado en el teléfono. Se enviará al recuperar señal.') + '</p>' +
+      '<div class="row center">' + chipFor(s) + UI.chip(s.foto ? 'Foto' : '—', { tone: 'success', small: true }) + (s.firma ? UI.chip('Firma', { tone: 'success', small: true }) : '') + '</div></div>' +
+      '<div class="pa-card">' + UI.kv([['Cliente', esc(s.p.cliente)], ['Pedido', '<span class="mono">' + esc(s.p.pedidoId) + '</span>'], ['Descargue', fmtT(s.unloadSec)], ['Hora', hhmm(s.doneMs)]]) + '</div>';
+    if (n >= 0) { var nx = S.stops[n]; html += '<div class="pa-h">Siguiente parada</div>' + stopCard(nx) + '<div class="pa-act">' + btn('openStop', 'Ir a la parada ' + (n + 1), { i: n, icon: 'navigation' }) + '</div>'; }
+    else html += '<div class="pa-act">' + btn('home', 'Ver resumen de la jornada', { icon: 'flag' }) + '</div>';
+    return { html: html };
+  };
+
+  V.novs = function () {
+    bar('Novedades', S.novs.length ? S.novs.length + ' reportada' + (S.novs.length > 1 ? 's' : '') + ' hoy' : 'Reporta lo que pase en la vía');
+    var html = btn('newNov', 'Reportar novedad en la vía', { icon: 'alert-triangle', kind: 'btn-secondary' });
+    html += S.novs.length ? '<div class="stack-sm">' + S.novs.map(function (n) { return '<div class="pa-card"><div class="row between"><strong class="t-14">' + esc(n.tipo) + '</strong>' + UI.chip(n.estado, { tone: 'info', small: true }) + '</div><div class="muted t-13">' + esc(n.obs || n.motivo) + '</div><div class="muted t-12">' + hhmm(n.ms) + ' · ' + esc(n.donde) + '</div></div>'; }).join('') + '</div>' :
+      UI.empty({ icon: 'inbox', title: 'Sin novedades hoy', text: 'Si hay un retén, una falla del vehículo o un problema en la vía, repórtalo aquí para que la torre de control reajuste la ruta.' });
+    return { html: html };
+  };
+  V.profile = function () {
+    bar('Perfil', 'Conductor');
+    var html = '<div class="pa-card"><div class="row" style="gap:12px;flex-wrap:nowrap">' + UI.avatar(COND.nombre, { size: 'lg' }) + '<div><div class="strong t-16">' + esc(COND.nombre) + '</div><div class="muted t-13">Conductor · ' + esc(A.get('sedes', COND.sedeId).nombre) + '</div></div></div>' +
+      UI.kv([['Cédula', '<span class="mono">' + esc(COND.cedula) + '</span>'], ['Licencia', esc(COND.licencia) + ' · vence ' + F.fecha(COND.licenciaVence)], ['Vehículo', UI.plate(VEH.placa) + ' <span class="muted t-13">' + esc(VEH.marca) + ' ' + esc(VEH.modelo) + '</span>'], ['Teléfono', '<span class="mono">' + esc(COND.telefono) + '</span>'], ['Entregas del mes', COND.entregasMes], ['Calificación', COND.calificacion.toString().replace('.', ',') + ' / 5']]) + '</div>' +
+      '<div class="pa-card"><span class="pa-h">Vehículo</span>' + UI.kv([['SOAT', 'vence ' + F.fecha(VEH.soat)], ['Tecnomecánica', 'vence ' + F.fecha(VEH.tecnomecanica)], ['Capacidad', F.kg(VEH.pesoMaxKg) + ' · ' + F.m3(VEH.volumenMaxM3)]]) + '</div>' +
+      '<div class="pa-card"><label class="switch"><input type="checkbox" id="offSw2"' + (S.online ? '' : ' checked') + '> Trabajar sin conexión</label><span class="hint">Simula una zona sin señal: los eventos quedan en cola.</span></div>' +
+      '<a class="btn btn-secondary btn-block" href="panel.html">' + ic('layout-dashboard') + 'Volver al panel de control</a><button type="button" class="btn btn-ghost btn-block" data-act="logout">' + ic('log-out') + 'Cerrar sesión</button>';
+    return { html: html, after: function () { var o = $('#offSw2'); if (o) o.onchange = function () { setOnline(!o.checked); }; } };
+  };
+
+  /* ---------- mapa miniatura ---------- */
+  /* No se llama a destroy(): UI.map deja un ResizeObserver que fallaría sobre un mapa ya removido */
+  function destroyMap() { mapApi = null; }
+  function drawMini(s) {
+    var host = $('#miniMap'); if (!host) return;
+    mapApi = UI.map(host, { center: [s.p.latitud, s.p.longitud], zoom: 15, zoomControl: false }); if (!mapApi.map) return;
+    var m = mapApi.map; ['dragging', 'touchZoom', 'doubleClickZoom', 'boxZoom', 'keyboard'].forEach(function (k) { if (m[k]) m[k].disable(); });
+    var va = { lat: s.p.latitud - 0.006, lng: s.p.longitud - 0.007 };
+    mapApi.route([[va.lat, va.lng], [s.p.latitud - 0.002, s.p.longitud - 0.007], [s.p.latitud - 0.002, s.p.longitud], [s.p.latitud, s.p.longitud]], { color: 'var(--blue)', weight: 4, dashed: s.phase === 'pending' });
+    mapApi.pin({ lat: s.p.latitud, lng: s.p.longitud, n: s.i + 1, state: s.phase === 'done' ? 'done' : 'current' });
+    if (s.phase === 'enroute') mapApi.vehicle({ lat: va.lat, lng: va.lng, placa: VEH.placa, state: 'moving' });
+    var api = mapApi, bnds = [[va.lat, va.lng], [s.p.latitud, s.p.longitud]];
+    setTimeout(function () { if (api !== mapApi) return; try { api.invalidate(); m.fitBounds(bnds, { padding: [26, 26], animate: false, maxZoom: 16 }); } catch (e) {} }, 250);
+  }
+
+  /* ---------- temporizador ---------- */
+  function startTimer(s) { clearInterval(timerId); timerId = setInterval(function () { var t = $('#timer'); if (!t) { clearInterval(timerId); return; } t.textContent = fmtT(Math.round((Date.now() - s.unloadAt) / 1000)); }, 500); }
+
+  /* ---------- firma ---------- */
+  function initSig(s) {
+    var cv = $('#sig'), box = $('#sigBox'); if (!cv) return; var dpr = window.devicePixelRatio || 1, w = box.clientWidth, h = box.clientHeight; cv.width = w * dpr; cv.height = h * dpr;
+    var g = cv.getContext('2d'); g.scale(dpr, dpr); g.lineWidth = 2.4; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#12161B';
+    sigState = { cv: cv, g: g, drawing: false, has: false, w: w, h: h };
+    if (s.firma && s.firma.img) { var im = new Image(); im.onload = function () { g.drawImage(im, 0, 0, w, h); sigState.has = true; $('#sigPh').hidden = true; }; im.src = s.firma.img; }
+    function pt(e) { var r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+    cv.addEventListener('pointerdown', function (e) { e.preventDefault(); cv.setPointerCapture(e.pointerId); sigState.drawing = true; var p = pt(e); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[0] + .01, p[1] + .01); g.stroke(); sigState.has = true; $('#sigPh').hidden = true; box.removeAttribute('aria-invalid'); $('#sigE').hidden = true; });
+    cv.addEventListener('pointermove', function (e) { if (!sigState.drawing) return; var p = pt(e); g.lineTo(p[0], p[1]); g.stroke(); });
+    ['pointerup', 'pointercancel'].forEach(function (k) { cv.addEventListener(k, function () { sigState.drawing = false; }); });
+  }
+
+  /* ---------- render ---------- */
+  function render(keepScroll) {
+    clearInterval(timerId); destroyMap(); closeSheet(); sigState = sigState && S.view === 'evidence' ? sigState : null;
+    recomputeEta();
+    var tabOf = { home: 'ruta', stops: 'paradas', stop: 'paradas', partial: 'paradas', novedad: 'paradas', evidence: 'paradas', confirm: 'paradas', novs: 'novs', profile: 'perfil' };
+    S.tab = tabOf[S.view]; var v = V[S.view](), top = bodyEl.scrollTop;
+    bodyEl.innerHTML = v.html; bodyEl.scrollTop = keepScroll ? top : 0; renderNav(); renderOff(); updateNet(); renderSide(); if (v.after) v.after();
+  }
+  function go(view, cur) { if (cur != null) S.cur = cur; S.view = view; render(); }
+  function cleanQty(s) { s.qty = null; }
+
+  /* ---------- acciones ---------- */
+  function openChecklist() {
+    sheet('<h3>Antes de salir</h3><p class="muted t-13" style="margin-top:-6px">Confirma cada punto para iniciar el recorrido.</p>' + CHECK.map(function (t, i) { return '<label class="pa-chk"><input type="checkbox" class="chk"> <span>' + esc(t) + '</span></label>'; }).join('') +
+      '<span class="error-text" id="chkE" hidden>' + ic('alert-circle', 'icon-sm') + 'Marca todos los puntos para salir.</span>' + btn('go', 'Iniciar recorrido', { icon: 'play' }) + '<button type="button" class="btn btn-ghost btn-block" data-act="closeSheet">Cancelar</button>');
+  }
+  var ACT = {
+    startRoute: openChecklist,
+    closeSheet: closeSheet,
+    go: function () {
+      var all = UI.$$('.chk', $('#scr')).every(function (c) { return c.checked; }); if (!all) { $('#chkE').hidden = false; return; }
+      closeSheet(); S.started = true; S.startMs = Date.now(); var f = S.stops[0]; f.phase = 'enroute'; recomputeEta();
+      emit('Inicio de recorrido', null, 'Lista de verificación completa · ' + S.stops.length + ' paradas'); S.view = 'stops'; render(); snack('Recorrido iniciado. Buen viaje.');
+    },
+    openStop: function (e, el) { go('stop', +el.dataset.i); },
+    back: function () { var s = S.stops[S.cur]; if (S.view === 'stop') go('stops'); else if (S.view === 'evidence') { if (s.result === 'parcial') go('partial'); else if (s.result === 'novedad') go('novedad'); else { s.phase = 'unloaded'; s.result = null; go('stop'); } } else { s.result = null; s.phase = 'unloaded'; go('stop'); } },
+    home: function () { go('home'); },
+    call: function (e, el) { var s = S.stops[+el.dataset.i]; snack('Llamando a ' + s.cli.contacto.nombre + '…'); },
+    nav: function (e, el) { var s = S.stops[+el.dataset.i]; snack('Abriendo navegación a ' + s.cli.direccionEntrega.split(',')[0]); },
+    arrive: function () {
+      var s = S.stops[S.cur]; s.phase = 'arrived'; s.arriveMs = Date.now(); s.distM = 12 + Math.floor(Math.random() * 40); s.precision = 5 + Math.floor(Math.random() * 9); s.coords = jitter(s.p.latitud, s.p.longitud);
+      emit('Llegada al cliente', s, 'A ' + s.distM + ' m del punto de entrega'); render();
+    },
+    startUnload: function () { var s = S.stops[S.cur]; s.phase = 'unloading'; s.unloadAt = Date.now(); emit('Inicio de descargue', s); render(); },
+    endUnload: function () { var s = S.stops[S.cur]; s.unloadSec = Math.max(1, Math.round((Date.now() - s.unloadAt) / 1000)); s.phase = 'unloaded'; emit('Fin de descargue', s, 'Duración ' + fmtT(s.unloadSec)); render(); },
+    resComplete: function () { var s = S.stops[S.cur]; s.result = 'completa'; s.motivo = ''; s.qty = s.ped.lineas.map(function (l) { return l.cantidad; }); s.phase = 'evidence'; go('evidence'); },
+    resPartial: function () { var s = S.stops[S.cur]; s.result = 'parcial'; s.phase = 'evidence'; go('partial'); },
+    resNov: function () { var s = S.stops[S.cur]; s.result = 'novedad'; s.phase = 'evidence'; go('novedad'); },
+    toEvidence: function () { go('evidence'); },
+    qm: function (e, el) { stepQty(+el.dataset.l, -1); }, qp: function (e, el) { stepQty(+el.dataset.l, 1); },
+    partialNext: function () {
+      var s = S.stops[S.cur], ok = true, any = false; s.ped.lineas.forEach(function (l, li) { var v = s.qty[li], er = $('#qe' + li); er.hidden = true; if (isNaN(v) || v < 0 || v > l.cantidad) { er.hidden = false; er.innerHTML = ic('alert-circle', 'icon-sm') + 'Ingresa entre 0 y ' + l.cantidad + '.'; ok = false; } if (v < l.cantidad) any = true; });
+      if (ok && !any) { var er0 = $('#qe0'); er0.hidden = false; er0.innerHTML = ic('alert-circle', 'icon-sm') + 'Todo se recibió: usa «Entrega completa» o reduce alguna cantidad.'; ok = false; }
+      var m = $('#pmot').value; $('#pmotE').hidden = !!m; if (!m) ok = false; if (!ok) return;
+      s.motivo = m; s.obs = $('#pobs').value.trim(); s.phase = 'evidence'; go('evidence');
+    },
+    novNext: function () {
+      var s = S.stops[S.cur], r = $('input[name=nm]:checked', bodyEl), ob = $('#nobs').value.trim(), ok = true; $('#nmE').hidden = !!r; if (!r) ok = false;
+      var needObs = r && r.value === 'Otro motivo'; $('#nobsE').hidden = !(needObs && !ob); if (needObs && !ob) ok = false; if (!ok) return;
+      s.motivo = r.value; s.obs = ob; s.phase = 'evidence'; go('evidence');
+    },
+    shot: function () {
+      var s = S.stops[S.cur], f = $('#flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+      setTimeout(function () { s.foto = { ms: Date.now(), svg: photoSVG({ seed: s.p.pedidoId + Date.now(), fecha: F.fecha(new Date()) + ' · ' + new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }), coords: s.coords.lat + ', ' + s.coords.lng + ' · ±' + (s.precision || 8) + ' m' }) }; var c = $('#cam'); c.classList.add('has'); c.removeAttribute('aria-invalid'); c.innerHTML = s.foto.svg + '<span class="pa-flash" id="flash"></span>'; $('#camE').hidden = true; $('[data-act=shot]').innerHTML = ic('camera') + 'Repetir foto'; }, 160);
+    },
+    sigClear: function () { if (!sigState) return; sigState.g.clearRect(0, 0, sigState.w, sigState.h); sigState.has = false; $('#sigPh').hidden = false; },
+    sendEv: function () {
+      var s = S.stops[S.cur], nov = s.result === 'novedad', ok = true, rec = $('#rec').value.trim();
+      $('#camE').hidden = !!s.foto; if (!s.foto) { ok = false; $('#cam').setAttribute('aria-invalid', 'true'); }
+      if (!nov) { $('#recE').hidden = !!rec; if (!rec) ok = false; var has = sigState && sigState.has; $('#sigE').hidden = !!has; if (!has) { ok = false; $('#sigBox').setAttribute('aria-invalid', 'true'); } }
+      if (!ok) { var bad = $('.error-text:not([hidden])', bodyEl); if (bad) bad.scrollIntoView({ block: 'center' }); return; }
+      s.receptor = rec; if (sigState && sigState.has) s.firma = { img: sigState.cv.toDataURL('image/png') };
+      var b = $('[data-act=sendEv]'); b.disabled = true; b.innerHTML = '<span class="spin"></span>' + (S.online ? 'Enviando…' : 'Guardando…');
+      setTimeout(function () {
+        s.doneMs = Date.now(); s.phase = 'done';
+        emit('Evidencia: foto', s, 'Precisión ± ' + (s.precision || 8) + ' m'); if (s.firma) emit('Evidencia: firma', s, 'Recibe ' + rec);
+        emit(s.result === 'completa' ? 'Entrega completa' : s.result === 'parcial' ? 'Entrega parcial' : 'Novedad en entrega', s, s.motivo || ('Descargue ' + fmtT(s.unloadSec)));
+        if (s.result !== 'completa') S.novs.unshift({ ms: s.doneMs, tipo: s.result === 'parcial' ? 'Entrega parcial' : 'Entrega fallida', motivo: s.motivo, obs: s.obs, donde: 'Parada ' + (s.i + 1) + ' · ' + s.p.cliente, estado: S.online ? 'Enviada' : 'En cola' });
+        var nx = nextIdx(); if (nx >= 0) { var n = S.stops[nx]; n.phase = 'enroute'; recomputeEta(); emit('Salida hacia la siguiente parada', n, 'ETA ' + hhmm(n.etaMs)); }
+        go('confirm');
+      }, 900);
+    },
+    closeRoute: function () { S.closed = true; emit('Recorrido finalizado', null, stopsDone() + ' paradas atendidas'); render(); snack('Recorrido cerrado. Regresa al CEDI.'); },
+    newNov: function () {
+      sheet('<h3>Novedad en la vía</h3><div class="field"><label class="label" for="vt">Tipo</label><select class="select" id="vt"><option value="">Selecciona un tipo</option><option>Retén o cierre de vía</option><option>Falla mecánica</option><option>Accidente o congestión</option><option>Clima adverso</option><option>Otro</option></select><span class="error-text" id="vtE" hidden>' + ic('alert-circle', 'icon-sm') + 'Selecciona el tipo de novedad.</span></div>' +
+        '<div class="field"><label class="label" for="vo">Detalle <span class="opt">(opcional)</span></label><textarea class="textarea" id="vo" placeholder="Ej.: cierre en la Av. Boyacá con calle 60 sur"></textarea></div>' + btn('saveNov', 'Reportar a la torre de control', { icon: 'send' }) + '<button type="button" class="btn btn-ghost btn-block" data-act="closeSheet">Cancelar</button>');
+    },
+    saveNov: function () {
+      var t = $('#vt').value; $('#vtE').hidden = !!t; if (!t) return; var o = $('#vo').value.trim(); closeSheet();
+      S.novs.unshift({ ms: Date.now(), tipo: t, motivo: t, obs: o, donde: 'En ruta', estado: S.online ? 'Enviada' : 'En cola' }); emit('Novedad en ruta', null, t + (o ? ' · ' + o : '')); render(); snack('Novedad enviada a la torre de control.');
+    },
+    logout: function () { UI.confirm({ title: '¿Cerrar sesión?', message: 'Saldrás de la app del conductor. Los eventos pendientes se conservan en el teléfono.', confirmLabel: 'Cerrar sesión' }).then(function (ok) { if (ok) location.href = 'index.html'; }); }
+  };
+  function stepQty(li, d) { var s = S.stops[S.cur], l = s.ped.lineas[li], v = Math.max(0, Math.min(l.cantidad, (s.qty[li] || 0) + d)); s.qty[li] = v; $('#q' + li).value = v; $('#qe' + li).hidden = true; qtyTotals(s); }
+
+  /* ---------- eventos de interfaz ---------- */
+  bodyEl.addEventListener('click', function (e) { var el = e.target.closest('[data-act]'); if (!el || el.disabled) return; var f = ACT[el.dataset.act]; if (f) f(e, el); });
+  $('#scr').addEventListener('click', function (e) { var el = e.target.closest('.pa-sheet [data-act]'); if (!el) return; var f = ACT[el.dataset.act]; if (f) f(e, el); });
+  bodyEl.addEventListener('input', function (e) { var t = e.target; if (t.id && /^q\d+$/.test(t.id)) { var s = S.stops[S.cur], li = +t.dataset.l, v = parseInt(t.value, 10); s.qty[li] = isNaN(v) ? NaN : v; qtyTotals(s); } });
+  $('#bar').addEventListener('click', function (e) { var el = e.target.closest('[data-act]'); if (el && ACT[el.dataset.act]) ACT[el.dataset.act](e, el); });
+  $('#pnav').addEventListener('click', function (e) { var b = e.target.closest('[data-tab]'); if (!b) return; var t = b.dataset.tab; go({ ruta: 'home', paradas: 'stops', novs: 'novs', perfil: 'profile' }[t]); });
+  $('#offSw').addEventListener('change', function () { setOnline(!this.checked); });
+  $('#resetBtn').addEventListener('click', function () { UI.confirm({ title: '¿Reiniciar la jornada?', message: 'Se borran los eventos enviados en esta demostración y la ruta vuelve al inicio.', confirmLabel: 'Reiniciar' }).then(function (ok) { if (!ok) return; var on = S.online; S = fresh(); S.online = on; $('#offSw').checked = !on; render(); UI.toast('Jornada reiniciada.', 'success'); }); });
+
+  function tick() { $('#clk').textContent = F.hora(new Date()); } tick(); setInterval(tick, 20000);
+  render();
+});
+</script>
+</body></html>

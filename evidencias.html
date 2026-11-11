@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evidencias · Armetales</title>
+<meta name="description" content="Gestión de evidencias de entrega: fotos, firmas y remisiones con ubicación, integridad y control para el cierre.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de evidencias (tokens y componentes viven en app.css) */
+  .kpi-row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .kpi-row > :last-child:nth-child(odd) { grid-column: span 2; } .kpi .kpi-value { font-size: 28px; } .kpi .kpi-spark { display: none; } .kpi { padding: 12px; } }
+  .ev-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .ev-toolbar .search { flex: 1 1 240px; max-width: 360px; } .ev-toolbar .select { width: auto; min-width: 150px; max-width: 100%; flex: 0 1 auto; }
+  .ev-toolbar .grow { margin-left: auto; }
+  @media (max-width: 639px) { .hide-sm { display: none; } .nv-t { display: none; } #vPrev, #vNext { min-width: 44px; padding-inline: 10px; } .tabs .tab { padding-inline: 10px; white-space: nowrap; } .ev-toolbar .segmented { flex: 1 1 100%; } .ev-toolbar .segmented button { height: 34px; justify-content: center; } .ev-toolbar .segmented button { flex: 1; } .kpi .kpi-foot { white-space: normal; } }
+  @media (max-width: 639px) { .ev-toolbar .select { flex: 1 1 140px; } .ev-toolbar .search { max-width: none; } .ev-toolbar .grow { margin-left: 0; } }
+  .ev-grid { display: grid; gap: 16px; padding: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 232px), 1fr)); }
+  .ev-card { display: flex; flex-direction: column; text-align: left; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); overflow: hidden; cursor: pointer; padding: 0; color: inherit; transition: border-color .15s, box-shadow .15s, transform .15s; }
+  .ev-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-pop); transform: translateY(-1px); }
+  .ev-thumb { position: relative; aspect-ratio: 4 / 3; background: var(--surface-3); overflow: hidden; border-bottom: 1px solid var(--border); }
+  .ev-thumb svg { width: 100%; height: 100%; display: block; } .ev-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ev-thumb .tl { position: absolute; top: 8px; left: 8px; } .ev-thumb .tr { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); display: grid; place-items: center; color: var(--text-2); }
+  .ev-thumb .tr .icon { width: 14px; height: 14px; }
+  .ev-info { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .ev-info .t1 { font-weight: 600; font-size: 13.5px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ev-info .t2 { font-size: 12px; color: var(--text-2); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+  .ev-pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 16px 14px; flex-wrap: wrap; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-2); }
+  .tbl-thumb { width: 52px; height: 39px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); background: var(--surface-3); flex: none; } .tbl-thumb svg, .tbl-thumb img { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .cell-ev { display: flex; align-items: center; gap: 10px; }
+  /* visor */
+  .vw { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 900px) { .vw { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } }
+  .vw-media { border: 1px solid var(--border); border-radius: var(--r-card); overflow: hidden; background: var(--surface-3); aspect-ratio: 4 / 3; } .vw-media svg, .vw-media img { width: 100%; height: 100%; display: block; object-fit: contain; }
+  .vw-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .vw-box { border: 1px solid var(--border); border-radius: var(--r-card); padding: 12px 14px; background: var(--surface); min-width: 0; }
+  .vw-box h3 { font-size: 13px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .vw-map { --h: 190px; border-radius: var(--r-ctl); } .vw-map .leaflet-control-attribution { display: none; }
+  .hash { font-family: var(--font-mono); font-size: 12px; word-break: break-all; padding: 8px 10px; border-radius: var(--r-ctl); background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2); }
+  .seal { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--green-bg); color: var(--green-fg); font-weight: 600; font-size: 12.5px; border: 1px solid var(--green-line); } .seal .icon { width: 14px; height: 14px; }
+  .log-row { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; } .log-row:last-child { border-bottom: 0; } .log-row .t { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2); }
+  .vw-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  /* por entrega */
+  .stop-card { display: grid; gap: 14px 20px; padding: 14px 16px; border-bottom: 1px solid var(--border); grid-template-columns: minmax(0, 1fr); }
+  .stop-card:last-child { border-bottom: 0; }
+  @media (min-width: 900px) { .stop-card { grid-template-columns: minmax(220px, 1fr) minmax(0, 1.6fr) auto; align-items: center; } }
+  .stop-head { display: flex; gap: 12px; align-items: flex-start; min-width: 0; } .stop-n { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); border: 2px solid var(--border-strong); font-weight: 600; font-size: 12.5px; }
+  .req-list { display: grid; gap: 8px; } .req { display: flex; align-items: center; gap: 10px; font-size: 13px; min-height: 36px; flex-wrap: wrap; }
+  .req .ri { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); color: var(--text-2); } .req .ri .icon { width: 13px; height: 13px; stroke-width: 2.4; }
+  .req.ok .ri { background: var(--green); color: #fff; } .req.bad .ri { background: var(--red); color: #fff; } .req.warn .ri { background: var(--amber); color: #fff; }
+  .req .rt { flex: 0 1 230px; min-width: 150px; } .req .rt small { display: block; color: var(--text-2); font-size: 12px; } .req.bad .rt small { color: var(--red-fg); font-weight: 500; }
+  .mini-th { width: 44px; height: 33px; border-radius: 5px; overflow: hidden; border: 1px solid var(--border); padding: 0; background: var(--surface-3); cursor: pointer; } .mini-th svg, .mini-th img { width: 100%; height: 100%; display: block; object-fit: cover; } .mini-th:hover { border-color: var(--steel); }
+  .stop-act { display: flex; flex-direction: column; gap: 6px; align-items: stretch; min-width: 150px; }
+  .dz { border: 1.5px dashed var(--border-strong); border-radius: var(--r-card); background: var(--surface-2); padding: 20px 14px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; display: flex; flex-direction: column; gap: 4px; align-items: center; width: 100%; color: inherit; }
+  .dz:hover, .dz.is-over { border-color: var(--blue); background: var(--blue-bg); } .dz[aria-invalid="true"] { border-color: var(--red); } .dz .icon { width: 26px; height: 26px; color: var(--text-2); }
+  .dz.has { border-style: solid; border-color: var(--green-line); background: var(--green-bg); } .dz.has .icon { color: var(--green-fg); }
+  .meter-wrap { min-width: 0; }
+  @media (prefers-reduced-motion: reduce) { .ev-card { transition: none; } .ev-card:hover { transform: none; } }
+</style>
+</head>
+<body data-page="evidencias">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Operación</div>
+      <h1 class="page-title">Evidencias de entrega</h1>
+      <p class="page-desc">Fotos, firmas y remisiones de cada entrega, con ubicación, sello de integridad y control de lo obligatorio para el cierre.</p>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-secondary" href="conductor.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>Capturar desde la app</a>
+      <button type="button" class="btn btn-primary" id="attachBtn"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Adjuntar evidencia</button>
+    </div>
+  </header>
+
+  <section aria-label="Indicadores de evidencia"><div class="kpi-row" id="kpiRow"></div></section>
+
+  <section class="section" aria-label="Vistas de evidencias">
+    <div class="tabs" role="tablist" id="mainTabs" aria-label="Vistas">
+      <button class="tab" role="tab" aria-controls="tpGal" aria-selected="true" id="tabGal">Galería <span class="count" id="cGal"></span></button>
+      <button class="tab" role="tab" aria-controls="tpEnt" aria-selected="false" id="tabEnt">Por entrega</button>
+      <button class="tab" role="tab" aria-controls="tpNov" aria-selected="false" id="tabNov"><span>Novedades<span class="hide-sm"> asociadas</span></span> <span class="count" id="cNov"></span></button>
+    </div>
+
+    <div class="tab-panel" id="tpGal" role="tabpanel" aria-labelledby="tabGal">
+      <div class="card">
+        <div class="ev-toolbar" role="search">
+          <div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="input" type="search" id="fQ" placeholder="Pedido, cliente o ID de evidencia" aria-label="Buscar evidencias"></div>
+          <select class="select input-sm" id="fDsp" aria-label="Despacho"></select>
+          <select class="select input-sm" id="fTipo" aria-label="Tipo de evidencia"></select>
+          <select class="select input-sm" id="fVal" aria-label="Estado de validación"></select>
+          <div class="segmented grow" role="group" aria-label="Forma de vista" id="viewSeg"><button type="button" data-v="grid" aria-pressed="true">Galería</button><button type="button" data-v="table" aria-pressed="false">Tabla</button></div>
+        </div>
+        <div id="galBody" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tpEnt" role="tabpanel" aria-labelledby="tabEnt" hidden>
+      <div class="card">
+        <div class="card-head">
+          <div><h2 class="card-title">Evidencia obligatoria por entrega</h2><p class="card-sub">Una entrega no se cierra si falta la foto o la firma del receptor.</p></div>
+          <div class="field" style="min-width:min(100%,300px)"><label class="label sr-only" for="dSel">Despacho</label><select class="select" id="dSel"></select></div>
+        </div>
+        <div id="entHead" class="card-body" style="padding-bottom:0"></div>
+        <div id="entBody"></div>
+        <div class="card-foot row between" id="entFoot"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tpNov" role="tabpanel" aria-labelledby="tabNov" hidden>
+      <div id="novTable"></div>
+    </div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, ic = UI.icon, pageSize = 12;
+  var TIPOS = ['Foto de entrega', 'Firma del receptor', 'Remisión firmada', 'Foto de novedad'];
+  var TIPO_ICON = { 'Foto de entrega': 'camera', 'Firma del receptor': 'pen', 'Remisión firmada': 'file-text', 'Foto de novedad': 'alert-triangle' };
+  var CERRADA = { Entregada: 1, Parcial: 1, Fallida: 1 };
+  var PARAD = {}; A.paradas.forEach(function (p) { PARAD[p.paradaId] = Object.assign({}, p); });
+  var EV = A.evidencias.map(function (e) { return Object.assign({ origen: 'App del conductor' }, e); });
+  var LOG = {}, st = { q: '', dsp: '', tipo: '', val: '', view: 'grid', page: 1, dsel: null, tab: 'gal' }, seq = EV.length, uid = 0;
+
+  /* ---------- datos derivados ---------- */
+  function ped(e) { return A.get('pedidos', e.pedidoId); }
+  function cli(e) { var p = ped(e); return p ? A.get('clientes', p.clienteId) : null; }
+  function cliente(e) { var p = ped(e); return p ? p.cliente : '—'; }
+  function autor(id) { var c = A.get('conductores', id); if (c) return c.nombre; var u = A.get('usuarios', id); return u ? u.nombre : (id || '—'); }
+  function evsDe(paradaId) { return EV.filter(function (e) { return e.paradaId === paradaId; }); }
+  function tieneVal(paradaId, tipo) { return EV.some(function (e) { return e.paradaId === paradaId && e.tipo === tipo && e.validacion !== 'Rechazada'; }); }
+  function requisitos(p) { return p.estado === 'Fallida' ? ['Foto de novedad'] : ['Foto de entrega', 'Firma del receptor']; }
+  function entregaOk(p) { return requisitos(p).every(function (t) { return tieneVal(p.paradaId, t); }); }
+  function valChip(v) { return UI.chip(v, { label: v === 'Pendiente' ? 'Pendiente de validar' : v, tone: v === 'Validada' ? 'success' : v === 'Rechazada' ? 'danger' : 'warning', small: true }); }
+  function haversine(a, b, c, d) { var R = 6371000, r = Math.PI / 180, dl = (c - a) * r, dg = (d - b) * r, x = Math.sin(dl / 2) * Math.sin(dl / 2) + Math.cos(a * r) * Math.cos(c * r) * Math.sin(dg / 2) * Math.sin(dg / 2); return Math.round(2 * R * Math.asin(Math.sqrt(x))); }
+  function fhFull(v) { var d = new Date(v); return F.fecha(d) + ' · ' + F.hora(d) + ':' + ('0' + d.getSeconds()).slice(-2); }
+  function integridadTexto(e) { return [e.evidenciaId, e.pedidoId, e.paradaId, e.tipo, e.fechaHora, e.latitud, e.longitud, e.autorId].join('|'); }
+  function hashear(e) {
+    if (e.hash) return Promise.resolve(e.hash);
+    var s = integridadTexto(e), fb = function () { var h = 2166136261 >>> 0, o = ''; for (var k = 0; k < 8; k++) { for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i) + k; h = Math.imul(h, 16777619) >>> 0; } o += ('00000000' + h.toString(16)).slice(-8); } return o; };
+    if (window.crypto && crypto.subtle && window.TextEncoder) return crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)).then(function (b) { e.hash = Array.from(new Uint8Array(b)).map(function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''); return e.hash; }, function () { e.hash = fb(); return e.hash; });
+    e.hash = fb(); return Promise.resolve(e.hash);
+  }
+  function logDe(e) {
+    if (LOG[e.evidenciaId]) return LOG[e.evidenciaId]; var t = new Date(e.fechaHora).getTime(), u = A.usuarios;
+    LOG[e.evidenciaId] = [{ ms: t, quien: autor(e.autorId), accion: 'Captura y envío (' + e.origen.toLowerCase() + ')' }, { ms: t + 4000, quien: 'Sistema', accion: 'Sello de integridad calculado y archivo bloqueado' }, { ms: t + 90000 + (e.evidenciaId.length * 61000), quien: (u[2] || u[0]).nombre, accion: 'Consultó la evidencia' }];
+    return LOG[e.evidenciaId];
+  }
+  function addLog(e, accion) { logDe(e).push({ ms: Date.now(), quien: A.usuarioActual.nombre, accion: accion }); }
+
+  /* ---------- miniaturas generadas (SVG) ---------- */
+  function rng(seed) { var h = 2166136261; for (var i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); } return function () { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 10000) / 10000; }; }
+  function sigPath(r) { var x = 30, y = 140, d = 'M' + x + ' ' + y, i; for (i = 0; i < 5; i++) { var nx = x + 24 + r() * 16, ny = 120 + r() * 50, cx1 = x + 6 + r() * 10, cy1 = 70 + r() * 40, cx2 = nx - 8, cy2 = 190 - r() * 40; d += ' C' + cx1.toFixed(0) + ' ' + cy1.toFixed(0) + ' ' + cx2.toFixed(0) + ' ' + cy2.toFixed(0) + ' ' + nx.toFixed(0) + ' ' + ny.toFixed(0); x = nx; y = ny; } return d + ' c14 5 24 -3 34 -8'; }
+  function artSVG(e) {
+    var r = rng(e.evidenciaId), id = 'h' + (++uid), W = 320, H = 240, t = e.tipo, fh = new Date(e.fechaHora), out = '', i;
+    var head = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid slice" role="img" aria-label="' + esc(t) + ' (imagen de ejemplo)" xmlns="http://www.w3.org/2000/svg">';
+    if (t === 'Firma del receptor') {
+      var nom = (e.firma || '').split(' · ')[0];
+      return head + '<rect width="' + W + '" height="' + H + '" fill="var(--surface-2)"/><rect x="14" y="14" width="292" height="212" rx="8" fill="var(--surface)" stroke="var(--border-strong)"/>' +
+        '<path d="' + sigPath(r) + '" fill="none" stroke="var(--text)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 176H286" stroke="var(--border-strong)" stroke-dasharray="4 4"/>' +
+        '<text x="34" y="196" fill="var(--text-2)" font-family="Instrument Sans, sans-serif" font-size="11">' + esc(nom || 'Receptor') + '</text><text x="34" y="212" fill="var(--text-3)" font-family="IBM Plex Mono, monospace" font-size="9.5">' + esc(e.pedidoId) + ' · ' + esc(F.hora(fh)) + '</text></svg>';
+    }
+    if (t === 'Remisión firmada') {
+      var rows = ''; for (i = 0; i < 5; i++) rows += '<rect x="30" y="' + (92 + i * 16) + '" width="' + (150 + r() * 80).toFixed(0) + '" height="5" rx="2" fill="var(--border-strong)"/><rect x="250" y="' + (92 + i * 16) + '" width="40" height="5" rx="2" fill="var(--border-strong)"/>';
+      return head + '<rect width="' + W + '" height="' + H + '" fill="var(--surface-3)"/><g transform="rotate(-1.2 160 120)"><rect x="22" y="12" width="276" height="216" rx="4" fill="var(--surface)" stroke="var(--border-strong)"/>' +
+        '<rect x="30" y="22" width="90" height="12" rx="2" fill="var(--steel)"/><text x="30" y="52" fill="var(--text)" font-family="IBM Plex Mono, monospace" font-size="10">REMISIÓN ' + esc(e.pedidoId) + '</text><text x="30" y="66" fill="var(--text-2)" font-family="Instrument Sans, sans-serif" font-size="9">' + esc(cliente(e).slice(0, 38)) + '</text>' +
+        '<path d="M30 76H290" stroke="var(--border-strong)"/>' + rows + '<g transform="translate(206 168) rotate(-12)"><rect width="76" height="28" rx="4" fill="none" stroke="var(--red)" stroke-width="2"/><text x="38" y="19" text-anchor="middle" fill="var(--red)" font-family="Barlow Semi Condensed, sans-serif" font-weight="700" font-size="14">RECIBIDO</text></g>' +
+        '<path d="M34 204 c14 -22 22 6 34 -10 s16 -14 30 2 s20 -8 32 -2" fill="none" stroke="var(--text)" stroke-width="2" stroke-linecap="round"/></g></svg>';
+    }
+    var x = 18, ground = 150; for (i = 0; i < 5; i++) { var w = 38 + r() * 46, h = 24 + r() * 52, y = ground - h; out += '<rect x="' + x.toFixed(0) + '" y="' + y.toFixed(0) + '" width="' + w.toFixed(0) + '" height="' + h.toFixed(0) + '" rx="2" fill="var(--steel)" opacity=".92"/><rect x="' + x.toFixed(0) + '" y="' + y.toFixed(0) + '" width="' + w.toFixed(0) + '" height="' + h.toFixed(0) + '" rx="2" fill="url(#' + id + ')"/>'; x += w + 6; if (x > 262) break; }
+    var nov = t === 'Foto de novedad';
+    return head + '<defs><pattern id="' + id + '" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="8" fill="rgba(255,255,255,.42)"/></pattern></defs>' +
+      '<rect width="' + W + '" height="' + H + '" fill="var(--surface-3)"/><rect x="0" y="40" width="' + W + '" height="' + (ground - 40) + '" fill="var(--surface-2)" opacity=".7"/><rect y="' + ground + '" width="' + W + '" height="' + (H - ground) + '" fill="var(--border-strong)" opacity=".7"/>' +
+      (nov ? '<g opacity=".95"><rect x="18" y="' + (ground - 30) + '" width="' + (80 + r() * 60).toFixed(0) + '" height="30" fill="var(--steel)" opacity=".4"/><path d="M200 ' + (ground - 56) + 'h60v56h-60z" fill="none" stroke="var(--red)" stroke-width="3" stroke-dasharray="7 5"/></g>' : out) +
+      '<path d="M0 ' + (ground + 16) + ' H' + W + '" stroke="var(--steel)" stroke-width="1" opacity=".35" stroke-dasharray="14 10"/><g fill="none" stroke="rgba(255,255,255,.75)" stroke-width="1.5"><path d="M12 24v-10h10M308 14h-10v10M12 ' + (H - 54) + 'v-10h10"/></g>' +
+      '<rect y="' + (H - 44) + '" width="' + W + '" height="44" fill="rgba(10,12,14,.66)"/><text x="12" y="' + (H - 27) + '" fill="#fff" font-family="IBM Plex Mono, monospace" font-size="11.5">' + esc(F.fecha(fh) + ' · ' + F.hora(fh) + ':' + ('0' + fh.getSeconds()).slice(-2)) + '</text>' +
+      '<text x="12" y="' + (H - 12) + '" fill="#fff" font-family="IBM Plex Mono, monospace" font-size="11" opacity=".9">' + esc(e.latitud + ', ' + e.longitud + ' · ±' + e.precisionM + ' m') + '</text></svg>';
+  }
+  function media(e) { return e.objUrl ? '<img src="' + e.objUrl + '" alt="' + esc(e.tipo) + ' cargada">' : (e._svg || (e._svg = artSVG(e))); }
+
+  /* ---------- indicadores ---------- */
+  function renderKpis() {
+    var tot = EV.length, val = EV.filter(function (e) { return e.validacion === 'Validada'; }).length, pen = EV.filter(function (e) { return e.validacion === 'Pendiente'; }).length;
+    var cerradas = Object.keys(PARAD).map(function (k) { return PARAD[k]; }).filter(function (p) { return CERRADA[p.estado] || p.estado === 'En sitio'; }), ok = cerradas.filter(entregaOk).length, falta = cerradas.length - ok;
+    $('#kpiRow').innerHTML = [
+      UI.kpi({ id: 'k-tot', label: 'Evidencias registradas', icon: 'image', value: tot, note: 'En ' + A.despachos.filter(function (d) { return EV.some(function (e) { return e.despachoId === d.despachoId; }); }).length + ' despachos', onClick: true }),
+      UI.kpi({ id: 'k-val', label: 'Validadas', icon: 'shield-check', valueHtml: Math.round(val / tot * 100) + '<small>%</small>', note: val + ' de ' + tot + ' evidencias', onClick: true }),
+      UI.kpi({ id: 'k-pen', label: 'Pendientes de validar', icon: 'clock', value: pen, note: pen ? 'Requieren revisión' : 'Todo validado', onClick: true }),
+      UI.kpi({ id: 'k-falta', label: 'Entregas con evidencia incompleta', icon: 'alert-triangle', value: falta, note: ok + ' de ' + cerradas.length + ' completas', onClick: true })
+    ].map(function (h) { return '<div>' + h + '</div>'; }).join('');
+    $('#cGal').textContent = tot; $('#cNov').textContent = A.novedades.length;
+  }
+  $('#kpiRow').addEventListener('click', function (e) {
+    var k = e.target.closest('[data-kpi]'); if (!k) return; var id = k.dataset.kpi;
+    if (id === 'k-falta') { switchTab('ent'); return; }
+    st.val = id === 'k-val' ? 'Validada' : id === 'k-pen' ? 'Pendiente' : ''; st.q = ''; st.dsp = ''; st.tipo = ''; syncFilters(); switchTab('gal'); st.page = 1; renderGal();
+    $('#tpGal').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  /* ---------- galería y tabla ---------- */
+  function syncFilters() {
+    var dsps = A.despachos.filter(function (d) { return EV.some(function (e) { return e.despachoId === d.despachoId; }); });
+    $('#fDsp').innerHTML = '<option value="">Todos los despachos</option>' + dsps.map(function (d) { return '<option value="' + d.despachoId + '"' + (st.dsp === d.despachoId ? ' selected' : '') + '>' + esc(d.despachoId + ' · ' + d.vehiculoId) + '</option>'; }).join('');
+    $('#fTipo').innerHTML = '<option value="">Todos los tipos</option>' + TIPOS.map(function (t) { return '<option' + (st.tipo === t ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('');
+    $('#fVal').innerHTML = '<option value="">Toda validación</option>' + [['Validada', 'Validadas'], ['Pendiente', 'Pendientes de validar'], ['Rechazada', 'Rechazadas']].map(function (v) { return '<option value="' + v[0] + '"' + (st.val === v[0] ? ' selected' : '') + '>' + v[1] + '</option>'; }).join('');
+    $('#fQ').value = st.q;
+  }
+  function filtered() {
+    var q = UI.norm(st.q || '');
+    return EV.filter(function (e) {
+      if (st.dsp && e.despachoId !== st.dsp) return false; if (st.tipo && e.tipo !== st.tipo) return false; if (st.val && e.validacion !== st.val) return false;
+      if (q && UI.norm([e.evidenciaId, e.pedidoId, cliente(e), e.tipo, e.paradaId].join(' ')).indexOf(q) < 0) return false; return true;
+    }).sort(function (a, b) { return new Date(b.fechaHora) - new Date(a.fechaHora); });
+  }
+  var tbl = null;
+  function renderGal() {
+    var rows = filtered(), host = $('#galBody');
+    if (!rows.length) {
+      host.innerHTML = UI.empty({ icon: 'image', title: 'No hay evidencias con esos filtros', text: 'Prueba con otro despacho o tipo, o limpia la búsqueda.', action: { label: 'Limpiar filtros' } });
+      var b = $('button', host); if (b) b.onclick = function () { st.q = st.dsp = st.tipo = st.val = ''; syncFilters(); renderGal(); }; return;
+    }
+    if (st.view === 'table') {
+      host.innerHTML = '<div id="evTbl"></div>';
+      tbl = UI.table($('#evTbl'), {
+        rows: rows, pageSize: 10, rowKey: 'evidenciaId', caption: 'Evidencias de entrega',
+        columns: [
+          { key: 'evidenciaId', label: 'Evidencia', title: true, render: function (r) { return '<div class="cell-ev"><span class="tbl-thumb">' + media(r) + '</span><span><span class="mono">' + esc(r.evidenciaId) + '</span><br><span class="muted t-12">' + esc(r.tipo) + '</span></span></div>'; } },
+          { key: 'pedidoId', label: 'Pedido', mono: true },
+          { key: 'cliente', label: 'Cliente', value: cliente, render: function (r) { return esc(cliente(r)); } },
+          { key: 'despachoId', label: 'Despacho', mono: true },
+          { key: 'fechaHora', label: 'Capturada', render: function (r) { return F.fechaHora(r.fechaHora); } },
+          { key: 'validacion', label: 'Validación', render: function (r) { return valChip(r.validacion); } },
+          { key: 'sello', label: 'Sello', hideMobile: true, sortable: false, render: function () { return '<span class="seal">' + ic('lock') + 'Protegida</span>'; } }
+        ],
+        onRowClick: function (r) { openViewer(r.evidenciaId, rows); }
+      });
+      return;
+    }
+    var pages = Math.max(1, Math.ceil(rows.length / pageSize)); if (st.page > pages) st.page = pages;
+    var cur = rows.slice((st.page - 1) * pageSize, st.page * pageSize);
+    host.innerHTML = '<div class="ev-grid" role="list">' + cur.map(function (e) {
+      return '<button type="button" class="ev-card" role="listitem" data-id="' + e.evidenciaId + '" aria-label="' + esc(e.tipo + ' del pedido ' + e.pedidoId + ', ' + cliente(e)) + '"><div class="ev-thumb">' + media(e) + '<span class="tl">' + UI.chip(e.tipo, { tone: e.tipo === 'Foto de novedad' ? 'danger' : 'neutral', small: true, noDot: true }) + '</span><span class="tr" data-tip="Protegida: no editable" aria-hidden="true">' + ic('lock') + '</span></div>' +
+        '<div class="ev-info"><div class="t1">' + esc(cliente(e)) + '</div><div class="t2"><span class="mono">' + esc(e.pedidoId) + '</span><span>' + F.fechaHora(e.fechaHora) + '</span></div><div class="t2">' + valChip(e.validacion) + '<span class="mono">' + esc(e.evidenciaId) + '</span></div></div></button>';
+    }).join('') + '</div><div class="ev-pager"><span>' + rows.length + ' evidencia' + (rows.length > 1 ? 's' : '') + (pages > 1 ? ' · página ' + st.page + ' de ' + pages : '') + '</span>' + (pages > 1 ? '<nav class="pagination" aria-label="Paginación"><button type="button" class="page-btn" data-pg="' + (st.page - 1) + '" aria-label="Página anterior"' + (st.page === 1 ? ' disabled' : '') + '>' + ic('chevron-left', 'icon-sm') + '</button>' + Array.apply(null, Array(pages)).map(function (_, i) { return '<button type="button" class="page-btn" data-pg="' + (i + 1) + '"' + (i + 1 === st.page ? ' aria-current="page"' : '') + '>' + (i + 1) + '</button>'; }).join('') + '<button type="button" class="page-btn" data-pg="' + (st.page + 1) + '" aria-label="Página siguiente"' + (st.page === pages ? ' disabled' : '') + '>' + ic('chevron-right', 'icon-sm') + '</button></nav>' : '') + '</div>';
+    UI.$$('.ev-card', host).forEach(function (c) { c.onclick = function () { openViewer(c.dataset.id, rows); }; });
+    UI.$$('[data-pg]', host).forEach(function (b) { b.onclick = function () { st.page = +b.dataset.pg; renderGal(); $('#tpGal').scrollIntoView({ block: 'nearest' }); }; });
+  }
+  $('#fQ').addEventListener('input', function () { st.q = this.value; st.page = 1; renderGal(); });
+  [['fDsp', 'dsp'], ['fTipo', 'tipo'], ['fVal', 'val']].forEach(function (p) { $('#' + p[0]).addEventListener('change', function () { st[p[1]] = this.value; st.page = 1; renderGal(); }); });
+  $('#viewSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; st.view = b.dataset.v; UI.$$('button', this).forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); renderGal(); });
+
+  /* ---------- visor ---------- */
+  function openViewer(id, list) {
+    list = list && list.length ? list : EV; var i = list.findIndex(function (e) { return e.evidenciaId === id; }); if (i < 0) { list = EV; i = list.findIndex(function (e) { return e.evidenciaId === id; }); } if (i < 0) return;
+    var api = UI.modal({ title: 'Evidencia', width: 1060, body: '', footer: [] }), foot = api.footer;
+    function show(k) {
+      i = (k + list.length) % list.length; var e = list[i], p = ped(e), c = cli(e), par = PARAD[e.paradaId], desp = A.get('despachos', e.despachoId);
+      addLog(e, 'Consultó la evidencia'); api.setTitle(e.tipo + ' · ' + e.evidenciaId);
+      var dist = c ? haversine(e.latitud, e.longitud, c.latitud, c.longitud) : null, dentro = dist != null && dist <= 100;
+      var logs = logDe(e).slice().sort(function (a, b) { return b.ms - a.ms; });
+      api.setBody('<div class="vw"><div class="vw-col"><div class="vw-media">' + media(e) + '</div><div class="vw-actions"><button type="button" class="btn btn-secondary" id="vDl">' + ic('download') + 'Descargar copia</button>' +
+        (e.validacion !== 'Validada' ? '<button type="button" class="btn btn-primary" id="vOk">' + ic('check-circle') + 'Validar evidencia</button>' : '') + (e.validacion !== 'Rechazada' ? '<button type="button" class="btn btn-ghost" id="vNo">' + ic('x-circle') + 'Rechazar</button>' : '') + '<button type="button" class="btn btn-ghost" id="vEd">' + ic('pen') + 'Editar</button></div><div id="vBlock"></div>' +
+        '<div class="vw-box"><h3>' + ic('eye', 'icon-sm') + 'Registro de consultas</h3><div>' + logs.slice(0, 6).map(function (l) { return '<div class="log-row"><span class="t">' + F.fechaHora(l.ms) + '</span><span><strong>' + esc(l.quien) + '</strong> · ' + esc(l.accion) + '</span></div>'; }).join('') + '</div></div></div>' +
+        '<div class="vw-col"><div class="vw-box"><h3>Datos de la evidencia</h3>' + UI.kv([['Tipo', esc(e.tipo)], ['Validación', valChip(e.validacion)], ['Capturada', fhFull(e.fechaHora)], ['Autor', esc(autor(e.autorId)) + '<div class="muted t-12">' + esc(e.origen) + '</div>'], ['Formato', /\.png$/i.test(e.archivo || '') ? 'Imagen PNG' : /\.pdf$/i.test(e.archivo || '') ? 'Documento PDF' : 'Imagen JPG']].concat(e.firma ? [['Receptor', esc(e.firma)]] : [])) + '</div>' +
+        '<div class="vw-box"><h3>Vínculos</h3>' + UI.kv([['Pedido', '<a href="pedidos.html?id=' + encodeURIComponent(e.pedidoId) + '" class="mono">' + esc(e.pedidoId) + '</a>'], ['Cliente', c ? '<a href="clientes.html?id=' + encodeURIComponent(c.clienteIdSAP) + '">' + esc(c.razonSocial) + '</a>' : '—'], ['Parada', par ? '<a href="seguimiento.html?despacho=' + encodeURIComponent(e.despachoId) + '">Parada ' + par.secuencia + ' de ' + (desp ? desp.paradas : '—') + '</a> ' + UI.chip(par.estado, { small: true }) : '—'], ['Despacho', '<a href="despachos.html?id=' + encodeURIComponent(e.despachoId) + '" class="mono">' + esc(e.despachoId) + '</a>' + (desp ? ' ' + UI.plate(desp.vehiculoId) : '')]]) + '</div>' +
+        '<div class="vw-box"><h3>' + ic('map-pin', 'icon-sm') + 'Ubicación de la captura</h3><div id="vMap" class="vw-map" role="img" aria-label="Mapa con la ubicación de la evidencia y la dirección del cliente"></div>' +
+        '<p class="t-13" style="margin-top:8px"><span class="mono">' + e.latitud + ', ' + e.longitud + '</span> · ±' + e.precisionM + ' m</p>' + (c ? '<p class="t-13 muted">Dirección: ' + esc(c.direccionEntrega) + '</p>' : '') +
+        (dist != null ? '<div style="margin-top:8px">' + UI.banner({ tone: dentro ? 'success' : 'warning', text: dentro ? 'Capturada a ' + dist + ' m de la dirección del cliente, dentro del radio de entrega (100 m).' : 'Capturada a ' + dist + ' m de la dirección del cliente: fuera del radio de entrega (100 m). Revisa la parada.' }) + '</div>' : '') + '</div>' +
+        '<div class="vw-box"><h3>' + ic('shield-check', 'icon-sm') + 'Integridad</h3><span class="seal">' + ic('lock') + 'Protegida: no editable</span><p class="muted t-12" style="margin:8px 0 6px">Huella SHA-256 calculada al recibir la evidencia. Cualquier cambio en la evidencia la invalida.</p><div class="hash" id="vHash">Calculando huella…</div><div class="row" style="margin-top:8px"><button type="button" class="btn btn-ghost btn-sm" id="vCp">' + ic('copy') + 'Copiar huella</button></div></div></div></div>');
+      foot.innerHTML = ''; var nav = UI.el('div', { class: 'row', style: 'margin-right:auto' }, '<button type="button" class="btn btn-secondary" id="vPrev" aria-label="Evidencia anterior"' + (list.length < 2 ? ' disabled' : '') + '>' + ic('chevron-left') + '<span class="nv-t">Anterior</span></button><span class="muted t-13">' + (i + 1) + ' de ' + list.length + '</span><button type="button" class="btn btn-secondary" id="vNext" aria-label="Evidencia siguiente"' + (list.length < 2 ? ' disabled' : '') + '><span class="nv-t">Siguiente</span>' + ic('chevron-right') + '</button>');
+      foot.appendChild(nav); foot.appendChild(UI.el('button', { type: 'button', class: 'btn btn-primary', id: 'vClose' }, 'Cerrar'));
+      $('#vPrev', foot).onclick = function () { show(i - 1); }; $('#vNext', foot).onclick = function () { show(i + 1); }; $('#vClose', foot).onclick = function () { api.close(); };
+      hashear(e).then(function (h) { var el = $('#vHash', api.body); if (el) el.textContent = h; });
+      var cp = $('#vCp', api.body); cp.onclick = function () { hashear(e).then(function (h) { try { navigator.clipboard.writeText(h); } catch (x) {} UI.toast('Huella copiada.', 'success'); }); };
+      $('#vDl', api.body).onclick = function () { descargar(e); };
+      var ok = $('#vOk', api.body); if (ok) ok.onclick = function () { e.validacion = 'Validada'; addLog(e, 'Validó la evidencia'); UI.toast('Evidencia validada.', 'success'); refreshAll(); show(i); };
+      var no = $('#vNo', api.body); if (no) no.onclick = function () { rechazar(e, function () { refreshAll(); show(i); }); };
+      $('#vEd', api.body).onclick = function () { addLog(e, 'Intentó editar (bloqueado)'); $('#vBlock', api.body).innerHTML = UI.banner({ tone: 'danger', title: 'Edición bloqueada', text: 'Las evidencias son inmutables para conservar su valor probatorio. Si hay un error, adjunta una nueva evidencia: la original queda en el histórico.' }); };
+      var host = $('#vMap', api.body); if (host && c) {
+        var m = UI.map(host, { center: [e.latitud, e.longitud], zoom: 17, zoomControl: false });
+        if (m.map) { m.route([[c.latitud, c.longitud], [e.latitud, e.longitud]], { color: 'var(--blue)', weight: 3, dashed: true }); m.pin({ lat: c.latitud, lng: c.longitud, n: 'C', state: 'origin', popup: 'Dirección del cliente' }); m.pin({ lat: e.latitud, lng: e.longitud, n: 'E', state: dentro ? 'done' : 'failed', popup: 'Captura de la evidencia' }); setTimeout(function () { try { m.invalidate(); m.map.fitBounds([[c.latitud, c.longitud], [e.latitud, e.longitud]], { padding: [30, 30], maxZoom: 18, animate: false }); } catch (x) {} }, 280); }
+      }
+    }
+    show(i); return api;
+  }
+  function rechazar(e, done) {
+    var m = UI.modal({ title: 'Rechazar evidencia', width: 460, body: '<p class="muted t-13" style="margin-bottom:12px">La entrega volverá a exigir una evidencia nueva de este tipo.</p><div class="field"><label class="label" for="rzM">Motivo del rechazo</label><select class="select" id="rzM"><option value="">Selecciona un motivo</option><option>Imagen borrosa o ilegible</option><option>La mercancía no corresponde al pedido</option><option>Firma incompleta</option><option>Ubicación fuera del punto de entrega</option></select><span class="error-text" id="rzE" hidden>' + ic('alert-circle', 'icon-sm') + 'Selecciona el motivo del rechazo.</span></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Rechazar evidencia', kind: 'danger', onClick: function () { var v = $('#rzM', m.body).value; if (!v) { $('#rzE', m.body).hidden = false; $('#rzM', m.body).setAttribute('aria-invalid', 'true'); return false; } e.validacion = 'Rechazada'; addLog(e, 'Rechazó la evidencia: ' + v); UI.toast('Evidencia rechazada. Se pedirá una nueva.', 'warning'); done(); } }] });
+  }
+  function resolveVars(s) { var cs = getComputedStyle(document.documentElement); return s.replace(/var\((--[a-z0-9-]+)\)/g, function (_, n) { return cs.getPropertyValue(n).trim() || '#888'; }).replace(' preserveAspectRatio="xMidYMid slice"', ''); }
+  function descargar(e) {
+    addLog(e, 'Descargó una copia'); var url, name = e.evidenciaId;
+    if (e.objUrl) { url = e.objUrl; name += '-' + (e.archivo || 'archivo').replace(/[^\w.-]/g, '_'); }
+    else { var blob = new Blob([resolveVars(e._svg || (e._svg = artSVG(e)))], { type: 'image/svg+xml' }); url = URL.createObjectURL(blob); name += '.svg'; }
+    var a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); UI.toast('Copia descargada. La original sigue protegida.', 'success');
+  }
+
+  /* ---------- por entrega (HU-145 / HU-146) ---------- */
+  function renderEntrega() {
+    var dsps = A.despachos.slice().sort(function (a, b) { return a.despachoId < b.despachoId ? 1 : -1; });
+    if (!st.dsel) st.dsel = (dsps.find(function (d) { return d.despachoId === 'DSP-2611-017'; }) || dsps[0]).despachoId;
+    $('#dSel').innerHTML = dsps.map(function (d) { return '<option value="' + d.despachoId + '"' + (d.despachoId === st.dsel ? ' selected' : '') + '>' + esc(d.despachoId + ' · ' + d.vehiculoId + ' · ' + d.estado) + '</option>'; }).join('');
+    var d = A.get('despachos', st.dsel), pars = Object.keys(PARAD).map(function (k) { return PARAD[k]; }).filter(function (p) { return p.despachoId === st.dsel; }).sort(function (a, b) { return a.secuencia - b.secuencia; });
+    var cond = A.get('conductores', d.conductorId), cerr = pars.filter(function (p) { return CERRADA[p.estado]; }), okAll = pars.every(function (p) { return CERRADA[p.estado] && entregaOk(p); });
+    var faltan = pars.filter(function (p) { return (CERRADA[p.estado] || p.estado === 'En sitio') && !entregaOk(p); }), sin = pars.filter(function (p) { return !CERRADA[p.estado]; });
+    $('#entHead').innerHTML = '<div class="row" style="gap:12px 20px;margin-bottom:12px">' + UI.plate(d.vehiculoId) + '<span class="t-13"><strong>' + esc(cond ? cond.nombre : '—') + '</strong><span class="muted"> · ' + esc((A.get('rutas', d.rutaId) || {}).nombre || d.rutaId) + '</span></span>' + UI.chip(d.estado) + '<span class="muted t-13">' + cerr.length + ' de ' + pars.length + ' entregas cerradas</span><a class="btn btn-ghost btn-sm ml-auto" href="despachos.html?id=' + d.despachoId + '">Ver despacho</a></div>' +
+      (faltan.length ? UI.banner({ tone: 'danger', title: 'Cierre bloqueado', text: faltan.length + (faltan.length > 1 ? ' entregas no tienen' : ' entrega no tiene') + ' la evidencia obligatoria completa. Adjunta lo que falta para poder cerrarlas.' }) : sin.length ? UI.banner({ tone: 'info', text: 'Hay ' + sin.length + ' parada' + (sin.length > 1 ? 's' : '') + ' por atender. La evidencia se exige al cerrar cada entrega.' }) : UI.banner({ tone: 'success', text: 'Todas las entregas tienen su evidencia obligatoria.' })) + '<div style="height:12px"></div>';
+    $('#entBody').innerHTML = pars.map(function (p) {
+      var evs = evsDe(p.paradaId), req = requisitos(p), started = CERRADA[p.estado] || p.estado === 'En sitio', c = A.get('clientes', p.clienteId), btnCierre = '';
+      var items = started ? req.map(function (t) {
+        var has = evs.filter(function (e) { return e.tipo === t && e.validacion !== 'Rechazada'; }), rech = evs.some(function (e) { return e.tipo === t && e.validacion === 'Rechazada'; }), cls = has.length ? 'ok' : 'bad';
+        return '<div class="req ' + cls + '"><span class="ri">' + ic(has.length ? 'check' : 'x') + '</span><span class="rt">' + esc(t) + ' <small>' + (has.length ? (has[0].validacion === 'Pendiente' ? 'Recibida · pendiente de validar' : 'Recibida y validada') : (rech ? 'Rechazada: falta una nueva' : t === 'Firma del receptor' ? 'Falta la firma del receptor' : 'Falta la foto')) + '</small></span>' + has.slice(0, 2).map(function (e) { return '<button type="button" class="mini-th" data-open="' + e.evidenciaId + '" data-par="' + p.paradaId + '" aria-label="Ver ' + esc(t) + '">' + media(e) + '</button>'; }).join('') + (has.length ? '' : '<button type="button" class="btn btn-secondary btn-sm" data-add="' + p.paradaId + '" data-tipo="' + esc(t) + '">' + ic('plus', 'icon-sm') + 'Adjuntar</button>') + '</div>';
+      }).join('') + (function () { var rm = evs.filter(function (e) { return e.tipo === 'Remisión firmada'; }); return '<div class="req ' + (rm.length ? 'ok' : '') + '"><span class="ri">' + ic(rm.length ? 'check' : 'minus') + '</span><span class="rt">Remisión firmada <small>' + (rm.length ? 'Recibida' : 'Recomendada, no bloquea el cierre') + '</small></span>' + rm.slice(0, 2).map(function (e) { return '<button type="button" class="mini-th" data-open="' + e.evidenciaId + '" data-par="' + p.paradaId + '" aria-label="Ver remisión firmada">' + media(e) + '</button>'; }).join('') + '</div>'; })() : '<p class="muted t-13">' + (p.estado === 'Pendiente' || p.estado === 'En camino' ? 'Aún no llega al cliente: todavía no se exige evidencia.' : '—') + '</p>';
+      if (p.estado === 'En sitio') btnCierre = '<button type="button" class="btn btn-primary btn-sm" data-close="' + p.paradaId + '"' + (entregaOk(p) ? '' : ' aria-describedby="why-' + p.paradaId + '"') + '>' + ic('check-circle') + 'Cerrar entrega</button>' + (entregaOk(p) ? '' : '<span class="error-text" id="why-' + p.paradaId + '">' + ic('alert-circle', 'icon-sm') + (tieneVal(p.paradaId, 'Firma del receptor') ? 'Falta la foto de la entrega.' : 'Falta la firma del receptor.') + '</span>');
+      else if (CERRADA[p.estado]) btnCierre = '<span>' + (entregaOk(p) ? UI.chip('Evidencia completa', { tone: 'success', small: true }) : UI.chip('Evidencia incompleta', { tone: 'danger', small: true })) + '</span>';
+      return '<div class="stop-card"><div class="stop-head"><span class="stop-n">' + p.secuencia + '</span><div style="min-width:0"><div class="strong t-14">' + esc(p.cliente) + '</div><div class="muted t-12"><span class="mono">' + esc(p.pedidoId) + '</span> · ' + esc(p.municipio) + '</div><div style="margin-top:6px">' + UI.chip(p.estado, { small: true }) + '</div></div></div><div class="req-list">' + items + '</div><div class="stop-act">' + btnCierre + '</div></div>';
+    }).join('');
+    $('#entFoot').innerHTML = '<span class="muted t-13">' + (d.estado === 'Cerrado' ? 'Despacho cerrado' + (d.fechaCierre ? ' · ' + F.fechaHora(d.fechaCierre) : '') : okAll ? 'Todo listo para cerrar el despacho.' : 'El despacho se cierra cuando todas las entregas tengan su evidencia.') + '</span><span class="row"><a class="btn btn-secondary" href="despachos.html?id=' + d.despachoId + '">Abrir despacho</a><button type="button" class="btn btn-primary" id="cierraD"' + (okAll && d.estado !== 'Cerrado' ? '' : ' disabled') + '>Cerrar despacho</button></span>';
+    var cd = $('#cierraD'); if (cd) cd.onclick = function () { UI.confirm({ title: '¿Cerrar el despacho ' + d.despachoId + '?', message: 'Todas las entregas tienen evidencia completa. El despacho pasará a Cerrado.', confirmLabel: 'Cerrar despacho', tone: 'primary' }).then(function (ok) { if (ok) { d.estado = 'Cerrado'; d.fechaCierre = new Date().toISOString(); UI.toast('Despacho cerrado.', 'success'); renderEntrega(); } }); };
+  }
+  $('#dSel').addEventListener('change', function () { st.dsel = this.value; renderEntrega(); });
+  $('#entBody').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.add) { openAttach({ paradaId: b.dataset.add, tipo: b.dataset.tipo }); }
+    else if (b.dataset.open) { var l = evsDe(b.dataset.par); openViewer(b.dataset.open, l); }
+    else if (b.dataset.close) {
+      var p = PARAD[b.dataset.close]; if (!entregaOk(p)) { UI.toast(tieneVal(p.paradaId, 'Firma del receptor') ? 'No se puede cerrar: falta la foto de la entrega.' : 'No se puede cerrar: falta la firma del receptor.', 'error'); return; }
+      UI.confirm({ title: '¿Cerrar la entrega de ' + p.cliente + '?', message: 'La evidencia obligatoria está completa. La parada quedará como entregada.', confirmLabel: 'Cerrar entrega', tone: 'primary' }).then(function (ok) { if (ok) { p.estado = 'Entregada'; p.horaEvento = new Date().toISOString(); UI.toast('Entrega cerrada.', 'success'); refreshAll(); } });
+    }
+  });
+
+  /* ---------- novedades asociadas (HU-148) ---------- */
+  function renderNov() {
+    var rows = A.novedades.map(function (n) { var ev = n.paradaId ? evsDe(n.paradaId) : EV.filter(function (e) { return e.pedidoId === n.pedidoId; }); var c = A.get('clientes', n.clienteId); return Object.assign({}, n, { cliente: c ? c.razonSocial : '—', nEv: ev.length, evs: ev }); });
+    UI.table($('#novTable'), {
+      rows: rows, pageSize: 8, rowKey: 'novedadId', caption: 'Novedades con sus evidencias', searchable: { placeholder: 'Buscar novedad, pedido o cliente' }, searchKeys: ['novedadId', 'pedidoId', 'cliente', 'motivo'],
+      filters: [{ key: 'tipo', label: 'Tipo', all: 'Todos los tipos', options: 'auto' }, { key: 'estado', label: 'Estado', all: 'Todos los estados', options: 'auto' }],
+      columns: [
+        { key: 'novedadId', label: 'Novedad', mono: true, title: true }, { key: 'tipo', label: 'Tipo' }, { key: 'motivo', label: 'Motivo', hideMobile: true },
+        { key: 'pedidoId', label: 'Pedido', mono: true, render: function (r) { return r.pedidoId ? esc(r.pedidoId) : '—'; } }, { key: 'cliente', label: 'Cliente' },
+        { key: 'estado', label: 'Estado', render: function (r) { return UI.chip(r.estado); } },
+        { key: 'nEv', label: 'Evidencias', num: true, render: function (r) { return r.nEv ? '<span class="tag">' + ic('image', 'icon-sm') + r.nEv + '</span>' : '<span class="muted">Sin evidencias</span>'; } },
+        { key: 'fechaHora', label: 'Fecha', render: function (r) { return F.fechaHora(r.fechaHora); } }
+      ],
+      emptyText: 'No hay novedades con esos filtros.',
+      onRowClick: function (r) {
+        UI.drawer({ title: r.novedadId, subtitle: r.tipo + ' · ' + r.cliente, width: 560, body: function (b, api) {
+          b.innerHTML = UI.kv([['Estado', UI.chip(r.estado)], ['Motivo', esc(r.motivo)], ['Pedido', r.pedidoId ? '<a class="mono" href="pedidos.html?id=' + encodeURIComponent(r.pedidoId) + '">' + esc(r.pedidoId) + '</a>' : '—'], ['Despacho', '<a class="mono" href="despachos.html?id=' + encodeURIComponent(r.despachoId) + '">' + esc(r.despachoId) + '</a>'], ['Registrada', F.fechaHora(r.fechaHora)], ['Reportó', esc(autor(r.reportadoPor))]]) +
+            '<h3 class="section-title" style="margin:18px 0 10px">Evidencias asociadas (' + r.nEv + ')</h3>' + (r.nEv ? '<div class="grid c2 gap-3">' + r.evs.map(function (e) { return '<button type="button" class="ev-card" data-id="' + e.evidenciaId + '"><div class="ev-thumb">' + media(e) + '</div><div class="ev-info"><div class="t1">' + esc(e.tipo) + '</div><div class="t2">' + valChip(e.validacion) + '<span class="mono">' + esc(e.evidenciaId) + '</span></div></div></button>'; }).join('') + '</div>' : UI.empty({ icon: 'image', title: 'Sin evidencias vinculadas', text: 'Esta novedad se reportó sin foto ni documento. Puedes adjuntar una desde la entrega.' }));
+          UI.$$('.ev-card', b).forEach(function (c) { c.onclick = function () { openViewer(c.dataset.id, r.evs); }; });
+        }, footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Abrir en novedades', kind: 'primary', onClick: function () { location.href = 'novedades.html?id=' + encodeURIComponent(r.novedadId); } }] });
+      }
+    });
+  }
+
+  /* ---------- adjuntar (HU-141 / HU-142) ---------- */
+  function openAttach(pre) {
+    pre = pre || {}; var file = null, objUrl = null;
+    var elegibles = Object.keys(PARAD).map(function (k) { return PARAD[k]; }).filter(function (p) { return CERRADA[p.estado] || p.estado === 'En sitio'; }).sort(function (a, b) { return a.despachoId === b.despachoId ? a.secuencia - b.secuencia : (a.despachoId < b.despachoId ? 1 : -1); });
+    var m = UI.modal({ title: 'Adjuntar evidencia', width: 560, body: '<form id="atF" novalidate class="stack" style="gap:14px">' +
+      '<div class="field"><label class="label" for="atP">Entrega (parada)</label><select class="select" id="atP"><option value="">Selecciona la entrega</option>' + elegibles.map(function (p) { return '<option value="' + p.paradaId + '"' + (pre.paradaId === p.paradaId ? ' selected' : '') + '>' + esc(p.despachoId.slice(-3) + ' · P' + p.secuencia + ' · ' + p.cliente + ' (' + p.estado + ')') + '</option>'; }).join('') + '</select><span class="error-text" id="atPE" hidden>' + ic('alert-circle', 'icon-sm') + 'Selecciona la entrega a la que pertenece.</span></div>' +
+      '<div class="field"><label class="label" for="atT">Tipo de evidencia</label><select class="select" id="atT"><option value="">Selecciona el tipo</option>' + TIPOS.map(function (t) { return '<option' + (pre.tipo === t ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select><span class="error-text" id="atTE" hidden></span></div>' +
+      '<div class="field"><span class="label" id="atFl">Archivo</span><button type="button" class="dz" id="atDz" aria-labelledby="atFl atDzT"><span id="atDzI">' + ic('upload') + '</span><strong id="atDzT">Arrastra el archivo aquí o haz clic para elegirlo</strong><span class="muted t-12" id="atDzS">Imagen JPG o PNG, o PDF · máximo 10 MB</span></button><input type="file" id="atFile" accept="image/*,.pdf" hidden><div><button type="button" class="btn btn-ghost btn-sm" id="atDemo">Usar archivo de ejemplo</button></div><span class="error-text" id="atFE" hidden></span></div>' +
+      '<div class="field"><label class="label" for="atO">Observación <span class="opt">(opcional)</span></label><textarea class="textarea" id="atO" placeholder="Ej.: la firma se tomó en portería"></textarea></div><div id="atPr" hidden><div class="row between t-13"><span>Subiendo y sellando…</span><strong id="atPn">0 %</strong></div><div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="atBar"><div class="meter-fill hatch" style="width:0"></div></div></div></form>',
+      footer: [{ label: 'Cancelar' }, { label: 'Adjuntar y sellar', kind: 'primary', id: 'atGo', keepOpen: true, onClick: function () { guardar(); } }] });
+    var b = m.body, dz = $('#atDz', b), inp = $('#atFile', b);
+    function setFile(f, url) {
+      file = f; objUrl = url || null; dz.classList.toggle('has', !!f); dz.removeAttribute('aria-invalid'); $('#atFE', b).hidden = true;
+      $('#atDzT', b).textContent = f ? f.name : 'Arrastra el archivo aquí o haz clic para elegirlo'; $('#atDzS', b).textContent = f ? (Math.max(1, Math.round(f.size / 1024)) + ' KB · listo para adjuntar') : 'Imagen JPG o PNG, o PDF · máximo 10 MB'; $('#atDzI', b).innerHTML = ic(f ? 'check-circle' : 'upload');
+    }
+    function intake(f) { if (!f) return; var tipo = $('#atT', b).value, isImg = /^image\//.test(f.type), isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name), er = $('#atFE', b);
+      var msg = ''; if (f.size > 10 * 1024 * 1024) msg = 'El archivo pesa más de 10 MB.'; else if (!isImg && !isPdf) msg = 'Formato no admitido. Usa JPG, PNG o PDF.'; else if ((tipo === 'Firma del receptor' || /^Foto/.test(tipo)) && !isImg) msg = 'Para ' + tipo.toLowerCase() + ' sube una imagen, no un PDF.';
+      if (msg) { setFile(null); er.hidden = false; er.innerHTML = ic('alert-circle', 'icon-sm') + msg; dz.setAttribute('aria-invalid', 'true'); return; } setFile(f, isImg ? URL.createObjectURL(f) : null); }
+    dz.onclick = function () { inp.click(); }; inp.onchange = function () { intake(inp.files[0]); };
+    ['dragenter', 'dragover'].forEach(function (k) { dz.addEventListener(k, function (e) { e.preventDefault(); dz.classList.add('is-over'); }); }); ['dragleave', 'drop'].forEach(function (k) { dz.addEventListener(k, function (e) { e.preventDefault(); dz.classList.remove('is-over'); }); });
+    dz.addEventListener('drop', function (e) { intake(e.dataTransfer && e.dataTransfer.files[0]); });
+    $('#atDemo', b).onclick = function () { var t = $('#atT', b).value; setFile({ name: (t === 'Firma del receptor' ? 'firma' : t === 'Remisión firmada' ? 'remision' : 'foto') + '_' + Date.now().toString().slice(-6) + '.jpg', size: 412 * 1024, type: 'image/jpeg', demo: true }); };
+    function guardar() {
+      var pv = $('#atP', b).value, tp = $('#atT', b).value, ok = true; $('#atPE', b).hidden = !!pv; if (!pv) ok = false; var te = $('#atTE', b); te.hidden = !!tp; te.innerHTML = ic('alert-circle', 'icon-sm') + 'Selecciona el tipo de evidencia.'; if (!tp) ok = false;
+      if (!file) { var fe = $('#atFE', b); fe.hidden = false; fe.innerHTML = ic('alert-circle', 'icon-sm') + 'Adjunta un archivo para continuar.'; dz.setAttribute('aria-invalid', 'true'); ok = false; } if (!ok) return;
+      var p = PARAD[pv], go = $('#atGo', m.footer), n = 0; go.disabled = true; go.innerHTML = '<span class="spin"></span>Sellando…'; $('#atPr', b).hidden = false;
+      var iv = setInterval(function () { n = Math.min(100, n + 12 + Math.random() * 14); $('#atPn', b).textContent = Math.round(n) + ' %'; $('.meter-fill', b).style.width = n + '%'; $('#atBar', b).setAttribute('aria-valuenow', Math.round(n)); if (n >= 100) { clearInterval(iv);
+        seq++; var jit = function (v) { return +(v + (Math.random() - .5) * .0005).toFixed(5); };
+        var e = { evidenciaId: 'EVD-' + ('00000' + seq).slice(-5), pedidoId: p.pedidoId, paradaId: p.paradaId, despachoId: p.despachoId, tipo: tp, archivo: 'evidencias/' + p.pedidoId + '-' + seq + (tp === 'Firma del receptor' ? '.png' : /pdf/i.test(file.name) ? '.pdf' : '.jpg'), firma: tp === 'Firma del receptor' ? (A.get('clientes', p.clienteId).contacto.nombre + ' · Receptor') : null, fechaHora: new Date().toISOString(), latitud: jit(p.latitud), longitud: jit(p.longitud), autorId: A.usuarioActual.usuarioId, validacion: 'Pendiente', precisionM: 0, origen: 'Consola web', objUrl: objUrl };
+        e.precisionM = 6; EV.push(e); hashear(e); addLog(e, 'Adjuntó la evidencia' + ($('#atO', b).value.trim() ? ': ' + $('#atO', b).value.trim() : '')); m.close(); UI.toast('Evidencia adjuntada y sellada. Quedó pendiente de validar.', 'success'); st.page = 1; refreshAll(); } }, 130);
+    }
+  }
+  $('#attachBtn').addEventListener('click', function () { openAttach(); });
+
+  /* ---------- pestañas y refresco ---------- */
+  var tabApi = UI.tabs($('#mainTabs'), { onChange: function (id) { st.tab = id === 'tpGal' ? 'gal' : id === 'tpEnt' ? 'ent' : 'nov'; if (st.tab === 'ent') renderEntrega(); } });
+  function switchTab(k) { var id = { gal: 'tabGal', ent: 'tabEnt', nov: 'tabNov' }[k]; $('#' + id).click(); }
+  function refreshAll() { renderKpis(); renderGal(); if (st.tab === 'ent') renderEntrega(); renderNov(); }
+
+  /* ---------- inicio (con esqueleto breve) ---------- */
+  var q = { id: UI.param('id'), dsp: UI.param('despacho'), ped: UI.param('pedido'), vista: UI.param('vista') };
+  if (q.dsp && A.get('despachos', q.dsp)) st.dsp = q.dsp; if (q.ped) st.q = q.ped;
+  syncFilters(); renderKpis(); $('#galBody').innerHTML = '<div class="card-body">' + UI.skeleton(5) + '</div>'; renderNov();
+  setTimeout(function () {
+    renderGal();
+    if (q.vista === 'entrega' || (q.dsp && A.get('despachos', q.dsp) && q.vista)) { if (q.dsp) st.dsel = q.dsp; switchTab('ent'); }
+    if (q.id) { var e = EV.find(function (x) { return x.evidenciaId === q.id; }); if (e) openViewer(e.evidenciaId, filtered()); }
+  }, 380);
+});
+</script>
+</body></html>

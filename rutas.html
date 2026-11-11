@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parametrización de rutas · Armetales</title>
+<meta name="description" content="Rutas poblacionales de Armetales: secuencia de municipios, kilómetros y peajes por tramo, zonas de cobertura y centro de distribución de salida.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de la parametrización de rutas (tokens y componentes viven en app.css) */
+  .kpi-row { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi .kpi-value { font-size: 26px; } .kpi { padding: 12px; } }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .toolbar .search { flex: 1 1 260px; max-width: 420px; }
+  .toolbar .select { width: auto; min-width: 150px; }
+  .toolbar .ml-auto { margin-left: auto; }
+  .route-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
+  .rcard { display: flex; flex-direction: column; gap: 14px; padding: 16px; text-align: left; width: 100%; font: inherit; color: inherit; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+  .rcard:hover { border-color: color-mix(in srgb, var(--steel) 50%, var(--border)); box-shadow: var(--shadow-2, 0 4px 14px rgba(0,0,0,.08)); }
+  .rcard:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .rc-top { display: flex; align-items: flex-start; gap: 12px; }
+  .rc-name { font-family: var(--font-display); font-weight: 600; font-size: 19px; line-height: 1.2; }
+  .rc-sketch { width: 100%; height: 76px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); }
+  .rc-sketch path { fill: none; stroke: var(--steel); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+  .rc-sketch circle { fill: var(--surface); stroke: var(--steel); stroke-width: 1.8; vector-effect: non-scaling-stroke; }
+  .rc-sketch .o { fill: var(--ink); stroke: var(--surface); }
+  .rc-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .rc-stats .v { font-family: var(--font-display); font-weight: 600; font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .rc-stats .l { font-size: 12px; color: var(--text-2); }
+  .rc-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .rc-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--text-2); border-top: 1px solid var(--border); padding-top: 10px; flex-wrap: wrap; }
+  .rc-foot .rc-vig { flex-basis: 100%; }
+  .rcard.is-off { opacity: .72; }
+  .d-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 900px) { .d-grid.c2 { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } }
+  .d-stats { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 640px) { .d-stats { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+  .mini-stat { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .mini-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .mini-stat .l { font-size: 12px; color: var(--text-2); }
+  .d-map { --h: 340px; }
+  .d-sec h3 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .seq { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .seq li { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 8px 6px 6px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface); }
+  .seq li.is-drop { box-shadow: 0 -2px 0 0 var(--blue); } .seq li.is-drag { opacity: .45; }
+  .seq .n { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--steel); display: grid; place-items: center; font: 600 11.5px/1 var(--font-mono); }
+  .seq .grip { width: 22px; height: 28px; border: 0; background: none; color: var(--text-2); cursor: grab; display: grid; place-items: center; padding: 0; border-radius: 6px; }
+  .seq .nm { font-weight: 500; } .seq .sub { font-size: 12px; color: var(--text-2); }
+  .seq .acts { display: flex; gap: 2px; } .seq .btn-icon { width: 28px; height: 28px; min-width: 28px; }
+  .seq li.origin { background: var(--surface-2); } .seq li.origin .n { border-radius: 7px; background: var(--ink); border-color: var(--ink); color: #fff; }
+  .add-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; } .add-row .select { flex: 1 1 200px; }
+  .tr-table { width: 100%; }
+  .tr-table .inp { width: 84px; text-align: right; font-family: var(--font-mono); }
+  .tr-table .pj { display: grid; gap: 6px; }
+  .tr-table .pj-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .tr-table .pj-row .input { height: 30px; font-size: 13px; padding: 0 8px; }
+  .tr-table tfoot td { font-weight: 600; background: var(--surface-2); }
+  .toll-tag { display: inline-flex; gap: 6px; align-items: baseline; padding: 2px 8px; border-radius: 6px; background: var(--amber-bg); color: var(--amber-fg, var(--text)); font-size: 12.5px; }
+  .toll-tag b { font-family: var(--font-mono); font-weight: 500; }
+  .cov-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ed-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  .use-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; flex-wrap: wrap; }
+  .use-row:last-child { border-bottom: 0; }
+  .wiz-steps { display: flex; gap: 8px; margin-bottom: 16px; font-size: 12.5px; color: var(--text-2); flex-wrap: wrap; }
+  .wiz-steps span { display: inline-flex; align-items: center; gap: 6px; } .wiz-steps b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; border: 1.5px solid var(--border); font-size: 12px; }
+  .wiz-steps .on { color: var(--text); font-weight: 600; } .wiz-steps .on b { background: var(--red); border-color: var(--red); color: #fff; } .wiz-steps .done b { background: var(--green); border-color: var(--green); color: #fff; }
+  .wiz-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 20px; }
+  .catalog { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 220px; overflow: auto; padding: 2px; }
+  .catalog .check { padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; }
+  .pick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 34px; }
+  .pick .tag button { border: 0; background: none; padding: 0 0 0 4px; cursor: pointer; color: inherit; }
+  .confirm-list { margin: 8px 0 0 18px; padding: 0; display: grid; gap: 4px; }
+  .kpi, .kpi .kpi-foot, .kpi .kpi-note { white-space: normal; }
+  :root[data-theme="dark"] a.btn { color: var(--b-fg); } /* el color de enlace del tema oscuro pisaba el de los botones-enlace */
+</style>
+</head>
+<body data-page="rutas">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Maestros</div>
+      <h1 class="page-title">Parametrización de rutas</h1>
+      <p class="page-desc">Define las rutas poblacionales con su secuencia de municipios, kilómetros, peajes y cobertura. Son la base de la planeación y del motor de rutas.</p>
+    </div>
+    <div class="page-actions"><a class="btn btn-secondary" href="motor-rutas.html">Abrir motor de rutas</a><button type="button" class="btn btn-primary" id="btnNew"></button></div>
+  </header>
+
+  <section aria-label="Resumen de rutas"><div class="kpi-row" id="kpiRow"></div></section>
+
+  <section class="section" aria-label="Lista de rutas">
+    <div class="toolbar mb-4">
+      <div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="input" type="search" id="q" placeholder="Buscar por ruta o municipio" aria-label="Buscar rutas"></div>
+      <select class="select" id="fZona" aria-label="Filtrar por zona"></select>
+      <select class="select" id="fEstado" aria-label="Filtrar por estado"></select>
+      <div class="segmented ml-auto" role="group" aria-label="Vista" id="viewSeg"><button type="button" data-v="cards" aria-pressed="true">Tarjetas</button><button type="button" data-v="table" aria-pressed="false">Tabla</button></div>
+    </div>
+    <div id="listHost"></div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$;
+  var ZONAS = ['Norte', 'Sur', 'Occidente', 'Oriente', 'Centro', 'Tequendama', 'Boyacá', 'Llanos'];
+  var view = 'cards', filt = { q: '', zona: '', estado: '' };
+  $('#btnNew').innerHTML = UI.icon('plus') + 'Crear ruta';
+
+  function hav(a, b) { var R = 6371, t = Math.PI / 180, dLa = (b.lat - a.lat) * t, dLo = (b.lng - a.lng) * t, x = Math.sin(dLa / 2) * Math.sin(dLa / 2) + Math.cos(a.lat * t) * Math.cos(b.lat * t) * Math.sin(dLo / 2) * Math.sin(dLo / 2); return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)); }
+  function r1(n) { return Math.round(n * 10) / 10; }
+  function dur(m) { m = Math.round(m); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60 < 10 ? '0' : '') + (m % 60) + ' min'; }
+  function sede(id) { return A.sedes.filter(function (s) { return s.id === id; })[0] || A.sedes[0]; }
+  function estadoChip(e) { return UI.chip(e, { tone: e === 'Vigente' ? 'success' : e === 'En revisión' ? 'warning' : 'neutral' }); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function sum(a, f) { return a.reduce(function (s, x) { return s + f(x); }, 0); }
+  function vigente(r) { return F.fecha(r.vigenciaDesde) + ' – ' + F.fecha(r.vigenciaHasta); }
+
+  /* catálogo de municipios con coordenadas (de las rutas existentes) */
+  var CAT = {}; A.rutas.forEach(function (r) { r.secuencia.forEach(function (s) { if (!CAT[s.nombre]) CAT[s.nombre] = { nombre: s.nombre, lat: s.lat, lng: s.lng, key: s.municipioKey }; }); });
+  var CATL = Object.keys(CAT).sort(function (a, b) { return a.localeCompare(b, 'es'); }).map(function (k) { return CAT[k]; });
+
+  function trazadoOf(r) { return r.trazado && r.trazado.length ? r.trazado : [[sede(r.origenId).lat, sede(r.origenId).lng]].concat(r.secuencia.map(function (s) { return [s.lat, s.lng]; })); }
+  function activos(r) {
+    return { desp: A.despachos.filter(function (d) { return d.rutaId === r.rutaId && (d.estado === 'Cargando' || d.estado === 'En ruta'); }), viajes: A.plan.viajes.filter(function (v) { return v.rutaId === r.rutaId; }) };
+  }
+  function coverage(r) {
+    var by = {}; A.clientes.filter(function (c) { return c.rutaId === r.rutaId; }).forEach(function (c) {
+      var k = c.municipio; var o = by[k] || (by[k] = { municipio: k, locs: {}, n: 0 }); o.n++; o.locs[c.localidad || c.barrio || '—'] = 1;
+    });
+    return Object.keys(by).map(function (k) { return { municipio: k, locs: Object.keys(by[k].locs), n: by[k].n }; }).sort(function (a, b) { return b.n - a.n; });
+  }
+
+  /* ---------- resumen ---------- */
+  function drawKpis() {
+    var vig = A.rutas.filter(function (r) { return r.estado === 'Vigente'; }), mun = {}; A.rutas.forEach(function (r) { r.municipios.forEach(function (m) { mun[m] = 1; }); });
+    var avgKm = A.rutas.length ? sum(A.rutas, function (r) { return r.kmIda; }) / A.rutas.length : 0, rev = A.rutas.filter(function (r) { return r.estado !== 'Vigente'; }).length;
+    $('#kpiRow').innerHTML =
+      UI.kpi({ label: 'Rutas vigentes', icon: 'route', value: vig.length, unit: 'de ' + A.rutas.length, note: rev ? rev + ' en revisión o inactivas' : 'Todas vigentes' }) +
+      UI.kpi({ label: 'Municipios cubiertos', icon: 'map-pin', value: Object.keys(mun).length, note: 'Desde ' + A.sedes[0].nombre }) +
+      UI.kpi({ label: 'Distancia media de ida', icon: 'navigation', valueHtml: F.num(avgKm, 1) + '<small>km</small>', note: 'Promedio por ruta' }) +
+      UI.kpi({ label: 'Clientes con ruta', icon: 'users', value: sum(A.rutas, function (r) { return r.clientes; }), note: 'Asignados por municipio' });
+  }
+
+  /* ---------- lista ---------- */
+  function filtered() {
+    var q = UI.norm(filt.q);
+    return A.rutas.filter(function (r) { return (!filt.zona || r.zona === filt.zona) && (!filt.estado || r.estado === filt.estado) && (!q || UI.norm(r.nombre + ' ' + r.rutaId + ' ' + r.municipios.join(' ')).indexOf(q) > -1); });
+  }
+  function sketch(r) {
+    var pts = trazadoOf(r), la = pts.map(function (p) { return p[0]; }), lo = pts.map(function (p) { return p[1]; }), mnA = Math.min.apply(null, la), mxA = Math.max.apply(null, la), mnO = Math.min.apply(null, lo), mxO = Math.max.apply(null, lo);
+    var W = 300, H = 76, pad = 10, sc = Math.min((W - 2 * pad) / Math.max(mxO - mnO, 0.001), (H - 2 * pad) / Math.max(mxA - mnA, 0.001)), ox = (W - (mxO - mnO) * sc) / 2, oy = (H - (mxA - mnA) * sc) / 2;
+    function X(p) { return ox + (p[1] - mnO) * sc; } function Y(p) { return H - (oy + (p[0] - mnA) * sc); }
+    var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + X(p).toFixed(1) + ' ' + Y(p).toFixed(1); }).join('');
+    var dots = r.secuencia.map(function (s) { var p = [s.lat, s.lng]; return '<circle cx="' + X(p).toFixed(1) + '" cy="' + Y(p).toFixed(1) + '" r="3.2"/>'; }).join('');
+    return '<svg class="rc-sketch" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><path d="' + d + '"/>' + dots + '<circle class="o" cx="' + X(pts[0]).toFixed(1) + '" cy="' + Y(pts[0]).toFixed(1) + '" r="4.5"/></svg>';
+  }
+  function drawList() {
+    var rows = filtered(), host = $('#listHost');
+    if (!rows.length) { host.innerHTML = '<div class="card">' + UI.empty({ icon: 'route', title: 'Ninguna ruta coincide', text: 'Prueba con otro municipio o quita los filtros.', action: { label: 'Limpiar filtros' } }) + '</div>'; var b = $('button', host); if (b) b.onclick = function () { filt = { q: '', zona: '', estado: '' }; $('#q').value = ''; $('#fZona').value = ''; $('#fEstado').value = ''; drawList(); }; return; }
+    if (view === 'cards') {
+      host.innerHTML = '<div class="route-grid">' + rows.map(function (r) {
+        var mun = r.municipios;
+        return '<button type="button" class="card rcard' + (r.estado === 'Inactiva' ? ' is-off' : '') + '" data-id="' + r.rutaId + '" aria-label="Abrir ' + esc(r.nombre) + '">' +
+          '<div class="rc-top"><div class="grow"><div class="mono t-12 muted">' + r.rutaId + '</div><div class="rc-name">' + esc(r.nombre) + '</div></div>' + estadoChip(r.estado) + '</div>' + sketch(r) +
+          '<div class="rc-stats"><div><div class="v">' + F.num(r.kmIda, 1) + '</div><div class="l">km de ida</div></div><div><div class="v">' + (r.peajesCOP ? F.cop(r.peajesCOP) : 'Sin peajes') + '</div><div class="l">peajes de ida</div></div><div><div class="v">' + mun.length + '</div><div class="l">municipios</div></div></div>' +
+          '<div class="rc-tags">' + mun.slice(0, 4).map(function (m) { return '<span class="tag">' + esc(m) + '</span>'; }).join('') + (mun.length > 4 ? '<span class="tag">+' + (mun.length - 4) + '</span>' : '') + '</div>' +
+          '<div class="rc-foot"><span>Sale de ' + esc(r.origen) + '</span><span>Zona ' + esc(r.zona) + '</span><span class="rc-vig">' + vigente(r) + '</span></div></button>';
+      }).join('') + '</div>';
+      return;
+    }
+    UI.table(host, {
+      rows: rows, rowKey: 'rutaId', pageSize: 10, caption: 'Rutas parametrizadas', emptyText: 'Ninguna ruta coincide.',
+      columns: [
+        { key: 'nombre', label: 'Ruta', title: true, render: function (r) { return '<span class="cell-main">' + esc(r.nombre) + '</span><div class="cell-sub mono">' + r.rutaId + '</div>'; } },
+        { key: 'zona', label: 'Zona' },
+        { key: 'origen', label: 'CEDI de salida' },
+        { key: 'municipios', label: 'Municipios', value: function (r) { return r.municipios.length; }, render: function (r) { return r.municipios.length + '<div class="cell-sub">' + esc(r.municipios.slice(0, 3).join(', ')) + (r.municipios.length > 3 ? '…' : '') + '</div>'; } },
+        { key: 'kmIda', label: 'Km (ida)', num: true, render: function (r) { return F.num(r.kmIda, 1); } },
+        { key: 'peajesCOP', label: 'Peajes (ida)', num: true, render: function (r) { return r.peajesCOP ? F.cop(r.peajesCOP) : '—'; } },
+        { key: 'vigenciaHasta', label: 'Vigencia', render: function (r) { return '<span class="nowrap">' + vigente(r) + '</span>'; }, hideMobile: true },
+        { key: 'estado', label: 'Estado', render: function (r) { return estadoChip(r.estado); } }
+      ],
+      onRowClick: function (r) { openDetail(r.rutaId); },
+      actions: function (r) { return [{ label: 'Ver detalle', icon: 'eye', onClick: function () { openDetail(r.rutaId); } }, { label: 'Editar ruta', icon: 'edit', onClick: function () { openDetail(r.rutaId, true); } }, { sep: true }, r.estado === 'Inactiva' ? { label: 'Reactivar', icon: 'refresh', onClick: function () { reactivate(r); } } : { label: 'Inactivar', icon: 'ban', danger: true, onClick: function () { deactivate(r); } }]; }
+    });
+  }
+  $('#listHost').addEventListener('click', function (e) { var c = e.target.closest('.rcard'); if (c) openDetail(c.dataset.id); });
+  $('#q').addEventListener('input', function (e) { filt.q = e.target.value; drawList(); });
+  $('#fZona').innerHTML = '<option value="">Todas las zonas</option>' + ZONAS.filter(function (z) { return A.rutas.some(function (r) { return r.zona === z; }); }).map(function (z) { return '<option>' + z + '</option>'; }).join('');
+  $('#fEstado').innerHTML = '<option value="">Todos los estados</option><option>Vigente</option><option>En revisión</option><option>Inactiva</option>';
+  $('#fZona').addEventListener('change', function (e) { filt.zona = e.target.value; drawList(); });
+  $('#fEstado').addEventListener('change', function (e) { filt.estado = e.target.value; drawList(); });
+  $('#viewSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; view = b.dataset.v; $$('button', $('#viewSeg')).forEach(function (x) { x.setAttribute('aria-pressed', x === b); }); drawList(); });
+  function refresh() { drawKpis(); drawList(); }
+
+  /* ---------- inactivar / reactivar (HU-039) ---------- */
+  function deactivate(r, after) {
+    var u = activos(r), n = u.desp.length + u.viajes.length;
+    var body = '<p>La ruta <strong>' + esc(r.nombre) + '</strong> dejará de ofrecerse para planear nuevos viajes. El historial de despachos y entregas se conserva.</p>';
+    if (n) body += '<div class="mt-3">' + UI.banner({ tone: 'warning', title: 'Tiene ' + n + (n === 1 ? ' despacho o viaje activo' : ' despachos o viajes activos'), html: '<ul class="confirm-list">' + u.desp.map(function (d) { return '<li><a href="despachos.html?id=' + d.despachoId + '">' + d.despachoId + '</a> · ' + esc(d.estado.toLowerCase()) + ' · ' + d.vehiculoId + '</li>'; }).join('') + u.viajes.map(function (v) { return '<li><a href="planeacion.html">Viaje ' + v.viajeId + '</a> propuesto · ' + v.vehiculoId + '</li>'; }).join('') + '</ul>Inactivar no los cancela; terminan con la ruta actual.' }) + '</div><label class="check mt-3"><input type="checkbox" id="ackBox"> Entiendo que estos despachos seguirán su curso</label><span class="error-text" id="ackErr" hidden></span>';
+    UI.modal({ title: '¿Inactivar la ruta ' + r.rutaId + '?', width: 520, body: body, footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Inactivar ruta', kind: 'danger', onClick: function (api) {
+      if (n && !$('#ackBox', api.body).checked) { var e = $('#ackErr', api.body); e.hidden = false; e.innerHTML = UI.icon('alert-circle', 'icon-sm') + 'Confirma que entiendes el efecto sobre los despachos activos.'; return false; }
+      r.estado = 'Inactiva'; refresh(); UI.toast('Ruta ' + r.rutaId + ' inactivada. Ya no aparece para planear.', 'success'); if (after) after();
+    } }] });
+  }
+  function reactivate(r, after) { r.estado = 'Vigente'; refresh(); UI.toast('Ruta ' + r.rutaId + ' reactivada y disponible para planeación.', 'success'); if (after) after(); }
+
+  /* ---------- detalle ---------- */
+  var D = null; /* { r, draft, editing, errs, api, map } */
+  function pointsOf(d) { var o = sede(d.origenId); return [{ nombre: d.origen, lat: o.lat, lng: o.lng }].concat(d.secuencia); }
+  function rebuildTramos(d, old) {
+    var pts = pointsOf(d), byKey = {}, tollBy = {};
+    old.forEach(function (t) { byKey[t.desde + '|' + t.hasta] = t; if (t.peajes.length) tollBy[t.hasta] = t.peajes; });
+    d.tramos = []; for (var i = 1; i < pts.length; i++) {
+      var k = pts[i - 1].nombre + '|' + pts[i].nombre, o = byKey[k];
+      d.tramos.push(o ? clone(o) : { orden: i, desde: pts[i - 1].nombre, hasta: pts[i].nombre, km: r1(hav(pts[i - 1], pts[i]) * 1.35), minutos: Math.round(hav(pts[i - 1], pts[i]) * 1.35 * 1.58), peajes: clone(tollBy[pts[i].nombre] || []) });
+      d.tramos[d.tramos.length - 1].orden = i;
+    }
+    d.secuencia.forEach(function (s, i) { s.orden = i + 1; });
+  }
+  function totals(d) {
+    var km = r1(sum(d.tramos, function (t) { return +t.km || 0; })), pj = sum(d.tramos, function (t) { return sum(t.peajes, function (p) { return +p.valorCOP || 0; }); }), min = sum(d.tramos, function (t) { return +t.minutos || 0; });
+    return { km: km, kmTotal: r1(km * 2), pj: pj, pjTotal: pj * 2, min: min };
+  }
+  function openDetail(id, edit) {
+    var r = A.rutas.filter(function (x) { return x.rutaId === id; })[0]; if (!r) return;
+    var foot = document.createElement('div'); foot.className = 'row between grow'; foot.style.width = '100%';
+    D = { r: r, draft: clone(r), editing: false, errs: {}, map: null, foot: foot };
+    var api = UI.drawer({ titleHtml: esc(r.nombre) + ' <span class="mono muted t-14">' + r.rutaId + '</span>', subtitleHtml: estadoChip(r.estado) + ' <span class="muted">· Zona ' + esc(r.zona) + ' · ' + vigente(r) + '</span>', width: 'min(1060px, 100vw)', footer: foot,
+      body: '<div class="stack-lg" id="dRoot"><div class="d-stats" id="dStats"></div><div id="dBanner"></div>' +
+        '<div class="d-grid c2"><div class="d-sec"><h3>Mapa de la ruta</h3><div class="d-map" id="dMap" role="region" aria-label="Mapa con la secuencia de poblaciones"></div></div><div class="d-sec" id="dSeq"></div></div>' +
+        '<div class="d-sec" id="dTramos"></div>' +
+        '<div class="d-grid c2"><div class="d-sec" id="dCov"></div><div class="d-sec" id="dCedi"></div></div></div>',
+      onClose: function () { if (D && D.map && D.map.destroy) { try { D.map.destroy(); } catch (e) {} } D = null; history.replaceState && history.replaceState(null, '', location.pathname); } });
+    D.api = api; $('#dMap', api.body).style.setProperty('--h', '340px'); D.map = UI.map($('#dMap', api.body), { center: [4.7, -74.1], zoom: 10 });
+    renderAll(true); setTimeout(function () { D && D.map.invalidate && D.map.invalidate(); drawMap(true); }, 280);
+    if (edit) startEdit();
+  }
+  function renderAll(fit) { renderStats(); renderSeq(); renderTramos(); renderCov(); renderCedi(); renderFoot(); drawMap(fit); }
+  function renderStats() {
+    var d = D.draft, t = totals(d), u = activos(D.r);
+    $('#dStats', D.api.body).innerHTML = [[F.num(t.km, 1) + ' km', 'Ida (' + F.num(t.kmTotal, 1) + ' km ida y vuelta)'], [t.pj ? F.cop(t.pj) : 'Sin peajes', 'Peajes de ida (' + F.cop(t.pjTotal) + ' ida y vuelta)'], [dur(t.min), 'Duración de ida sin paradas'], [d.secuencia.length + '', 'Municipios en la secuencia'], [(u.desp.length + u.viajes.length) + '', 'Despachos y viajes activos']].map(function (x) { return '<div class="mini-stat"><div class="v">' + x[0] + '</div><div class="l">' + x[1] + '</div></div>'; }).join('');
+    var errN = Object.keys(D.errs).length; $('#dBanner', D.api.body).innerHTML = errN ? UI.banner({ tone: 'danger', title: 'Corrige ' + errN + (errN === 1 ? ' campo' : ' campos') + ' para guardar', text: 'Los mensajes aparecen junto a cada campo.' }) : (D.editing ? UI.banner({ tone: 'info', text: 'Estás editando. Al cambiar la secuencia o el CEDI se recalculan los tramos; los peajes se mantienen asociados al municipio de destino.' }) : '');
+  }
+  function errT(k) { return D.errs[k] ? '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + esc(D.errs[k]) + '</span>' : ''; }
+  function grip() { return '<span class="grip" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>'; }
+  function renderSeq() {
+    var d = D.draft, ed = D.editing, o = sede(d.origenId), used = {}; d.secuencia.forEach(function (s) { used[s.nombre] = 1; });
+    var h = '<h3>Secuencia de poblaciones <span class="muted t-13" style="font-weight:400">' + (ed ? 'Arrastra o usa las flechas' : d.secuencia.length + ' paradas') + '</span></h3><ol class="seq" id="seqList"><li class="origin"><span></span><span class="n">C</span><div><div class="nm">' + esc(d.origen) + '</div><div class="sub">Centro de distribución de salida</div></div><span></span></li>';
+    h += d.secuencia.map(function (s, i) {
+      var t = d.tramos[i];
+      return '<li data-i="' + i + '"' + (ed ? ' draggable="true"' : '') + '>' + (ed ? grip() : '<span></span>') + '<span class="n">' + (i + 1) + '</span><div><div class="nm">' + esc(s.nombre) + '</div><div class="sub">' + (t ? F.num(t.km, 1) + ' km desde ' + esc(t.desde) : '') + '</div></div>' +
+        (ed ? '<div class="acts"><button type="button" class="btn btn-ghost btn-icon" data-mv="-1" data-i="' + i + '" aria-label="Subir ' + esc(s.nombre) + '"' + (i === 0 ? ' disabled' : '') + '>' + UI.icon('arrow-up', 'icon-sm') + '</button><button type="button" class="btn btn-ghost btn-icon" data-mv="1" data-i="' + i + '" aria-label="Bajar ' + esc(s.nombre) + '"' + (i === d.secuencia.length - 1 ? ' disabled' : '') + '>' + UI.icon('arrow-down', 'icon-sm') + '</button><button type="button" class="btn btn-ghost btn-icon" data-rm="' + i + '" aria-label="Quitar ' + esc(s.nombre) + ' de la ruta">' + UI.icon('x', 'icon-sm') + '</button></div>' : '<span></span>') + '</li>';
+    }).join('') + '</ol>';
+    if (!d.secuencia.length) h += '<div class="mt-2">' + UI.empty({ icon: 'map-pin', title: 'La ruta no tiene municipios', text: 'Agrega al menos una población para poder guardarla.' }) + '</div>';
+    h += errT('seq');
+    if (ed) h += '<div class="add-row"><select class="select" id="addMun" aria-label="Municipio a agregar"><option value="">Agregar municipio…</option>' + CATL.filter(function (c) { return !used[c.nombre]; }).map(function (c) { return '<option>' + esc(c.nombre) + '</option>'; }).join('') + '</select><button type="button" class="btn btn-secondary" id="btnAddMun">' + UI.icon('plus') + 'Agregar</button></div><span class="error-text" id="addErr" hidden></span>';
+    $('#dSeq', D.api.body).innerHTML = h;
+  }
+  function renderTramos() {
+    var d = D.draft, ed = D.editing, t = totals(d);
+    var h = '<h3>Tramos, kilómetros y peajes</h3>';
+    if (!d.tramos.length) { $('#dTramos', D.api.body).innerHTML = h + UI.empty({ icon: 'route', title: 'Sin tramos', text: 'Los tramos se generan a partir de la secuencia.' }); return; }
+    h += '<div class="table-wrap"><table class="table tr-table"><thead><tr><th>#</th><th>Tramo</th><th class="num">Kilómetros</th><th class="num">Minutos</th><th>Peajes del tramo</th></tr></thead><tbody>';
+    h += d.tramos.map(function (tr, i) {
+      var pj = ed ? '<div class="pj">' + tr.peajes.map(function (p, j) { return '<div class="pj-row"><input class="input" style="flex:1 1 130px" data-pn="' + i + ',' + j + '" value="' + esc(p.nombre) + '" aria-label="Nombre del peaje ' + (j + 1) + ' del tramo ' + (i + 1) + '"' + (D.errs['pn' + i + '_' + j] ? ' aria-invalid="true"' : '') + '><input class="input" style="width:110px;text-align:right" type="number" min="0" step="100" data-pv="' + i + ',' + j + '" value="' + p.valorCOP + '" aria-label="Valor del peaje (COP)"' + (D.errs['pv' + i + '_' + j] ? ' aria-invalid="true"' : '') + '><button type="button" class="btn btn-ghost btn-icon btn-sm" data-rmp="' + i + ',' + j + '" aria-label="Quitar peaje">' + UI.icon('trash', 'icon-sm') + '</button></div>' + (D.errs['pn' + i + '_' + j] || D.errs['pv' + i + '_' + j] ? '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + esc(D.errs['pn' + i + '_' + j] || D.errs['pv' + i + '_' + j]) + '</span>' : ''); }).join('') + '<div><button type="button" class="btn btn-ghost btn-sm" data-addp="' + i + '">' + UI.icon('plus', 'icon-sm') + 'Agregar peaje</button></div></div>'
+        : (tr.peajes.length ? tr.peajes.map(function (p) { return '<span class="toll-tag">' + esc(p.nombre) + ' <b>' + F.cop(p.valorCOP) + '</b></span>'; }).join(' ') : '<span class="muted">Sin peajes</span>');
+      var km = ed ? '<input class="input inp" type="number" min="0.1" step="0.1" data-km="' + i + '" value="' + tr.km + '" aria-label="Kilómetros del tramo ' + (i + 1) + '"' + (D.errs['km' + i] ? ' aria-invalid="true"' : '') + '>' + (D.errs['km' + i] ? '<div><span class="error-text">' + esc(D.errs['km' + i]) + '</span></div>' : '') : F.num(tr.km, 1);
+      return '<tr><td class="mono">' + (i + 1) + '</td><td><span class="cell-main">' + esc(tr.desde) + ' → ' + esc(tr.hasta) + '</span></td><td class="num" data-label="Kilómetros">' + km + '</td><td class="num">' + tr.minutos + '</td><td>' + pj + '</td></tr>';
+    }).join('');
+    h += '</tbody><tfoot id="trFoot"><tr><td></td><td>Totales de ida</td><td class="num">' + F.num(t.km, 1) + '</td><td class="num">' + t.min + '</td><td>' + F.cop(t.pj) + '</td></tr><tr><td></td><td>Ida y vuelta</td><td class="num">' + F.num(t.kmTotal, 1) + '</td><td class="num">' + t.min * 2 + '</td><td>' + F.cop(t.pjTotal) + '</td></tr></tfoot></table></div>';
+    $('#dTramos', D.api.body).innerHTML = h;
+  }
+  function renderCov() {
+    var d = D.draft, ed = D.editing, cov = coverage(D.r);
+    var h = '<h3>Zonas de cobertura</h3><div class="stack">' + (ed ? '<div class="field"><label class="label" for="eZona">Zona principal</label><select class="select" id="eZona">' + ZONAS.map(function (z) { return '<option' + (z === d.zona ? ' selected' : '') + '>' + z + '</option>'; }).join('') + '</select></div><div class="field"><span class="label">Zonas adicionales que atiende</span><div class="cov-chips">' + ZONAS.filter(function (z) { return z !== d.zona; }).map(function (z) { return '<button type="button" class="filter-chip" data-zx="' + z + '" aria-pressed="' + ((d.zonasExtra || []).indexOf(z) > -1) + '">' + z + '</button>'; }).join('') + '</div></div>'
+      : '<div class="cov-chips"><span class="chip chip-info">Zona ' + esc(d.zona) + ' · principal</span>' + (d.zonasExtra || []).map(function (z) { return '<span class="tag">' + esc(z) + '</span>'; }).join('') + '</div>');
+    h += cov.length ? '<div class="table-wrap"><table class="table is-dense"><thead><tr><th>Municipio</th><th>Localidades o barrios</th><th class="num">Clientes</th></tr></thead><tbody>' + cov.map(function (c) { return '<tr><td>' + esc(c.municipio) + '</td><td>' + esc(c.locs.slice(0, 3).join(', ')) + (c.locs.length > 3 ? ' +' + (c.locs.length - 3) : '') + '</td><td class="num">' + c.n + '</td></tr>'; }).join('') + '</tbody></table></div><a class="btn btn-ghost btn-sm" href="clientes.html" style="align-self:flex-start">Ver clientes de la ruta</a>' : '<p class="muted">Todavía no hay clientes asignados a esta ruta.</p>';
+    $('#dCov', D.api.body).innerHTML = h + '</div>';
+  }
+  function renderCedi() {
+    var d = D.draft, ed = D.editing, s = sede(d.origenId), u = activos(D.r);
+    var h = '<h3>Salida y vigencia</h3><div class="stack">';
+    if (ed) {
+      h += '<div class="field"><label class="label" for="eNombre">Nombre de la ruta</label><input class="input" id="eNombre" value="' + esc(d.nombre) + '"' + (D.errs.nombre ? ' aria-invalid="true"' : '') + '>' + errT('nombre') + '</div>' +
+        '<div class="field"><label class="label" for="eCedi">Centro de distribución de salida</label><select class="select" id="eCedi">' + A.sedes.map(function (x) { return '<option value="' + x.id + '"' + (x.id === d.origenId ? ' selected' : '') + '>' + esc(x.nombre) + ' · ' + esc(x.tipo) + '</option>'; }).join('') + '</select><span class="hint">' + esc(s.direccion) + ', ' + esc(s.ciudad) + '</span></div>' +
+        '<div class="form-grid c2"><div class="field"><label class="label" for="eVd">Vigente desde</label><input class="input" type="date" id="eVd" value="' + d.vigenciaDesde + '"></div><div class="field"><label class="label" for="eVh">Vigente hasta</label><input class="input" type="date" id="eVh" value="' + d.vigenciaHasta + '"' + (D.errs.vig ? ' aria-invalid="true"' : '') + '>' + errT('vig') + '</div></div>' +
+        '<div class="field"><label class="label" for="eEstado">Estado</label><select class="select" id="eEstado"><option' + (d.estado === 'Vigente' ? ' selected' : '') + '>Vigente</option><option' + (d.estado === 'En revisión' ? ' selected' : '') + '>En revisión</option></select></div>';
+    } else {
+      h += UI.kv([['CEDI de salida', esc(s.nombre) + '<div class="muted t-12">' + esc(s.direccion) + ', ' + esc(s.ciudad) + '</div>'], ['Corte de despacho', esc(s.corteHora) + ' · consolidación ' + s.consolidacionMin + ' min'], ['Vigencia', vigente(d)], ['Estado', estadoChip(d.estado)], ['Clientes asignados', d.clientes]]);
+    }
+    h += '<div><div class="strong t-13 mb-2">Uso actual</div>' + ((u.desp.length + u.viajes.length) ? u.desp.map(function (x) { return '<div class="use-row"><span><a href="despachos.html?id=' + x.despachoId + '" class="mono">' + x.despachoId + '</a> · ' + x.vehiculoId + '</span>' + UI.chip(x.estado, { small: true }) + '</div>'; }).join('') + u.viajes.map(function (v) { return '<div class="use-row"><span><a href="planeacion.html">Viaje ' + v.viajeId + '</a> · ' + v.vehiculoId + '</span>' + UI.chip('Propuesto', { small: true }) + '</div>'; }).join('') : '<p class="muted t-13">Ningún despacho ni viaje activo usa esta ruta.</p>') + '</div></div>';
+    $('#dCedi', D.api.body).innerHTML = h;
+  }
+  function renderFoot() {
+    var f = D.foot, r = D.r;
+    if (D.editing) f.innerHTML = '<button type="button" class="btn btn-ghost" id="fCancel">Descartar cambios</button><button type="button" class="btn btn-primary" id="fSave">Guardar cambios</button>';
+    else f.innerHTML = '<button type="button" class="btn btn-ghost" id="fClose">Cerrar</button><span class="row gap-2">' + (r.estado === 'Inactiva' ? '<button type="button" class="btn btn-secondary" id="fReact">Reactivar</button>' : '<button type="button" class="btn btn-danger" id="fOff">Inactivar</button>') + '<a class="btn btn-secondary" href="motor-rutas.html">Usar en motor de rutas</a><button type="button" class="btn btn-primary" id="fEdit">' + UI.icon('edit') + 'Editar ruta</button></span>';
+    var b;
+    if ((b = $('#fClose', f))) b.onclick = function () { D.api.close(); };
+    if ((b = $('#fEdit', f))) b.onclick = startEdit;
+    if ((b = $('#fOff', f))) b.onclick = function () { deactivate(r, function () { D.api.close(); }); };
+    if ((b = $('#fReact', f))) b.onclick = function () { reactivate(r, function () { D.draft = clone(r); renderAll(); $('.ov-sub', D.api.el).innerHTML = estadoChip(r.estado) + ' <span class="muted">· Zona ' + esc(r.zona) + ' · ' + vigente(r) + '</span>'; }); };
+    if ((b = $('#fCancel', f))) b.onclick = function () { D.draft = clone(D.r); D.editing = false; D.errs = {}; renderAll(true); UI.toast('Cambios descartados.', 'info'); };
+    if ((b = $('#fSave', f))) b.onclick = save;
+  }
+  function startEdit() { D.editing = true; D.errs = {}; D.draft = clone(D.r); renderAll(); }
+
+  /* mapa */
+  function drawMap(fit) {
+    if (!D || !D.map || !D.map.map) return; var m = D.map, d = D.draft, o = sede(d.origenId); m.clear();
+    var same = JSON.stringify(d.secuencia.map(function (s) { return s.nombre; })) === JSON.stringify(D.r.secuencia.map(function (s) { return s.nombre; })) && d.origenId === D.r.origenId;
+    var pts = [[o.lat, o.lng]].concat(d.secuencia.map(function (s) { return [s.lat, s.lng]; }));
+    var col = getComputedStyle(document.documentElement).getPropertyValue('--blue').trim() || '#2A6BDB';
+    if (pts.length > 1) m.route(same ? trazadoOf(D.r) : pts, { color: col, weight: 4, dashed: !same });
+    m.pin({ lat: o.lat, lng: o.lng, state: 'origin', n: 'C', title: d.origen, popup: '<strong>' + esc(d.origen) + '</strong><br>Salida de la ruta' });
+    d.secuencia.forEach(function (s, i) { var t = d.tramos[i]; m.pin({ lat: s.lat, lng: s.lng, n: i + 1, state: 'pending', title: s.nombre, popup: '<strong>' + esc(s.nombre) + '</strong><br>' + (t ? F.num(t.km, 1) + ' km desde ' + esc(t.desde) : '') + (t && t.peajes.length ? '<br>' + t.peajes.map(function (p) { return esc(p.nombre) + ' ' + F.cop(p.valorCOP); }).join('<br>') : '') }); });
+    if (fit !== false) m.fit(pts, { padding: 36, maxZoom: 12 });
+  }
+
+  /* eventos del detalle (delegados) */
+  document.addEventListener('click', function (e) {
+    if (!D || !D.api || !D.api.el.contains(e.target)) return; var d = D.draft, t;
+    if ((t = e.target.closest('[data-mv]'))) { var i = +t.dataset.i, j = i + +t.dataset.mv; if (j < 0 || j >= d.secuencia.length) return; var old = d.tramos.slice(); d.secuencia.splice(j, 0, d.secuencia.splice(i, 1)[0]); rebuildTramos(d, old); delete D.errs.seq; renderAll(false); var nb = $('[data-mv="' + t.dataset.mv + '"][data-i="' + j + '"]', D.api.el) || $('[data-mv="' + (-t.dataset.mv) + '"][data-i="' + j + '"]', D.api.el); if (nb) nb.focus(); }
+    else if ((t = e.target.closest('[data-rm]'))) { var old2 = d.tramos.slice(), nm = d.secuencia[+t.dataset.rm].nombre; d.secuencia.splice(+t.dataset.rm, 1); rebuildTramos(d, old2); renderAll(); UI.toast(nm + ' se quitó de la secuencia. Guarda para confirmarlo.', 'info'); }
+    else if (e.target.closest('#btnAddMun')) { var v = $('#addMun', D.api.el).value, er = $('#addErr', D.api.el); if (!v) { er.hidden = false; er.innerHTML = UI.icon('alert-circle', 'icon-sm') + 'Elige el municipio que quieres agregar.'; return; } if (d.secuencia.some(function (s) { return s.nombre === v; })) { er.hidden = false; er.textContent = 'Ese municipio ya está en la ruta.'; return; } var c = CAT[v], old3 = d.tramos.slice(); d.secuencia.push({ orden: d.secuencia.length + 1, municipioKey: c.key, nombre: c.nombre, lat: c.lat, lng: c.lng }); rebuildTramos(d, old3); delete D.errs.seq; renderAll(); }
+    else if ((t = e.target.closest('[data-rmp]'))) { var p = t.dataset.rmp.split(','); d.tramos[+p[0]].peajes.splice(+p[1], 1); renderStats(); renderTramos(); }
+    else if ((t = e.target.closest('[data-addp]'))) { d.tramos[+t.dataset.addp].peajes.push({ nombre: '', valorCOP: 0 }); renderTramos(); var ins = $$('[data-pn^="' + t.dataset.addp + ',"]', D.api.el); if (ins.length) ins[ins.length - 1].focus(); }
+    else if ((t = e.target.closest('[data-zx]'))) { var z = t.dataset.zx, a = d.zonasExtra || (d.zonasExtra = []), k = a.indexOf(z); if (k > -1) a.splice(k, 1); else a.push(z); renderCov(); }
+  });
+  document.addEventListener('change', function (e) {
+    if (!D || !D.editing || !D.api.el.contains(e.target)) return; var d = D.draft, t = e.target, m;
+    if ((m = t.dataset.km)) { var v = parseFloat(t.value); d.tramos[+m].km = v; if (v > 0) { d.tramos[+m].minutos = Math.round(v * 1.58); delete D.errs['km' + m]; t.removeAttribute('aria-invalid'); } renderStats(); renderTramos(); return; }
+    if (t.dataset.pn) { var q = t.dataset.pn.split(','); d.tramos[+q[0]].peajes[+q[1]].nombre = t.value; return; }
+    if (t.dataset.pv) { var q2 = t.dataset.pv.split(','); d.tramos[+q2[0]].peajes[+q2[1]].valorCOP = t.value === '' ? '' : Math.round(+t.value); renderStats(); renderTramos(); return; }
+    if (t.id === 'eNombre') { d.nombre = t.value; }
+    if (t.id === 'eVd') d.vigenciaDesde = t.value; if (t.id === 'eVh') d.vigenciaHasta = t.value; if (t.id === 'eEstado') d.estado = t.value;
+    if (t.id === 'eZona') { d.zona = t.value; d.zonasExtra = (d.zonasExtra || []).filter(function (z) { return z !== d.zona; }); renderCov(); }
+    if (t.id === 'eCedi') { var s = sede(t.value), old = d.tramos.slice(); d.origenId = s.id; d.origen = s.nombre; rebuildTramos(d, old); renderAll(); UI.toast('CEDI de salida cambiado a ' + s.nombre + '. Se recalculó el primer tramo.', 'info'); }
+  });
+  document.addEventListener('dragstart', function (e) { var li = e.target.closest && e.target.closest('#seqList li[data-i]'); if (!li || !D || !D.editing) return; D.dragI = +li.dataset.i; li.classList.add('is-drag'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', 'x'); } catch (x) {} });
+  document.addEventListener('dragover', function (e) { var li = e.target.closest && e.target.closest('#seqList li[data-i]'); if (!li || D == null || D.dragI == null) return; e.preventDefault(); $$('#seqList li').forEach(function (x) { x.classList.toggle('is-drop', x === li); }); });
+  document.addEventListener('dragend', function () { if (D) D.dragI = null; $$('#seqList li').forEach(function (x) { x.classList.remove('is-drag', 'is-drop'); }); });
+  document.addEventListener('drop', function (e) { var li = e.target.closest && e.target.closest('#seqList li[data-i]'); if (!li || !D || D.dragI == null) return; e.preventDefault(); var from = D.dragI, to = +li.dataset.i, d = D.draft; D.dragI = null; if (from === to) return; var old = d.tramos.slice(); d.secuencia.splice(to, 0, d.secuencia.splice(from, 1)[0]); rebuildTramos(d, old); renderAll(false); });
+
+  function save() {
+    var d = D.draft, errs = {};
+    if (!d.nombre.trim()) errs.nombre = 'Escribe el nombre de la ruta.';
+    else if (A.rutas.some(function (x) { return x.rutaId !== d.rutaId && UI.norm(x.nombre) === UI.norm(d.nombre); })) errs.nombre = 'Ya existe otra ruta con ese nombre.';
+    if (!d.secuencia.length) errs.seq = 'La ruta necesita al menos un municipio.';
+    if (!d.vigenciaDesde || !d.vigenciaHasta || d.vigenciaHasta <= d.vigenciaDesde) errs.vig = 'La fecha final debe ser posterior a la inicial.';
+    d.tramos.forEach(function (t, i) {
+      if (!(+t.km > 0)) errs['km' + i] = 'Mayor a 0';
+      t.peajes.forEach(function (p, j) { if (!String(p.nombre).trim()) errs['pn' + i + '_' + j] = 'Escribe el nombre del peaje.'; else if (p.valorCOP === '' || !(+p.valorCOP >= 0)) errs['pv' + i + '_' + j] = 'Ingresa un valor en pesos, 0 o más.'; });
+    });
+    D.errs = errs; if (Object.keys(errs).length) { renderAll(false); UI.toast('Hay campos por corregir antes de guardar.', 'error'); var f = $('[aria-invalid="true"]', D.api.el); if (f) f.focus(); return; }
+    var t = totals(d), r = D.r, changedSeq = JSON.stringify(d.secuencia.map(function (s) { return s.nombre; })) !== JSON.stringify(r.secuencia.map(function (s) { return s.nombre; })) || d.origenId !== r.origenId;
+    d.kmIda = t.km; d.kmTotal = t.kmTotal; d.peajesCOP = t.pj; d.duracionIdaMin = t.min; d.municipios = d.secuencia.map(function (s) { return s.nombre; }); d.nombre = d.nombre.trim();
+    if (changedSeq) d.trazado = [[sede(d.origenId).lat, sede(d.origenId).lng]].concat(d.secuencia.map(function (s) { return [s.lat, s.lng]; }));
+    Object.assign(r, d); D.draft = clone(r); D.editing = false; D.errs = {};
+    $('.ov-title', D.api.el).innerHTML = esc(r.nombre) + ' <span class="mono muted t-14">' + r.rutaId + '</span>'; $('.ov-sub', D.api.el).innerHTML = estadoChip(r.estado) + ' <span class="muted">· Zona ' + esc(r.zona) + ' · ' + vigente(r) + '</span>';
+    renderAll(true); refresh(); UI.toast('Ruta ' + r.rutaId + ' actualizada: ' + F.num(t.km, 1) + ' km de ida y ' + (t.pj ? F.cop(t.pj) + ' en peajes' : 'sin peajes') + '.', 'success');
+  }
+
+  /* ---------- crear ruta (HU-032) ---------- */
+  $('#btnNew').addEventListener('click', function () {
+    var W = { step: 1, nombre: '', zona: 'Norte', origenId: A.sedes[0].id, desde: A.ymd(0), hasta: A.ymd(365), sel: [], errs: {} };
+    var m = UI.modal({ title: 'Crear ruta poblacional', subtitle: 'Tres pasos: datos básicos, municipios y revisión de tramos.', width: 640, body: '<div id="wz"></div>' });
+    var host = $('#wz', m.body);
+    function build() {
+      var pts = [{ nombre: sede(W.origenId).nombre, lat: sede(W.origenId).lat, lng: sede(W.origenId).lng }].concat(W.sel.map(function (n) { return CAT[n]; }));
+      var tr = []; for (var i = 1; i < pts.length; i++) tr.push({ desde: pts[i - 1].nombre, hasta: pts[i].nombre, km: r1(hav(pts[i - 1], pts[i]) * 1.35), minutos: Math.round(hav(pts[i - 1], pts[i]) * 1.35 * 1.58) });
+      return tr;
+    }
+    function er(k) { return W.errs[k] ? '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + esc(W.errs[k]) + '</span>' : ''; }
+    function draw() {
+      var h = '<div class="wiz-steps">' + ['Datos', 'Municipios', 'Revisión'].map(function (s, i) { return '<span class="' + (W.step === i + 1 ? 'on' : W.step > i + 1 ? 'done' : '') + '"><b>' + (W.step > i + 1 ? '✓' : i + 1) + '</b>' + s + '</span>'; }).join('') + '</div>';
+      if (W.step === 1) h += '<div class="form-grid c2"><div class="field span-2"><label class="label" for="wNombre">Nombre de la ruta</label><input class="input" id="wNombre" value="' + esc(W.nombre) + '" placeholder="Ej.: Sabana Centro – Zipaquirá"' + (W.errs.nombre ? ' aria-invalid="true"' : '') + '>' + er('nombre') + '</div>' +
+        '<div class="field"><label class="label" for="wZona">Zona</label><select class="select" id="wZona">' + ZONAS.map(function (z) { return '<option' + (z === W.zona ? ' selected' : '') + '>' + z + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label class="label" for="wCedi">CEDI de salida</label><select class="select" id="wCedi">' + A.sedes.map(function (s) { return '<option value="' + s.id + '"' + (s.id === W.origenId ? ' selected' : '') + '>' + esc(s.nombre) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label class="label" for="wDesde">Vigente desde</label><input class="input" type="date" id="wDesde" value="' + W.desde + '"></div><div class="field"><label class="label" for="wHasta">Vigente hasta</label><input class="input" type="date" id="wHasta" value="' + W.hasta + '"' + (W.errs.vig ? ' aria-invalid="true"' : '') + '>' + er('vig') + '</div></div>';
+      if (W.step === 2) h += '<div class="stack"><div class="field"><span class="label">Selecciona los municipios en el orden de visita</span><div class="catalog" id="wCat">' + CATL.map(function (c) { var i = W.sel.indexOf(c.nombre); return '<label class="check"><input type="checkbox" value="' + esc(c.nombre) + '"' + (i > -1 ? ' checked' : '') + '> ' + esc(c.nombre) + '</label>'; }).join('') + '</div>' + er('sel') + '</div>' +
+        '<div class="field"><span class="label">Secuencia (' + W.sel.length + ')</span><div class="pick" id="wPick">' + (W.sel.length ? W.sel.map(function (n, i) { return '<span class="tag">' + (i + 1) + '. ' + esc(n) + '<button type="button" data-up="' + i + '" aria-label="Mover ' + esc(n) + ' antes"' + (i === 0 ? ' disabled' : '') + '>‹</button><button type="button" data-rm="' + i + '" aria-label="Quitar ' + esc(n) + '">×</button></span>'; }).join('') : '<span class="muted t-13">Aún no has elegido municipios.</span>') + '</div></div></div>';
+      if (W.step === 3) { var tr = build(), tk = r1(sum(tr, function (t) { return t.km; })); h += '<div class="stack">' + UI.banner({ tone: 'info', text: 'Los kilómetros se estiman por la vía (línea recta × 1,35). Podrás ajustarlos y registrar los peajes en la ficha de la ruta. Se crea en estado «En revisión».' }) + '<div class="table-wrap"><table class="table is-dense"><thead><tr><th>Tramo</th><th class="num">Km</th><th class="num">Min</th></tr></thead><tbody>' + tr.map(function (t) { return '<tr><td>' + esc(t.desde) + ' → ' + esc(t.hasta) + '</td><td class="num">' + F.num(t.km, 1) + '</td><td class="num">' + t.minutos + '</td></tr>'; }).join('') + '</tbody><tfoot><tr><td><strong>' + esc(W.nombre) + ' · ida</strong></td><td class="num"><strong>' + F.num(tk, 1) + '</strong></td><td class="num"><strong>' + sum(tr, function (t) { return t.minutos; }) + '</strong></td></tr></tfoot></table></div></div>'; }
+      h += '<div class="wiz-nav"><button type="button" class="btn btn-ghost" id="wBack">' + (W.step === 1 ? 'Cancelar' : 'Atrás') + '</button><button type="button" class="btn btn-primary" id="wNext">' + (W.step === 3 ? 'Crear ruta' : 'Continuar') + '</button></div>';
+      host.innerHTML = h;
+      $('#wBack', host).onclick = function () { if (W.step === 1) m.close(); else { W.step--; draw(); } };
+      $('#wNext', host).onclick = next;
+      var f = $('[aria-invalid="true"]', host); if (f) f.focus();
+    }
+    function next() {
+      W.errs = {};
+      if (W.step === 1) {
+        W.nombre = $('#wNombre', host).value.trim(); W.zona = $('#wZona', host).value; W.origenId = $('#wCedi', host).value; W.desde = $('#wDesde', host).value; W.hasta = $('#wHasta', host).value;
+        if (!W.nombre) W.errs.nombre = 'Escribe el nombre de la ruta.'; else if (A.rutas.some(function (x) { return UI.norm(x.nombre) === UI.norm(W.nombre); })) W.errs.nombre = 'Ya existe una ruta con ese nombre.';
+        if (!W.desde || !W.hasta || W.hasta <= W.desde) W.errs.vig = 'La fecha final debe ser posterior a la inicial.';
+      } else if (W.step === 2 && !W.sel.length) W.errs.sel = 'Elige al menos un municipio.';
+      if (Object.keys(W.errs).length) { draw(); return; }
+      if (W.step < 3) { W.step++; draw(); return; }
+      var tr = build(), pts = [{ nombre: sede(W.origenId).nombre, lat: sede(W.origenId).lat, lng: sede(W.origenId).lng }].concat(W.sel.map(function (n) { return CAT[n]; })), tk = r1(sum(tr, function (t) { return t.km; }));
+      var n = A.rutas.length + 1, id = 'R-' + (n < 10 ? '0' : '') + n, s = sede(W.origenId);
+      var nr = { rutaId: id, nombre: W.nombre, zona: W.zona, origenId: s.id, origen: s.nombre, municipios: W.sel.slice(), secuencia: W.sel.map(function (nm, i) { var c = CAT[nm]; return { orden: i + 1, municipioKey: c.key, nombre: nm, lat: c.lat, lng: c.lng }; }), tramos: tr.map(function (t, i) { return { orden: i + 1, desde: t.desde, hasta: t.hasta, km: t.km, minutos: t.minutos, peajes: [] }; }), kmIda: tk, kmTotal: r1(tk * 2), peajesCOP: 0, duracionIdaMin: sum(tr, function (t) { return t.minutos; }), vigenciaDesde: W.desde, vigenciaHasta: W.hasta, estado: 'En revisión', clientes: 0, trazado: pts.map(function (p) { return [p.lat, p.lng]; }), zonasExtra: [] };
+      A.rutas.push(nr); A.idx.rutas[id] = nr; m.close(); refresh(); UI.toast('Ruta ' + id + ' creada en revisión. Registra los peajes y actívala cuando esté lista.', 'success'); setTimeout(function () { openDetail(id, true); }, 260);
+    }
+    host.addEventListener('change', function (e) {
+      if (e.target.closest('#wCat')) { var v = e.target.value; if (e.target.checked) { if (W.sel.length >= 12) { e.target.checked = false; W.errs.sel = 'Una ruta admite máximo 12 municipios.'; draw(); return; } W.sel.push(v); } else W.sel.splice(W.sel.indexOf(v), 1); draw(); }
+    });
+    host.addEventListener('click', function (e) { var u = e.target.closest('[data-up]'), x = e.target.closest('#wPick [data-rm]'); if (u) { var i = +u.dataset.up; W.sel.splice(i - 1, 0, W.sel.splice(i, 1)[0]); draw(); } else if (x) { W.sel.splice(+x.dataset.rm, 1); draw(); } });
+    draw();
+  });
+
+  refresh();
+  var pid = UI.param('id'); if (pid) setTimeout(function () { openDetail(pid); }, 300);
+});
+</script>
+</body>
+</html>

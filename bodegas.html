@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bodegas WMS · Armetales</title>
+<meta name="description" content="Plano de almacenamiento, ubicaciones codificadas con QR, movimientos y bloqueos de las bodegas de Armetales.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de Bodegas WMS (tokens y componentes viven en app.css) */
+  .kpi-row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .kpi .kpi-value { font-size: 28px; } .kpi { padding: 12px; } }
+  .bod-pick { display: flex; align-items: center; gap: 8px; }
+  .bod-pick .select { width: auto; min-width: 190px; }
+  .plano-tools { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .plano-tools .tl { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+  .plano-body { padding: 16px; }
+  .dock { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .dock > div { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border: 1px dashed var(--border); border-radius: 6px; background: var(--surface-2); font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); min-width: 0; }
+  .dock > div:last-child { justify-content: flex-end; }
+  .dock .icon { flex: none; }
+  @media (max-width: 479px) { .dock > div { font-size: 10.5px; padding: 6px 8px; } }
+  .zones { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 292px), 1fr)); align-items: start; }
+  .zone { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+  .zone-head { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+  .zone-letter { width: 28px; height: 28px; border-radius: 7px; background: var(--text); color: var(--surface); display: grid; place-items: center; font: 600 15px var(--font-display); flex: none; }
+  .zone-name { font-weight: 600; font-size: 13.5px; line-height: 1.2; }
+  .zone-sub { font-size: 12px; color: var(--text-2); }
+  .zone-occ { margin-left: auto; text-align: right; font: 600 18px var(--font-display); font-variant-numeric: tabular-nums; line-height: 1; }
+  .zone-occ small { display: block; font: 400 11px var(--font-ui); color: var(--text-2); margin-top: 3px; }
+  .aisle { padding: 10px 12px 12px; }
+  .aisle + .aisle { border-top: 1px dashed var(--border); }
+  .aisle-label { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--text-2); margin-bottom: 6px; }
+  .cells { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 62px)); gap: 6px; }
+  .cell { position: relative; overflow: hidden; aspect-ratio: 1 / 1; min-height: 44px; padding: 0; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; transition: border-color .14s, transform .14s, opacity .14s, box-shadow .14s; --hc: var(--steel); }
+  .cell:hover { border-color: var(--steel); transform: translateY(-1px); }
+  .cell .cp { position: absolute; top: 3px; left: 3px; padding: 0 3px; border-radius: 3px; background: color-mix(in srgb, var(--surface) 82%, transparent); font: 500 10.5px var(--font-mono); color: var(--text-2); z-index: 1; }
+  .cell .cv { position: absolute; right: 3px; bottom: 3px; padding: 0 3px; border-radius: 3px; background: color-mix(in srgb, var(--surface) 82%, transparent); font: 600 11.5px var(--font-ui); font-variant-numeric: tabular-nums; z-index: 1; }
+  .cell .cf { position: absolute; left: 0; right: 0; bottom: 0; height: var(--p); background-color: color-mix(in srgb, var(--hc) 12%, transparent); opacity: .5; }
+  @media (max-width: 639px) { .tabs .tab { padding-inline: 9px; white-space: nowrap; } .hide-sm { display: none; } }
+  .cell .cf { --hc: var(--lvc, var(--steel)); }
+  .cell.lv-warn { --hc: var(--amber); --lvc: var(--amber); } .cell.lv-crit { --hc: var(--red); --lvc: var(--red); }
+  .cell.st-libre { background: var(--surface-2); border-style: dashed; }
+  .cell.st-bloqueada { background: var(--red-bg); border-color: var(--red-line); color: var(--red-fg); }
+  .cell.st-bloqueada .cp { color: var(--red-fg); }
+  .cell.st-bloqueada .cf { display: none; }
+  .cell .ci { position: absolute; inset: 0; display: grid; place-items: center; }
+  .cell.st-conteo { border-color: var(--blue); }
+  .cell.st-conteo::after { content: ""; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--blue); z-index: 1; }
+  .cell.ghost { border: 1px dashed var(--border); background: transparent; cursor: default; pointer-events: none; opacity: .5; }
+  .vista-estado .cell .cf { display: none; }
+  .vista-estado .cell.st-libre { background: var(--green-bg); border: 1px solid var(--green-line); }
+  .vista-estado .cell.st-ocupada { background: var(--blue-bg); border-color: var(--blue-line); }
+  .vista-estado .cell.st-conteo { background: var(--amber-bg); border-color: var(--amber-line); }
+  .vista-estado .cell.st-conteo::after { background: var(--amber); }
+  .finding .cell:not(.is-hit) { opacity: .3; }
+  .cell.is-hit { outline: 2px solid var(--red); outline-offset: 1px; box-shadow: 0 0 0 5px color-mix(in srgb, var(--red) 16%, transparent); z-index: 2; }
+  .cell.is-sel { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .lv-note { padding: 14px 12px; font-size: 12.5px; color: var(--text-2); }
+  .legend-grid { display: grid; gap: 8px; }
+  .legend-grid .li { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .legend-grid .sq { width: 22px; height: 22px; border-radius: 5px; border: 1px solid var(--border); position: relative; overflow: hidden; flex: none; --hc: var(--steel); background: var(--surface); }
+  .legend-grid .sq i { position: absolute; left: 0; right: 0; bottom: 0; height: 60%; background-color: color-mix(in srgb, var(--hc) 14%, transparent); }
+  .legend-grid .sq i { --hc: var(--lvc, var(--steel)); }
+  .legend-grid .sq.w { --lvc: var(--amber); } .legend-grid .sq.c { --lvc: var(--red); }
+  .legend-grid .sq.free { background: var(--surface-2); border-style: dashed; }
+  .legend-grid .sq.blk { background: var(--red-bg); border-color: var(--red-line); }
+  .legend-grid .sq.cnt { border-color: var(--blue); }
+  .legend-grid .sq.s-free { background: var(--green-bg); border-color: var(--green-line); }
+  .legend-grid .sq.s-occ { background: var(--blue-bg); border-color: var(--blue-line); }
+  .legend-grid .sq.s-cnt { background: var(--amber-bg); border-color: var(--amber-line); }
+  .finder-list { display: grid; gap: 4px; margin-top: 10px; }
+  .finder-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); text-align: left; font: inherit; color: inherit; cursor: pointer; }
+  .finder-item:hover { background: var(--surface-2); border-color: var(--steel); }
+  .finder-item .fi-main { flex: 1; min-width: 0; font-size: 13px; }
+  .finder-item .fi-main span { display: block; font-size: 12px; color: var(--text-2); }
+  .zone-row { display: grid; grid-template-columns: 26px minmax(0,1fr) 92px; gap: 10px; align-items: center; padding: 6px 0; font-size: 13px; }
+  .loc-code { font: 500 28px var(--font-mono); letter-spacing: -.01em; line-height: 1.1; }
+  .mini-stat { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .mini-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .mini-stat .l { font-size: 12px; color: var(--text-2); }
+  .qr-box { display: flex; gap: 16px; align-items: center; }
+  .paper { background: white; color: black; border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow-1); }
+  .paper svg { display: block; }
+  .lbl { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 14px; align-items: center; padding: 12px; }
+  .lbl-code { font: 500 26px "IBM Plex Mono", monospace; line-height: 1.1; letter-spacing: -.01em; }
+  .lbl-meta { font-size: 12px; line-height: 1.4; color: #333; }
+  .lbl-brand { display: flex; align-items: center; gap: 6px; font: 700 11px var(--font-display); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 4px; }
+  .lbl-brand img { width: 16px; height: 16px; object-fit: contain; }
+  .lbl-sku { margin-top: 6px; padding-top: 6px; border-top: 1px solid #bbb; font-size: 11.5px; }
+  .lbl-sheet { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .lbl-sheet .lbl-code { font-size: 19px; }
+  .lbl-sheet .lbl { padding: 10px; gap: 10px; }
+  .bod-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+  .bod-card.is-current { border-color: var(--text); }
+  .bod-card .bc-top { display: flex; gap: 12px; align-items: flex-start; }
+  .bod-card .bc-ico { width: 38px; height: 38px; border-radius: 9px; background: var(--surface-3); display: grid; place-items: center; color: var(--text-2); flex: none; }
+  .bod-card .bc-name { font: 600 17px var(--font-display); line-height: 1.2; }
+  .bod-card .bc-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 12px; }
+  .bod-card .bc-stats .v { font: 600 20px var(--font-display); font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .bod-card .bc-stats .l { font-size: 12px; color: var(--text-2); }
+  .mv-arrow { color: var(--text-3, var(--text-2)); }
+  .cap-preview { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .code-preview { font: 500 24px var(--font-mono); letter-spacing: -.01em; }
+</style>
+</head>
+<body data-page="bodegas">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Bodega · WMS</div>
+      <h1 class="page-title">Gestión de bodegas</h1>
+      <p class="page-desc" id="phDesc">Plano de almacenamiento, ubicaciones codificadas y movimientos de cada bodega.</p>
+    </div>
+    <div class="page-actions">
+      <div class="bod-pick"><label class="sr-only" for="bodSel">Bodega</label><select class="select" id="bodSel"></select></div>
+      <button type="button" class="btn btn-primary" id="newLocBtn"></button>
+    </div>
+  </header>
+
+  <section aria-label="Resumen de la bodega"><div class="kpi-row" id="kpiRow"></div></section>
+
+  <section class="section" aria-label="Módulos de bodega">
+    <div class="tabs" role="tablist" id="tabs" aria-label="Vistas de bodega">
+      <button class="tab" role="tab" aria-controls="pnPlano" aria-selected="true" id="tbPlano">Plano</button>
+      <button class="tab" role="tab" aria-controls="pnUbic" aria-selected="false" id="tbUbic">Ubicaciones <span class="count" id="cUbic"></span></button>
+      <button class="tab" role="tab" aria-controls="pnBod" aria-selected="false" id="tbBod">Bodegas<span class="hide-sm"> y áreas</span></button>
+      <button class="tab" role="tab" aria-controls="pnMov" aria-selected="false" id="tbMov">Movimientos</button>
+    </div>
+
+    <div class="tab-panel" id="pnPlano" role="tabpanel" aria-labelledby="tbPlano">
+      <div class="layout-main-side">
+        <div class="card">
+          <div class="plano-tools">
+            <div class="tl"><span id="nivelLbl">Nivel</span><div class="segmented" role="group" aria-labelledby="nivelLbl" id="nivelSeg"></div></div>
+            <div class="tl"><span id="vistaLbl">Colorear por</span><div class="segmented" role="group" aria-labelledby="vistaLbl" id="vistaSeg"><button type="button" data-v="ocup" aria-pressed="true">Ocupación</button><button type="button" data-v="estado" aria-pressed="false">Estado</button></div></div>
+          </div>
+          <div class="plano-body" id="planoHost"></div>
+        </div>
+        <aside class="stack" aria-label="Herramientas del plano">
+          <div class="card">
+            <div class="card-head"><div><h2 class="card-title">¿Dónde está este SKU?</h2><p class="card-sub">Resalta sus ubicaciones en el plano</p></div></div>
+            <div class="card-body">
+              <div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="input" type="search" id="skuQ" placeholder="SKU o descripción" aria-label="Buscar SKU en la bodega" autocomplete="off"></div>
+              <div id="finder"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2 class="card-title">Leyenda</h2></div>
+            <div class="card-body"><div class="legend-grid" id="legend"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><h2 class="card-title">Requieren atención</h2><p class="card-sub" id="attnSub"></p></div></div>
+            <div class="card-body" id="attn" style="padding-top:0"></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="pnUbic" role="tabpanel" aria-labelledby="tbUbic" hidden>
+      <div class="section-head"><div><h2 class="section-title">Ubicaciones codificadas</h2><p class="muted t-13">Formato zona-pasillo-nivel-posición, por ejemplo <span class="mono">A-03-2-04</span>.</p></div>
+        <div class="row"><button type="button" class="btn btn-secondary" id="zoneLblBtn">Etiquetas por zona</button><button type="button" class="btn btn-secondary" id="newLoc2">Crear ubicación</button></div></div>
+      <div id="locTable"></div>
+    </div>
+
+    <div class="tab-panel" id="pnBod" role="tabpanel" aria-labelledby="tbBod" hidden>
+      <div class="section-head"><h2 class="section-title">Bodegas</h2><button type="button" class="btn btn-secondary" id="newBodBtn">Crear bodega</button></div>
+      <div class="bod-grid" id="bodGrid"></div>
+      <div class="section-head" style="margin-top:28px"><div><h2 class="section-title" id="areasTitle">Áreas</h2><p class="muted t-13">Zonas de almacenamiento y áreas operativas de la bodega seleccionada.</p></div><button type="button" class="btn btn-secondary" id="newAreaBtn">Crear área</button></div>
+      <div id="areaTable"></div>
+    </div>
+
+    <div class="tab-panel" id="pnMov" role="tabpanel" aria-labelledby="tbMov" hidden>
+      <div class="section-head"><div><h2 class="section-title">Movimientos entre ubicaciones</h2><p class="muted t-13">Recepciones, reubicaciones, salidas a preparación y bloqueos con su responsable.</p></div><button type="button" class="btn btn-secondary" id="newMovBtn">Registrar movimiento</button></div>
+      <div id="movTable"></div>
+    </div>
+  </section>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$, IDX = A.idx;
+  var ZONA_FAM = { Varilla: 'A', 'Malla': 'B', 'Lámina': 'B', Perfil: 'C', 'Tubería': 'C', Alambre: 'D', Teja: 'D', Cemento: 'E' };
+  var S = { bod: null, nivel: 1, vista: 'ocup', sku: null, q: '', hits: [] };
+  var BODS = A.sedes.map(function (s) { return Object.assign({}, s); });
+  var me = A.usuarioActual;
+  var round = function (n, d) { var k = Math.pow(10, d || 0); return Math.round(n * k) / k; };
+
+  /* ---------- datos derivados ---------- */
+  function bod(id) { return BODS.filter(function (b) { return b.id === (id || S.bod); })[0]; }
+  function locs(id) { return A.ubicaciones.filter(function (u) { return u.bodegaId === (id || S.bod); }); }
+  function invOf(u) { return A.inventario.filter(function (r) { return r.bodegaId === u.bodegaId && r.ubicacionId === u.ubicacionId; })[0] || null; }
+  function prod(sku) { return IDX.productos[sku]; }
+  function pct(u) { return u.capacidadM3 ? Math.round(u.ocupacionM3 / u.capacidadM3 * 100) : 0; }
+  function lvOf(p) { return p >= 95 ? 'crit' : p >= 80 ? 'warn' : 'ok'; }
+  function stKey(u) { return u.estado === 'Bloqueada' ? 'bloqueada' : u.estado === 'En conteo' ? 'conteo' : u.sku ? 'ocupada' : 'libre'; }
+  function stChip(u) { return UI.chip(u.estado, { tone: u.estado === 'Bloqueada' ? 'danger' : u.estado === 'En conteo' ? 'warning' : u.estado === 'Disponible' ? 'success' : 'info' }); }
+  function nivelTxt(n) { return n === 1 ? 'Nivel 1 · piso' : 'Nivel ' + n; }
+  function pctTxt(a, b) { return Math.round(a / b * 100) + ' %'; }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function mkCode(z, pa, ni, po) { return z + '-' + pad2(pa) + '-' + ni + '-' + pad2(po); }
+  function toast(m, t, o) { UI.toast(m, t || 'success', o); }
+
+  /* áreas (zonas de almacenamiento y áreas operativas) */
+  var AREAS = [];
+  BODS.forEach(function (b) {
+    var seen = {};
+    A.ubicaciones.filter(function (u) { return u.bodegaId === b.id; }).forEach(function (u) { if (!seen[u.zona]) { seen[u.zona] = 1; AREAS.push({ bodegaId: b.id, codigo: u.zona, nombre: u.zonaNombre, tipo: 'Almacenamiento' }); } });
+    AREAS.push({ bodegaId: b.id, codigo: 'MR', nombre: 'Muelle de recibo', tipo: 'Recibo' }, { bodegaId: b.id, codigo: 'MD', nombre: 'Muelle de despacho', tipo: 'Despacho' });
+    if (b.id === 'CEDI-BOG') AREAS.push({ bodegaId: b.id, codigo: 'CU', nombre: 'Cuarentena y calidad', tipo: 'Cuarentena' });
+  });
+  function areasOf(id) { return AREAS.filter(function (a) { return a.bodegaId === (id || S.bod); }); }
+  function storageAreas(id) { return areasOf(id).filter(function (a) { return a.tipo === 'Almacenamiento'; }).sort(function (a, b) { return a.codigo < b.codigo ? -1 : 1; }); }
+
+  /* movimientos semilla (determinista) */
+  var MOVS = [];
+  (function () {
+    var seed = 11; function rnd() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+    var n = 0, ops = A.operarios;
+    A.inventario.forEach(function (r) {
+      var p = prod(r.sku), k = 1 + (rnd() < 0.45 ? 1 : 0), ou = ops.filter(function (o) { return o.bodegaId === r.bodegaId; });
+      for (var i = 0; i < k; i++) {
+        var t = rnd(), tipo = t < 0.38 ? 'Recepción' : t < 0.62 ? 'Reubicación' : 'Salida a preparación', q = Math.max(1, Math.round(r.stockFisico * (0.08 + rnd() * 0.5)));
+        var other = locs(r.bodegaId).filter(function (u) { return u.zona === r.ubicacionId[0] && u.ubicacionId !== r.ubicacionId; });
+        var oth = other.length ? other[Math.floor(rnd() * other.length)].ubicacionId : 'Muelle de recibo', mu = 'M-0' + (1 + Math.floor(rnd() * 4));
+        MOVS.push({ id: 'MOV-' + (26000 + (++n)), fecha: A.ahora.getTime() - Math.round((i * 30 + 1 + rnd() * 60) * 3600000), tipo: tipo, bodegaId: r.bodegaId, sku: r.sku, desc: p ? p.descripcion : r.descripcion, unidad: p ? p.unidadBase : 'Unidad',
+          origen: tipo === 'Recepción' ? 'Muelle de recibo' : tipo === 'Reubicación' ? oth : r.ubicacionId, destino: tipo === 'Recepción' ? r.ubicacionId : tipo === 'Reubicación' ? r.ubicacionId : mu,
+          cantidad: q, operario: ou[Math.floor(rnd() * ou.length)].nombre, ref: tipo === 'Recepción' ? 'OC-45' + (10000 + Math.floor(rnd() * 8999)) : tipo === 'Salida a preparación' ? 'TP-' + (48200 + Math.floor(rnd() * 90)).toString().padStart(5, '0') : 'REU-' + Math.floor(rnd() * 900 + 100) });
+      }
+    });
+    MOVS.sort(function (a, b) { return b.fecha - a.fecha; });
+  })();
+  function addMov(o) { MOVS.unshift(Object.assign({ id: 'MOV-' + (26000 + MOVS.length + 1), fecha: Date.now(), bodegaId: S.bod, operario: me.nombre, unidad: 'Unidad', cantidad: 0, ref: '—', sku: '', desc: '' }, o)); }
+  var MOV_TONE = { 'Recepción': 'success', 'Reubicación': 'info', 'Salida a preparación': 'neutral', 'Asignación': 'info', 'Bloqueo': 'danger', 'Desbloqueo': 'success', 'Ajuste de capacidad': 'warning' };
+
+  /* ---------- QR verosímil (determinista, no escaneable) ---------- */
+  function qrSvg(text, px, label) {
+    var N = 25, h = 2166136261; for (var i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
+    function rnd() { h |= 0; h = h + 0x6D2B79F5 | 0; var t = Math.imul(h ^ h >>> 15, 1 | h); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+    var m = [], res = []; for (var y = 0; y < N; y++) { m.push([]); res.push([]); for (var x = 0; x < N; x++) { m[y].push(0); res[y].push(false); } }
+    function finder(ox, oy) { for (var y = -1; y <= 7; y++) for (var x = -1; x <= 7; x++) { var X = ox + x, Y = oy + y; if (X < 0 || Y < 0 || X >= N || Y >= N) continue; res[Y][X] = true; m[Y][X] = (x >= 0 && x <= 6 && y >= 0 && y <= 6 && (x === 0 || x === 6 || y === 0 || y === 6 || (x >= 2 && x <= 4 && y >= 2 && y <= 4))) ? 1 : 0; } }
+    finder(0, 0); finder(N - 7, 0); finder(0, N - 7);
+    for (var t = 8; t < N - 8; t++) { res[6][t] = res[t][6] = true; m[6][t] = m[t][6] = t % 2 === 0 ? 1 : 0; }
+    for (var y = -2; y <= 2; y++) for (var x = -2; x <= 2; x++) { res[18 + y][18 + x] = true; m[18 + y][18 + x] = (Math.max(Math.abs(x), Math.abs(y)) !== 1) ? 1 : 0; }
+    for (var y = 0; y < N; y++) for (var x = 0; x < N; x++) if (!res[y][x]) m[y][x] = rnd() < 0.5 ? 1 : 0;
+    var d = ''; for (var y = 0; y < N; y++) for (var x = 0; x < N; x++) if (m[y][x]) d += 'M' + (x + 2) + ' ' + (y + 2) + 'h1v1h-1z';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + (N + 4) + ' ' + (N + 4) + '" width="' + px + '" height="' + px + '" role="img" aria-label="' + esc(label || 'Código QR ' + text) + '" shape-rendering="crispEdges"><rect width="' + (N + 4) + '" height="' + (N + 4) + '" fill="white"/><path d="' + d + '" fill="black"/></svg>';
+  }
+  function labelHtml(u, px) {
+    var r = invOf(u), p = r && prod(r.sku), b = bod(u.bodegaId);
+    return '<div class="paper lbl">' + qrSvg(u.codigoQR, px || 96) + '<div style="min-width:0"><div class="lbl-brand"><img src="assets/img/logo-mark.png" alt="">Armetales</div><div class="lbl-code">' + esc(u.ubicacionId) + '</div>' +
+      '<div class="lbl-meta">' + esc(b.nombre) + '<br>Zona ' + u.zona + ' · ' + esc(u.zonaNombre) + '<br>Pasillo ' + u.pasillo + ' · ' + u.rack + ' · ' + nivelTxt(u.nivel).replace(' · piso', '') + ' · Pos. ' + u.posicion + '</div>' +
+      (r ? '<div class="lbl-sku"><span style="font-family:\'IBM Plex Mono\',monospace">' + r.sku + '</span> ' + esc(p ? p.descripcion : r.descripcion) + '</div>' : '') + '</div></div>';
+  }
+
+  /* ---------- encabezado, selector, KPIs ---------- */
+  function fillSel() {
+    $('#bodSel').innerHTML = BODS.map(function (b) { return '<option value="' + b.id + '"' + (b.id === S.bod ? ' selected' : '') + '>' + esc(b.nombre) + '</option>'; }).join('');
+  }
+  $('#newLocBtn').innerHTML = UI.icon('plus') + 'Crear ubicación';
+  function renderHead() {
+    var b = bod(), L = locs();
+    $('#phDesc').innerHTML = '<strong>' + esc(b.nombre) + '</strong> · ' + esc(b.ciudad) + ' · responsable ' + esc(b.responsable) + '. ' + (L.length ? 'Toca una ubicación del plano para ver su detalle.' : 'Aún no tiene layout configurado.');
+    $('#cUbic').textContent = L.length;
+  }
+  function renderKpis() {
+    var L = locs(), occ = L.filter(function (u) { return u.sku; }).length, lib = L.filter(function (u) { return !u.sku && u.estado === 'Disponible'; }).length, bl = L.filter(function (u) { return u.estado === 'Bloqueada'; }).length, ct = L.filter(function (u) { return u.estado === 'En conteo'; }).length;
+    var m3 = L.reduce(function (s, u) { return s + u.ocupacionM3; }, 0), cap = L.reduce(function (s, u) { return s + u.capacidadM3; }, 0), zs = {}, ps = {}, rk = {};
+    L.forEach(function (u) { zs[u.zona] = 1; ps[u.zona + u.pasillo] = 1; rk[u.rack] = 1; });
+    $('#kpiRow').innerHTML =
+      UI.kpi({ id: 'pos', label: 'Posiciones', icon: 'layers', value: L.length, note: occ + ' ocupadas · ' + lib + ' libres', onClick: true }) +
+      UI.kpi({ id: 'ocup', label: 'Ocupación volumétrica', icon: 'gauge', valueHtml: (cap ? F.num(m3 / cap * 100, 0) : '0') + '<small>%</small>', note: F.num(m3, 0) + ' de ' + F.num(cap, 0) + ' m³', onClick: true }) +
+      UI.kpi({ id: 'bloq', label: 'Bloqueadas', icon: 'lock', value: bl, note: ct + ' en conteo cíclico', onClick: true }) +
+      UI.kpi({ id: 'zonas', label: 'Zonas y racks', icon: 'warehouse', value: Object.keys(zs).length, note: Object.keys(ps).length + ' pasillos · ' + Object.keys(rk).length + ' racks', onClick: true });
+  }
+  $('#kpiRow').addEventListener('click', function (e) {
+    var k = e.target.closest('[data-kpi]'); if (!k) return; var id = k.dataset.kpi;
+    if (id === 'bloq') { goTab('pnUbic'); locTbl.setFilter('estado', 'Bloqueada'); }
+    else if (id === 'pos') { goTab('pnUbic'); locTbl.setFilter('estado', ''); }
+    else if (id === 'ocup') { goTab('pnPlano'); setVista('ocup'); } else goTab('pnBod');
+  });
+  function goTab(id) { tabsApi.select(id); }
+
+  /* ---------- plano ---------- */
+  function cellHtml(u) {
+    var p = pct(u), sk = stKey(u), lv = lvOf(p), r = invOf(u), prd = r && prod(r.sku);
+    var tip = u.ubicacionId + ' · ' + u.estado + (u.sku ? ' · ' + p + ' % · ' + (prd ? prd.descripcion : u.sku) : '');
+    return '<button type="button" class="cell st-' + sk + ' lv-' + lv + (S.hits.indexOf(u.ubicacionId) > -1 ? ' is-hit' : '') + '" data-id="' + u.ubicacionId + '" title="' + esc(tip) + '" aria-label="Ubicación ' + u.ubicacionId + ', ' + esc(u.estado.toLowerCase()) + (u.sku ? ', ocupación ' + p + ' por ciento' : '') + '" style="--p:' + Math.min(100, p) + '%">' +
+      (u.sku && sk !== 'bloqueada' ? '<i class="cf hatch"></i>' : '') + '<span class="cp">' + u.posicion + '</span>' + (sk === 'bloqueada' ? '<span class="ci">' + UI.icon('lock', 'icon-sm') + '</span>' : u.sku ? '<span class="cv">' + p + '</span>' : '') + '</button>';
+  }
+  function renderPlano() {
+    var host = $('#planoHost'), L = locs(), b = bod();
+    if (!L.length) {
+      $('#nivelSeg').innerHTML = ''; host.className = 'plano-body';
+      host.innerHTML = UI.empty({ icon: 'warehouse', title: b.nombre + ' aún no tiene layout', text: 'Define zonas, pasillos y racks creando las primeras ubicaciones codificadas. Mientras tanto la bodega no puede recibir mercancía.', action: { label: 'Crear la primera ubicación', id: 'new-loc' } });
+      renderSide(); return;
+    }
+    var maxNiv = Math.max.apply(null, L.map(function (u) { return u.nivel; })); if (S.nivel > maxNiv) S.nivel = 1;
+    $('#nivelSeg').innerHTML = Array.apply(null, Array(maxNiv)).map(function (_, i) { return '<button type="button" data-n="' + (i + 1) + '" aria-pressed="' + (S.nivel === i + 1) + '">' + (i === 0 ? 'Nivel 1 · piso' : 'Nivel ' + (i + 1)) + '</button>'; }).join('');
+    var zones = storageAreas().map(function (a) { return a.codigo; });
+    L.forEach(function (u) { if (zones.indexOf(u.zona) < 0) zones.push(u.zona); }); zones.sort();
+    var html = '<div class="dock"><div>' + UI.icon('arrow-down', 'icon-sm') + 'Recibo · M-01 a M-02</div><div>Despacho · M-03 a M-04' + UI.icon('arrow-up-right', 'icon-sm') + '</div></div><div class="zones">';
+    zones.forEach(function (z) {
+      var ZL = L.filter(function (u) { return u.zona === z; }), area = storageAreas().filter(function (a) { return a.codigo === z; })[0], nombre = ZL.length ? ZL[0].zonaNombre : (area ? area.nombre : 'Zona ' + z);
+      var cap = ZL.reduce(function (s, u) { return s + u.capacidadM3; }, 0), oc = ZL.reduce(function (s, u) { return s + u.ocupacionM3; }, 0), zp = cap ? Math.round(oc / cap * 100) : 0;
+      var pas = {}; ZL.forEach(function (u) { pas[u.pasillo] = 1; }); var pl = Object.keys(pas).sort(), cols = ZL.length ? Math.max.apply(null, ZL.map(function (u) { return +u.posicion; })) : 0, zn = ZL.length ? Math.max.apply(null, ZL.map(function (u) { return u.nivel; })) : 0;
+      html += '<section class="zone" aria-label="Zona ' + z + ', ' + esc(nombre) + '"><header class="zone-head"><span class="zone-letter" aria-hidden="true">' + z + '</span><div class="min-w-0"><div class="zone-name">' + esc(nombre) + '</div><div class="zone-sub">' + (ZL.length ? pl.length + ' pasillo' + (pl.length > 1 ? 's' : '') + ' · ' + ZL.length + ' ubicaciones' : 'Sin ubicaciones') + '</div></div>' + (ZL.length ? '<div class="zone-occ">' + zp + '%<small>ocupación</small></div>' : '') + '</header>';
+      if (!ZL.length) html += '<div class="lv-note">Esta zona está creada pero no tiene ubicaciones. <button type="button" class="btn btn-ghost btn-sm" data-newin="' + z + '">Crear ubicaciones</button></div>';
+      else if (S.nivel > zn) html += '<div class="lv-note">Esta zona tiene ' + zn + ' nivel' + (zn > 1 ? 'es' : '') + '. Elige un nivel menor para verla.</div>';
+      else pl.forEach(function (pa) {
+        html += '<div class="aisle"><div class="aisle-label"><span class="mono">Pasillo ' + pa + '</span><span class="mono">Rack R' + z + pa + ' · ' + (S.nivel === 1 ? 'piso' : 'nivel ' + S.nivel) + '</span></div><div class="cells" style="--cols:' + cols + '">';
+        for (var po = 1; po <= cols; po++) { var u = ZL.filter(function (x) { return x.pasillo === pa && x.nivel === S.nivel && +x.posicion === po; })[0]; html += u ? cellHtml(u) : '<span class="cell ghost" aria-hidden="true"></span>'; }
+        html += '</div></div>';
+      });
+      html += '</section>';
+    });
+    host.innerHTML = html + '</div>';
+    host.className = 'plano-body vista-' + S.vista + (S.hits.length ? ' finding' : '');
+    renderSide();
+  }
+  host_click();
+  function host_click() {
+    $('#planoHost').addEventListener('click', function (e) {
+      var c = e.target.closest('.cell[data-id]'); if (c) { openLoc(c.dataset.id); return; }
+      var a = e.target.closest('[data-newin]'); if (a) { locModal({ zona: a.dataset.newin }); return; }
+      var n = e.target.closest('[data-empty-action]'); if (n) locModal();
+    });
+  }
+  $('#nivelSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.nivel = +b.dataset.n; renderPlano(); });
+  function setVista(v) { S.vista = v; $$('#vistaSeg button').forEach(function (x) { x.setAttribute('aria-pressed', x.dataset.v === v); }); renderPlano(); }
+  $('#vistaSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) setVista(b.dataset.v); });
+
+  function renderSide() {
+    var L = locs(), vistaOc = S.vista === 'ocup';
+    $('#legend').innerHTML = vistaOc ?
+      '<div class="li"><span class="sq free"></span>Libre</div><div class="li"><span class="sq"><i class="hatch"></i></span>Ocupada menos de 80 %</div><div class="li"><span class="sq w"><i class="hatch"></i></span>Ocupada 80 a 94 %</div><div class="li"><span class="sq c"><i class="hatch"></i></span>Ocupada 95 % o más</div><div class="li"><span class="sq blk"></span>Bloqueada</div><div class="li"><span class="sq cnt"></span>Punto azul: en conteo cíclico</div>' :
+      '<div class="li"><span class="sq s-free"></span>Disponible (libre)</div><div class="li"><span class="sq s-occ"></span>Ocupada</div><div class="li"><span class="sq blk"></span>Bloqueada</div><div class="li"><span class="sq s-cnt"></span>En conteo cíclico</div>';
+    var att = L.filter(function (u) { return u.estado === 'Bloqueada' || u.estado === 'En conteo' || (u.sku && pct(u) >= 95); });
+    $('#attnSub').textContent = att.length ? att.length + ' ubicaciones' : 'Todo en orden';
+    $('#attn').innerHTML = att.length ? '<div class="finder-list" style="margin-top:0">' + att.map(function (u) { var why = u.estado === 'Bloqueada' ? 'Bloqueada' + (u.bloqueo ? ' · ' + u.bloqueo.motivo : '') : u.estado === 'En conteo' ? 'En conteo cíclico' : 'Ocupación ' + pct(u) + ' %'; return '<button type="button" class="finder-item" data-open="' + u.ubicacionId + '"><div class="fi-main"><span class="mono" style="display:inline;color:var(--text);font-size:13px">' + u.ubicacionId + '</span><span>' + esc(why) + '</span></div>' + UI.icon('chevron-right', 'icon-sm') + '</button>'; }).join('') + '</div>' : '<p class="muted t-13">No hay ubicaciones bloqueadas ni al límite de capacidad.</p>';
+    renderFinder();
+  }
+  $('#attn').addEventListener('click', function (e) { var b = e.target.closest('[data-open]'); if (b) openLoc(b.dataset.open); });
+
+  /* buscador de SKU (HU-199) */
+  function renderFinder() {
+    var host = $('#finder'), L = locs(), q = UI.norm(S.q);
+    if (S.sku) {
+      var p = prod(S.sku), mine = A.inventario.filter(function (r) { return r.bodegaId === S.bod && r.sku === S.sku; }), others = A.inventario.filter(function (r) { return r.bodegaId !== S.bod && r.sku === S.sku; }), tot = mine.reduce(function (s, r) { return s + r.stockFisico; }, 0);
+      host.innerHTML = '<div class="row between mt-3"><div style="min-width:0"><span class="mono strong">' + S.sku + '</span><div class="t-13 muted">' + esc(p ? p.descripcion : '') + '</div></div><button type="button" class="btn btn-ghost btn-sm" id="skuClear">Quitar</button></div>' +
+        (mine.length ? '<div class="t-13 mt-2"><strong>' + mine.length + ' ubicación' + (mine.length > 1 ? 'es' : '') + '</strong> con ' + F.num(tot) + ' ' + esc((p ? p.unidadBase : 'unid.').toLowerCase()) + 's en esta bodega.</div><div class="finder-list">' + mine.map(function (r) { var u = L.filter(function (x) { return x.ubicacionId === r.ubicacionId; })[0]; return '<button type="button" class="finder-item" data-open="' + r.ubicacionId + '"><div class="fi-main"><span class="mono" style="display:inline;color:var(--text);font-size:13px">' + r.ubicacionId + '</span><span>' + nivelTxt(u.nivel) + ' · ' + F.num(r.stockFisico) + ' físicas, ' + F.num(r.stockDisponible) + ' disponibles</span></div>' + stChip(u) + '</button>'; }).join('') + '</div>' :
+          '<div class="mt-3">' + UI.banner({ tone: 'warning', text: 'Este SKU no tiene ubicación en ' + bod().nombre + '.' }) + '</div>') +
+        (others.length ? '<p class="t-12 muted mt-3">También está en ' + others.map(function (r) { return esc(bod(r.bodegaId).nombre); }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(', ') + '.</p>' : '');
+      return;
+    }
+    if (!q) { host.innerHTML = '<p class="t-12 muted mt-3">Escribe un SKU o parte de la descripción, por ejemplo «varilla 1/2» o «1000235».</p>'; return; }
+    var skus = {}; A.inventario.filter(function (r) { return r.bodegaId === S.bod; }).forEach(function (r) { skus[r.sku] = 1; });
+    var res = A.productos.filter(function (p) { return skus[p.skuSAP] && q.split(/\s+/).every(function (t) { return UI.norm(p.skuSAP + ' ' + p.descripcion).indexOf(t) > -1; }); }).slice(0, 6);
+    host.innerHTML = res.length ? '<div class="finder-list">' + res.map(function (p) { return '<button type="button" class="finder-item" data-sku="' + p.skuSAP + '"><div class="fi-main"><span class="mono" style="display:inline;color:var(--text);font-size:13px">' + p.skuSAP + '</span><span>' + esc(p.descripcion) + '</span></div>' + UI.icon('map-pin', 'icon-sm') + '</button>'; }).join('') + '</div>' : '<div class="mt-3">' + UI.banner({ tone: 'warning', text: 'No hay un SKU almacenado en esta bodega que coincida con «' + S.q + '».' }) + '</div>';
+  }
+  function setSku(sku) {
+    S.sku = sku; S.hits = sku ? A.inventario.filter(function (r) { return r.bodegaId === S.bod && r.sku === sku; }).map(function (r) { return r.ubicacionId; }) : [];
+    if (sku && S.hits.length) { var inLvl = locs().some(function (u) { return S.hits.indexOf(u.ubicacionId) > -1 && u.nivel === S.nivel; }); if (!inLvl) { S.nivel = locs().filter(function (u) { return S.hits.indexOf(u.ubicacionId) > -1; })[0].nivel; } }
+    renderPlano();
+  }
+  $('#skuQ').addEventListener('input', function (e) { S.q = e.target.value; if (S.sku) { S.sku = null; S.hits = []; renderPlano(); } else renderFinder(); });
+  $('#finder').addEventListener('click', function (e) {
+    var s = e.target.closest('[data-sku]'); if (s) { $('#skuQ').value = s.dataset.sku; S.q = s.dataset.sku; setSku(s.dataset.sku); return; }
+    var o = e.target.closest('[data-open]'); if (o) { openLoc(o.dataset.open); return; }
+    if (e.target.closest('#skuClear')) { $('#skuQ').value = ''; S.q = ''; setSku(null); }
+  });
+
+  /* ---------- drawer de ubicación ---------- */
+  var drw = null;
+  function locBody(u) {
+    var r = invOf(u), p = r && prod(r.sku), pc = pct(u), libre = Math.max(0, u.capacidadM3 - u.ocupacionM3), b = bod(u.bodegaId);
+    var movs = MOVS.filter(function (m) { return m.origen === u.ubicacionId || m.destino === u.ubicacionId; }).slice(0, 4);
+    var blocked = u.estado === 'Bloqueada', counting = u.estado === 'En conteo';
+    return '<div class="stack-lg">' +
+      '<div><div class="loc-code">' + esc(u.ubicacionId) + '</div><div class="row gap-2 mt-2">' + stChip(u) + '<span class="tag">Zona ' + u.zona + ' · ' + esc(u.zonaNombre) + '</span></div></div>' +
+      (blocked ? UI.banner({ tone: 'danger', title: 'Ubicación bloqueada', text: (u.bloqueo ? u.bloqueo.motivo + (u.bloqueo.obs ? ' · ' + u.bloqueo.obs : '') + ' · ' + u.bloqueo.por + ', ' + F.fechaHora(u.bloqueo.fecha) : 'No admite ingresos ni reservas de stock hasta que se desbloquee.') }) : '') +
+      (counting ? UI.banner({ tone: 'info', title: 'En conteo cíclico', text: 'Durante el conteo no se permiten movimientos desde ni hacia esta ubicación. Revisa el conteo en Inventario.' }) : '') +
+      '<div class="row">' + (r ? '<button type="button" class="btn btn-primary btn-sm" data-act="move"' + (counting ? ' disabled' : '') + '>' + UI.icon('arrow-right') + 'Mover producto</button>' : '<button type="button" class="btn btn-primary btn-sm" data-act="assign"' + (blocked || counting ? ' disabled' : '') + '>' + UI.icon('package') + 'Asignar producto</button>') +
+        '<button type="button" class="btn btn-secondary btn-sm" data-act="label">' + UI.icon('file-text') + 'Imprimir etiqueta</button>' +
+        (blocked ? '<button type="button" class="btn btn-secondary btn-sm" data-act="unlock">' + UI.icon('lock') + 'Desbloquear</button>' : '<button type="button" class="btn btn-danger btn-sm" data-act="block"' + (counting ? ' disabled' : '') + '>' + UI.icon('lock') + 'Bloquear ubicación</button>') + '</div>' +
+      '<section><div class="row between mb-2"><h3>Capacidad volumétrica</h3><button type="button" class="btn btn-ghost btn-sm" data-act="cap">Editar</button></div>' + '<div class="meter-cap"><span>' + F.num(u.ocupacionM3, 2) + ' m³ de ' + F.num(u.capacidadM3, 1) + ' m³</span></div>' + UI.meter(u.ocupacionM3, u.capacidadM3, { mode: 'ocupacion', size: 'lg', label: 'Ocupación' }) +
+        '<div class="grid c2 gap-3 mt-3"><div class="mini-stat"><div class="v">' + F.num(libre, 1) + ' m³</div><div class="l">Volumen libre</div></div><div class="mini-stat"><div class="v">' + pc + '%</div><div class="l">Ocupación actual</div></div></div></section>' +
+      '<section><h3 class="mb-2">Producto almacenado</h3>' + (r ? '<div class="row gap-2 mb-2"><span class="mono strong">' + r.sku + '</span><span>' + esc(p ? p.descripcion : r.descripcion) + '</span></div>' + UI.kv([['Stock físico', F.num(r.stockFisico) + ' ' + esc(p ? p.unidadBase.toLowerCase() + 's' : '')], ['Reservado', F.num(r.stockReservado)], ['Disponible', '<strong>' + F.num(r.stockDisponible) + '</strong>'], ['Último conteo', r.fechaConteo ? F.fecha(r.fechaConteo) + (r.diferencia ? ' · diferencia ' + r.diferencia : ' · sin diferencia') : 'Sin conteo reciente']]) +
+        '<div class="mt-2"><a class="btn btn-ghost btn-sm" href="inventario.html?ubicacion=' + encodeURIComponent(u.ubicacionId) + '">Ver en inventario ' + UI.icon('arrow-right', 'icon-sm') + '</a> <a class="btn btn-ghost btn-sm" href="productos.html">Ficha del producto</a></div>' : '<p class="muted t-13">La ubicación está vacía. Asigna un SKU compatible con la zona para que pueda recibir mercancía.</p>') + '</section>' +
+      '<section><h3 class="mb-2">Código QR</h3><div class="qr-box"><div class="paper" style="padding:6px;flex:none">' + qrSvg(u.codigoQR, 112) + '</div><div class="min-w-0"><div class="mono t-13 strong">' + esc(u.codigoQR) + '</div><p class="muted t-13 mt-1">Al escanearlo, la app de bodega abre esta ubicación para confirmar ingresos, tomas y conteos.</p></div></div></section>' +
+      '<section><h3 class="mb-2">Movimientos recientes</h3>' + (movs.length ? UI.timeline(movs.map(function (m) { return { state: 'done', titleHtml: UI.chip(m.tipo, { tone: MOV_TONE[m.tipo], small: true }) + ' ' + F.num(m.cantidad) + ' · <span class="mono">' + esc(m.sku || '') + '</span>', meta: F.fechaHora(m.fecha) + ' · ' + esc(m.operario) + ' · ' + esc(m.origen) + ' → ' + esc(m.destino) }; })) : '<p class="muted t-13">Sin movimientos registrados.</p>') + '</section>' +
+      '<div class="t-12 muted">' + esc(b.nombre) + ' · Pasillo ' + u.pasillo + ' · ' + u.rack + ' · ' + nivelTxt(u.nivel) + ' · Posición ' + u.posicion + ' · ' + esc(u.tipo) + '</div></div>';
+  }
+  function openLoc(id) {
+    var u = A.ubicaciones.filter(function (x) { return x.bodegaId === S.bod && x.ubicacionId === id; })[0]; if (!u) return;
+    $$('.cell.is-sel').forEach(function (c) { c.classList.remove('is-sel'); });
+    var c = $('.cell[data-id="' + id + '"]'); if (c) c.classList.add('is-sel');
+    var cur = u;
+    drw = UI.drawer({ title: 'Ubicación ' + u.ubicacionId, subtitle: bod().nombre, width: 520, body: locBody(u), footer: [{ label: 'Cerrar', kind: 'secondary' }],
+      onClose: function () { var s = $('.cell.is-sel'); if (s) s.classList.remove('is-sel'); drw = null; } });
+    var api = drw;
+    function refresh() { api.setBody(locBody(cur)); }
+    api.body.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]'); if (!b || b.disabled) return; var a = b.dataset.act;
+      if (a === 'label') labelModal([cur]);
+      else if (a === 'block') blockModal(cur, refresh);
+      else if (a === 'unlock') unlockLoc(cur, refresh);
+      else if (a === 'move') moveModal(cur.ubicacionId, refresh);
+      else if (a === 'assign') assignModal(cur, refresh);
+      else if (a === 'cap') capModal(cur, refresh);
+    });
+    window.__refreshLoc = refresh;
+  }
+
+  /* etiquetas (HU-197) */
+  function labelModal(list) {
+    if (list.length === 1) {
+      var u = list[0];
+      UI.modal({ title: 'Etiqueta de ubicación', subtitle: u.ubicacionId + ' · vista previa 100 × 60 mm', width: 520,
+        body: '<div class="stack"><div style="max-width:420px;margin:0 auto;width:100%">' + labelHtml(u, 104) + '</div><div class="form-grid c2"><div class="field"><label class="label" for="lbCopies">Copias</label><input class="input" id="lbCopies" type="number" min="1" max="20" value="1"></div><div class="field"><label class="label" for="lbPrn">Impresora</label><select class="select" id="lbPrn"><option>Zebra ZT230 · Muelle de recibo</option><option>Zebra ZD421 · Oficina de bodega</option></select></div></div></div>',
+        footer: [{ label: 'Cancelar' }, { label: 'Imprimir etiqueta', kind: 'primary', icon: 'file-text', onClick: function (m) { var n = +$('#lbCopies', m.body).value; if (!(n >= 1 && n <= 20)) { $('#lbCopies', m.body).setAttribute('aria-invalid', 'true'); toast('Indica entre 1 y 20 copias.', 'error'); return false; } toast(n + ' etiqueta' + (n > 1 ? 's' : '') + ' de ' + u.ubicacionId + ' enviada' + (n > 1 ? 's' : '') + ' a ' + $('#lbPrn', m.body).value.split(' · ')[0] + '.', 'success'); } }] });
+    } else {
+      UI.modal({ title: 'Etiquetas en lote', subtitle: list.length + ' ubicaciones · 100 × 60 mm · ' + bod().nombre, width: 880,
+        body: '<div class="lbl-sheet">' + list.slice(0, 60).map(function (u) { return labelHtml(u, 78); }).join('') + '</div>' + (list.length > 60 ? '<p class="muted t-13 mt-3">Se muestran 60 de ' + list.length + '; el lote completo se envía a la impresora.</p>' : ''),
+        footer: [{ label: 'Cancelar' }, { label: 'Imprimir ' + list.length + ' etiquetas', kind: 'primary', icon: 'file-text', onClick: function () { toast('Lote de ' + list.length + ' etiquetas enviado a Zebra ZT230 · Muelle de recibo.', 'success'); } }] });
+    }
+  }
+
+  /* bloquear / desbloquear (HU-201) */
+  function blockModal(u, done) {
+    var r = invOf(u);
+    var m = UI.modal({ title: 'Bloquear ubicación', subtitle: u.ubicacionId, width: 500,
+      body: '<div class="stack">' + (r ? UI.banner({ tone: 'warning', text: 'Tiene ' + F.num(r.stockFisico) + ' unidades de ' + (prod(r.sku) ? prod(r.sku).descripcion : r.sku) + '. Mientras esté bloqueada no recibirá ingresos ni se tomará stock de ella.' }) : '') +
+        '<div class="field"><label class="label" for="bkWhy">Motivo</label><select class="select" id="bkWhy"><option value="">Selecciona un motivo</option><option>Daño en el rack</option><option>Inspección de seguridad</option><option>Producto en cuarentena</option><option>Mantenimiento de la zona</option><option>Otro</option></select><span class="error-text" id="bkWhyE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="bkObs">Observaciones <span class="opt" id="bkOpt">(opcional)</span></label><textarea class="textarea" id="bkObs" placeholder="Describe lo observado para quien desbloquee"></textarea><span class="error-text" id="bkObsE" hidden></span></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Bloquear ubicación', kind: 'danger', onClick: function (api) {
+        var why = $('#bkWhy', api.body), obs = $('#bkObs', api.body), ok = true;
+        function err(id, el, msg) { var e = $('#' + id, api.body); e.hidden = !msg; e.innerHTML = msg ? UI.icon('alert-circle', 'icon-sm') + esc(msg) : ''; el.setAttribute('aria-invalid', !!msg); if (msg) ok = false; }
+        err('bkWhyE', why, why.value ? '' : 'Selecciona el motivo del bloqueo.');
+        err('bkObsE', obs, why.value === 'Otro' && obs.value.trim().length < 5 ? 'Describe el motivo (mínimo 5 caracteres).' : '');
+        if (r && r.stockReservado > 0) { why.setAttribute('aria-invalid', 'true'); err('bkWhyE', why, 'Hay ' + F.num(r.stockReservado) + ' unidades reservadas aquí. Reubícalas antes de bloquear.'); ok = false; }
+        if (!ok) return false;
+        u.estado = 'Bloqueada'; u.bloqueo = { motivo: why.value, obs: obs.value.trim(), por: me.nombre, fecha: Date.now() };
+        addMov({ tipo: 'Bloqueo', sku: r ? r.sku : '', desc: why.value, origen: u.ubicacionId, destino: '—', cantidad: 0, ref: 'BLQ-' + (100 + MOVS.length) });
+        toast('Ubicación ' + u.ubicacionId + ' bloqueada: ' + why.value.toLowerCase() + '.', 'warning'); refreshAll(); if (done) done();
+      } }] });
+    $('#bkWhy', m.body).addEventListener('change', function () { $('#bkOpt', m.body).textContent = this.value === 'Otro' ? '(obligatorio)' : '(opcional)'; });
+  }
+  function unlockLoc(u, done) {
+    UI.confirm({ title: '¿Desbloquear ' + u.ubicacionId + '?', message: 'Volverá a admitir ingresos y movimientos' + (u.bloqueo ? '. Motivo del bloqueo: ' + u.bloqueo.motivo.toLowerCase() : '') + '.', confirmLabel: 'Desbloquear', tone: 'primary' }).then(function (ok) {
+      if (!ok) return; u.estado = u.sku ? 'Ocupada' : 'Disponible'; u.bloqueo = null;
+      addMov({ tipo: 'Desbloqueo', sku: u.sku || '', desc: '', origen: u.ubicacionId, destino: '—', cantidad: 0, ref: 'BLQ-' + (100 + MOVS.length) });
+      toast('Ubicación ' + u.ubicacionId + ' disponible de nuevo.', 'success'); refreshAll(); if (done) done();
+    });
+  }
+
+  /* capacidad (HU-195) */
+  function capModal(u, done) {
+    UI.modal({ title: 'Capacidad volumétrica', subtitle: u.ubicacionId, width: 440,
+      body: '<div class="field"><label class="label" for="cpV">Capacidad (m³)</label><input class="input" id="cpV" type="number" step="0.5" min="0.5" value="' + u.capacidadM3 + '"><span class="hint">Ocupación actual: ' + F.num(u.ocupacionM3, 2) + ' m³.</span><span class="error-text" id="cpE" hidden></span></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Guardar cambios', kind: 'primary', onClick: function (m) {
+        var i = $('#cpV', m.body), v = parseFloat(i.value), msg = isNaN(v) ? 'Ingresa un número.' : v < 0.5 || v > 60 ? 'La capacidad debe estar entre 0,5 y 60 m³.' : v < u.ocupacionM3 ? 'No puede ser menor que la ocupación actual (' + F.num(u.ocupacionM3, 2) + ' m³).' : '';
+        var e = $('#cpE', m.body); e.hidden = !msg; e.innerHTML = msg ? UI.icon('alert-circle', 'icon-sm') + esc(msg) : ''; i.setAttribute('aria-invalid', !!msg); if (msg) return false;
+        var old = u.capacidadM3; u.capacidadM3 = v; addMov({ tipo: 'Ajuste de capacidad', origen: u.ubicacionId, destino: '—', desc: F.num(old, 1) + ' → ' + F.num(v, 1) + ' m³', sku: u.sku || '' });
+        toast('Capacidad de ' + u.ubicacionId + ' actualizada a ' + F.num(v, 1) + ' m³.', 'success'); refreshAll(); if (done) done();
+      } }] });
+  }
+
+  /* asignar producto (HU-198) */
+  function assignModal(u, done) {
+    var cands = A.productos.filter(function (p) { return ZONA_FAM[p.familia] === u.zona; });
+    var m = UI.modal({ title: 'Asignar producto a la ubicación', subtitle: u.ubicacionId + ' · capacidad libre ' + F.num(u.capacidadM3 - u.ocupacionM3, 1) + ' m³', width: 520,
+      body: '<div class="form-grid"><div class="field"><label class="label" for="asS">SKU (compatibles con zona ' + u.zona + ')</label><select class="select" id="asS"><option value="">Selecciona un SKU</option>' + cands.map(function (p) { return '<option value="' + p.skuSAP + '">' + p.skuSAP + ' · ' + esc(p.descripcion) + '</option>'; }).join('') + '</select><span class="error-text" id="asSE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="asQ">Cantidad inicial</label><input class="input" id="asQ" type="number" min="1" step="1" placeholder="Ej. 120"><span class="hint" id="asH">Elige un SKU para ver cuánto cabe.</span><span class="error-text" id="asQE" hidden></span></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Asignar producto', kind: 'primary', onClick: function (api) {
+        var s = $('#asS', api.body), q = $('#asQ', api.body), ok = true, p = prod(s.value);
+        function err(id, el, msg) { var e = $('#' + id, api.body); e.hidden = !msg; e.innerHTML = msg ? UI.icon('alert-circle', 'icon-sm') + esc(msg) : ''; el.setAttribute('aria-invalid', !!msg); if (msg) ok = false; }
+        err('asSE', s, p ? '' : 'Selecciona el SKU que se almacenará.');
+        var n = +q.value, libre = u.capacidadM3 - u.ocupacionM3;
+        err('asQE', q, !p ? '' : !(n >= 1) || n !== Math.floor(n) ? 'Ingresa una cantidad entera mayor a cero.' : n * p.volumenM3 > libre ? 'No cabe: necesitas ' + F.num(n * p.volumenM3, 2) + ' m³ y hay ' + F.num(libre, 2) + ' m³ libres (máx. ' + F.num(Math.floor(libre / p.volumenM3)) + ').' : '');
+        if (!ok) return false;
+        u.sku = p.skuSAP; u.estado = 'Ocupada'; u.ocupacionM3 = round(n * p.volumenM3, 2);
+        A.inventario.push({ bodegaId: S.bod, ubicacionId: u.ubicacionId, sku: p.skuSAP, descripcion: p.descripcion, stockFisico: n, stockReservado: 0, stockDisponible: n, conteo: null, diferencia: null, fechaConteo: null });
+        addMov({ tipo: 'Asignación', sku: p.skuSAP, desc: p.descripcion, unidad: p.unidadBase, cantidad: n, origen: 'Muelle de recibo', destino: u.ubicacionId, ref: 'ASG-' + (100 + MOVS.length) });
+        toast(p.skuSAP + ' asignado a ' + u.ubicacionId + ' con ' + F.num(n) + ' unidades.', 'success'); refreshAll(); if (done) done();
+      } }] });
+    $('#asS', m.body).addEventListener('change', function () { var p = prod(this.value); $('#asH', m.body).textContent = p ? 'Caben hasta ' + F.num(Math.floor((u.capacidadM3 - u.ocupacionM3) / p.volumenM3)) + ' ' + p.unidadBase.toLowerCase() + 's (' + F.num(p.volumenM3, 4) + ' m³ c/u).' : 'Elige un SKU para ver cuánto cabe.'; });
+  }
+
+  /* mover producto (HU-200) */
+  function moveModal(originId, done) {
+    var src = locs().filter(function (u) { return u.sku && invOf(u); }), fixed = !!originId;
+    var o0 = originId || (src[0] && src[0].ubicacionId);
+    if (!src.length) { toast('Esta bodega no tiene producto almacenado para mover.', 'info'); return; }
+    var m = UI.modal({ title: 'Mover producto', subtitle: fixed ? 'Desde ' + originId : bod().nombre, width: 580,
+      body: '<div class="form-grid">' + (fixed ? '' : '<div class="field span-2"><label class="label" for="mvO">Origen</label><select class="select" id="mvO">' + src.map(function (u) { var r = invOf(u); return '<option value="' + u.ubicacionId + '"' + (u.ubicacionId === o0 ? ' selected' : '') + '>' + u.ubicacionId + ' · ' + esc(prod(r.sku).descripcion) + ' · ' + F.num(r.stockDisponible) + ' disp.</option>'; }).join('') + '</select></div>') +
+        '<div class="field span-2" id="mvInfo"></div>' +
+        '<div class="field"><label class="label" for="mvD">Destino</label><select class="select" id="mvD"></select><span class="error-text" id="mvDE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="mvQ">Cantidad a mover</label><input class="input" id="mvQ" type="number" min="1" step="1" inputmode="numeric"><span class="hint" id="mvQH"></span><span class="error-text" id="mvQE" hidden></span></div>' +
+        '<div class="field span-2"><label class="label" for="mvW">Motivo</label><select class="select" id="mvW"><option>Reubicación por ocupación</option><option>Consolidación de stock</option><option>Corrección de ubicación</option><option>Acercar al muelle de despacho</option></select></div>' +
+        '<div class="span-2 cap-preview" id="mvPrev" aria-live="polite"></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Mover producto', kind: 'primary', onClick: function (api) { return commit(api); } }] });
+    var B = m.body, oSel = $('#mvO', B), dSel = $('#mvD', B), qIn = $('#mvQ', B), cur;
+    function setErr(id, el, msg) { var e = $('#' + id, B); e.hidden = !msg; e.innerHTML = msg ? UI.icon('alert-circle', 'icon-sm') + esc(msg) : ''; el.setAttribute('aria-invalid', !!msg); return !msg; }
+    function loadSrc() {
+      var id = oSel ? oSel.value : o0; cur = locs().filter(function (u) { return u.ubicacionId === id; })[0]; var r = invOf(cur), p = prod(r.sku), lib = r.stockFisico - r.stockReservado;
+      $('#mvInfo', B).innerHTML = (cur.estado === 'En conteo' ? UI.banner({ tone: 'warning', title: 'Origen en conteo cíclico', text: 'No se pueden mover unidades hasta cerrar el conteo.' }) : '') + '<div class="row gap-2 mt-2"><span class="mono strong">' + r.sku + '</span><span>' + esc(p.descripcion) + '</span></div><div class="t-13 muted mt-1">' + F.num(r.stockFisico) + ' físicas · ' + F.num(r.stockReservado) + ' reservadas · <strong style="color:var(--text)">' + F.num(lib) + ' movibles</strong></div>';
+      var all = locs().filter(function (d) { return d.ubicacionId !== cur.ubicacionId && d.estado !== 'Bloqueada' && d.estado !== 'En conteo' && (!d.sku || d.sku === cur.sku); });
+      var same = all.filter(function (d) { return d.sku; }), free = all.filter(function (d) { return !d.sku; });
+      function opt(d) { return '<option value="' + d.ubicacionId + '">' + d.ubicacionId + ' · ' + F.num(d.capacidadM3 - d.ocupacionM3, 1) + ' m³ libres' + (d.zona !== cur.zona ? ' · zona ' + d.zona : '') + '</option>'; }
+      var sortZ = function (a, b) { return (a.zona === cur.zona ? 0 : 1) - (b.zona === cur.zona ? 0 : 1) || (a.ubicacionId < b.ubicacionId ? -1 : 1); };
+      dSel.innerHTML = '<option value="">Selecciona destino</option>' + (same.length ? '<optgroup label="Con el mismo SKU">' + same.sort(sortZ).map(opt).join('') + '</optgroup>' : '') + '<optgroup label="Libres">' + free.sort(sortZ).map(opt).join('') + '</optgroup>';
+      qIn.max = lib; $('#mvQH', B).textContent = 'Máximo ' + F.num(lib) + ' ' + p.unidadBase.toLowerCase() + 's.'; qIn.value = ''; upd();
+    }
+    function upd() {
+      var r = invOf(cur), p = prod(r.sku), q = +qIn.value || 0, d = locs().filter(function (u) { return u.ubicacionId === dSel.value; })[0], vol = p.volumenM3;
+      var so = Math.max(0, cur.ocupacionM3 - q * vol), dO = d ? d.ocupacionM3 + q * vol : 0;
+      $('#mvPrev', B).innerHTML = '<div><div class="row between t-13"><span><strong>Origen</strong> <span class="mono">' + cur.ubicacionId + '</span></span><span class="muted">' + F.num(r.stockFisico - q) + ' unid. · ' + F.num(so, 2) + '/' + F.num(cur.capacidadM3, 1) + ' m³ después</span></div>' + UI.meter(so, cur.capacidadM3, { mode: 'ocupacion', label: 'Ocupación del origen', text: pctTxt(so, cur.capacidadM3) }) + '</div>' +
+        '<div><div class="row between t-13"><span><strong>Destino</strong> <span class="mono">' + (d ? d.ubicacionId : '—') + '</span></span><span class="muted">' + (d ? F.num(dO, 2) + '/' + F.num(d.capacidadM3, 1) + ' m³ después' : 'Selecciona un destino') + '</span></div>' + (d ? UI.meter(dO, d.capacidadM3, { mode: 'ocupacion', label: 'Ocupación del destino', text: pctTxt(dO, d.capacidadM3) }) : UI.meter(0, 1, { showValue: false, label: 'Destino' })) + '</div>';
+    }
+    function commit(api) {
+      var r = invOf(cur), p = prod(r.sku), q = +qIn.value, lib = r.stockFisico - r.stockReservado, d = locs().filter(function (u) { return u.ubicacionId === dSel.value; })[0], ok = true;
+      if (cur.estado === 'En conteo') { toast('El origen está en conteo cíclico; no admite movimientos.', 'error'); return false; }
+      ok = setErr('mvDE', dSel, d ? '' : 'Selecciona la ubicación de destino.') && ok;
+      var qm = !(q >= 1) || q !== Math.floor(q) ? 'Ingresa una cantidad entera mayor a cero.' : q > lib ? (r.stockReservado ? 'Solo puedes mover ' + F.num(lib) + ': hay ' + F.num(r.stockReservado) + ' reservadas de ' + F.num(r.stockFisico) + '.' : 'Solo hay ' + F.num(r.stockFisico) + ' unidades en esta ubicación.') : '';
+      if (!qm && d) { var libM3 = d.capacidadM3 - d.ocupacionM3; if (q * p.volumenM3 > libM3 + 1e-9) qm = 'No cabe en ' + d.ubicacionId + ': necesita ' + F.num(q * p.volumenM3, 2) + ' m³ y tiene ' + F.num(libM3, 2) + ' m³ libres (máx. ' + F.num(Math.floor(libM3 / p.volumenM3)) + ').'; }
+      ok = setErr('mvQE', qIn, qm) && ok; if (!ok) return false;
+      r.stockFisico -= q; r.stockDisponible = r.stockFisico - r.stockReservado; cur.ocupacionM3 = round(Math.max(0, cur.ocupacionM3 - q * p.volumenM3), 2);
+      var rd = invOf(d); if (!rd) { rd = { bodegaId: S.bod, ubicacionId: d.ubicacionId, sku: r.sku, descripcion: p.descripcion, stockFisico: 0, stockReservado: 0, stockDisponible: 0, conteo: null, diferencia: null, fechaConteo: null }; A.inventario.push(rd); d.sku = r.sku; d.estado = 'Ocupada'; }
+      rd.stockFisico += q; rd.stockDisponible = rd.stockFisico - rd.stockReservado; d.ocupacionM3 = round(d.ocupacionM3 + q * p.volumenM3, 2);
+      if (r.stockFisico === 0) { A.inventario.splice(A.inventario.indexOf(r), 1); cur.sku = null; cur.ocupacionM3 = 0; if (cur.estado === 'Ocupada') cur.estado = 'Disponible'; }
+      addMov({ tipo: 'Reubicación', sku: r.sku, desc: p.descripcion, unidad: p.unidadBase, cantidad: q, origen: cur.ubicacionId, destino: d.ubicacionId, ref: 'REU-' + (100 + MOVS.length) });
+      toast(F.num(q) + ' unidades de ' + r.sku + ' movidas de ' + cur.ubicacionId + ' a ' + d.ubicacionId + '.', 'success'); refreshAll(); if (done) done(); if (!fixed && window.__refreshLoc) { /* sin drawer */ }
+    }
+    if (oSel) oSel.addEventListener('change', loadSrc); dSel.addEventListener('change', function () { setErr('mvDE', dSel, ''); upd(); }); qIn.addEventListener('input', function () { setErr('mvQE', qIn, ''); upd(); });
+    loadSrc();
+  }
+  $('#newMovBtn').addEventListener('click', function () { moveModal(null); });
+
+  /* crear ubicación (HU-196) */
+  function locModal(pre) {
+    pre = pre || {}; var zs = storageAreas(), b = bod();
+    if (!zs.length) {
+      UI.modal({ title: 'Primero crea un área', width: 460, body: UI.banner({ tone: 'warning', title: b.nombre + ' no tiene zonas de almacenamiento', text: 'Las ubicaciones se codifican por zona. Crea al menos un área de almacenamiento y luego define sus ubicaciones.' }),
+        footer: [{ label: 'Cancelar' }, { label: 'Crear área', kind: 'primary', onClick: function () { setTimeout(function () { areaModal(); }, 220); } }] }); return;
+    }
+    var m = UI.modal({ title: 'Crear ubicaciones', subtitle: b.nombre + ' · código zona-pasillo-nivel-posición', width: 580,
+      body: '<div class="form-grid c2"><div class="field"><label class="label" for="nlZ">Zona</label><select class="select" id="nlZ">' + zs.map(function (a) { return '<option value="' + a.codigo + '"' + (pre.zona === a.codigo ? ' selected' : '') + '>' + a.codigo + ' · ' + esc(a.nombre) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label class="label" for="nlT">Tipo</label><select class="select" id="nlT"><option>Piso / estiba</option><option>Rack</option></select></div>' +
+        '<div class="field"><label class="label" for="nlP">Pasillo</label><input class="input" id="nlP" type="number" min="1" max="30" value="1" inputmode="numeric"><span class="error-text" id="nlPE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="nlN">Nivel</label><input class="input" id="nlN" type="number" min="1" max="6" value="1" inputmode="numeric"><span class="error-text" id="nlNE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="nlO">Posición inicial</label><input class="input" id="nlO" type="number" min="1" max="40" value="1" inputmode="numeric"><span class="error-text" id="nlOE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="nlC">Cuántas crear en serie</label><input class="input" id="nlC" type="number" min="1" max="12" value="1" inputmode="numeric"><span class="error-text" id="nlCE" hidden></span></div>' +
+        '<div class="field span-2"><label class="label" for="nlV">Capacidad volumétrica por ubicación (m³)</label><input class="input" id="nlV" type="number" min="0.5" max="60" step="0.5" value="12"><span class="error-text" id="nlVE" hidden></span></div>' +
+        '<div class="field span-2 cap-preview"><span class="t-12 muted">Código generado</span><div class="code-preview" id="nlCode"></div><span class="t-13 muted" id="nlRack"></span></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Crear ubicaciones', kind: 'primary', onClick: function (api) { return save(api); } }] });
+    var B = m.body, g = function (id) { return $('#' + id, B); };
+    function setErr(id, msg) { var e = g(id + 'E'), i = g(id); e.hidden = !msg; e.innerHTML = msg ? UI.icon('alert-circle', 'icon-sm') + esc(msg) : ''; i.setAttribute('aria-invalid', !!msg); return !msg; }
+    function upd() { var z = g('nlZ').value, p = +g('nlP').value, n = +g('nlN').value, o = +g('nlO').value, c = +g('nlC').value; g('nlCode').textContent = mkCode(z, p || 0, n || 0, o || 0) + (c > 1 ? ' … ' + pad2((o || 0) + c - 1) : ''); g('nlRack').textContent = 'Rack R' + z + pad2(p || 0) + ' · ' + (c > 1 ? c + ' ubicaciones consecutivas' : '1 ubicación'); }
+    g('nlN').addEventListener('input', function () { g('nlT').value = +this.value === 1 ? 'Piso / estiba' : 'Rack'; });
+    $$('input,select', B).forEach(function (x) { x.addEventListener('input', upd); x.addEventListener('change', upd); }); upd();
+    function save(api) {
+      var z = g('nlZ').value, p = +g('nlP').value, n = +g('nlN').value, o = +g('nlO').value, c = +g('nlC').value, v = parseFloat(g('nlV').value), ok = true;
+      ok = setErr('nlP', Number.isInteger(p) && p >= 1 && p <= 30 ? '' : 'El pasillo debe ser un entero entre 1 y 30.') && ok;
+      ok = setErr('nlN', Number.isInteger(n) && n >= 1 && n <= 6 ? '' : 'El nivel debe estar entre 1 y 6.') && ok;
+      ok = setErr('nlO', Number.isInteger(o) && o >= 1 && o <= 40 ? '' : 'La posición debe estar entre 1 y 40.') && ok;
+      ok = setErr('nlC', Number.isInteger(c) && c >= 1 && c <= 12 ? '' : 'Puedes crear entre 1 y 12 a la vez.') && ok;
+      ok = setErr('nlV', v >= 0.5 && v <= 60 ? '' : 'La capacidad debe estar entre 0,5 y 60 m³.') && ok; if (!ok) return false;
+      var dup = []; for (var i = 0; i < c; i++) { var code = mkCode(z, p, n, o + i); if (locs().some(function (u) { return u.ubicacionId === code; })) dup.push(code); }
+      if (dup.length) { setErr('nlO', dup.length === 1 ? 'La ubicación ' + dup[0] + ' ya existe en ' + b.nombre + '.' : 'Ya existen ' + dup.join(', ') + ' en ' + b.nombre + '.'); return false; }
+      var area = zs.filter(function (a) { return a.codigo === z; })[0], created = [];
+      for (var k = 0; k < c; k++) { var id = mkCode(z, p, n, o + k); A.ubicaciones.push({ ubicacionId: id, bodegaId: S.bod, zona: z, zonaNombre: area.nombre, pasillo: pad2(p), rack: 'R' + z + pad2(p), nivel: n, posicion: pad2(o + k), codigoQR: 'QR-' + S.bod.split('-')[1] + '-' + id, capacidadM3: v, ocupacionM3: 0, estado: 'Disponible', tipo: g('nlT').value, sku: null, ultimoConteo: null }); created.push(id); }
+      toast(c === 1 ? 'Ubicación ' + created[0] + ' creada con código QR.' : c + ' ubicaciones creadas (' + created[0] + ' a ' + created[c - 1] + ') con su código QR.', 'success');
+      S.nivel = n; refreshAll();
+    }
+  }
+  ['newLocBtn', 'newLoc2'].forEach(function (id) { $('#' + id).addEventListener('click', function () { locModal(); }); });
+
+  /* ---------- tabla de ubicaciones ---------- */
+  var locTbl = UI.table($('#locTable'), {
+    rows: [], pageSize: 12, rowKey: 'ubicacionId', selectable: true, caption: 'Ubicaciones de la bodega', emptyText: 'No hay ubicaciones que coincidan con los filtros.',
+    searchable: { placeholder: 'Buscar por código o SKU' }, searchKeys: ['ubicacionId', 'sku', 'zonaNombre'],
+    filters: [{ key: 'zona', label: 'Zona', all: 'Todas las zonas', options: 'auto' }, { key: 'estado', label: 'Estado', all: 'Todos los estados', options: ['Disponible', 'Ocupada', 'Bloqueada', 'En conteo'] }, { key: 'tipo', label: 'Tipo', all: 'Todos los tipos', options: ['Piso / estiba', 'Rack'] }],
+    columns: [
+      { key: 'ubicacionId', label: 'Código', mono: true, title: true, render: function (u) { return '<span class="mono strong">' + u.ubicacionId + '</span>'; } },
+      { key: 'zona', label: 'Zona', render: function (u) { return '<span class="strong">' + u.zona + '</span><div class="cell-sub nowrap">' + esc(u.zonaNombre) + '</div>'; } },
+      { key: 'pasillo', label: 'Pasillo · rack', render: function (u) { return '<span class="mono">' + u.pasillo + ' · ' + u.rack + '</span>'; }, hideMobile: true },
+      { key: 'nivel', label: 'Nivel', render: function (u) { return '<span class="nowrap">' + u.nivel + ' · pos. ' + u.posicion + '</span>'; } },
+      { key: 'tipo', label: 'Tipo', hideMobile: true, render: function (u) { return '<span class="nowrap">' + u.tipo + '</span>'; } },
+      { key: 'capacidadM3', label: 'Capacidad', num: true, render: function (u) { return F.num(u.capacidadM3, 1) + ' m³'; }, hideMobile: true },
+      { key: 'ocupacionM3', label: 'Ocupación', value: function (u) { return pct(u); }, render: function (u) { return '<div style="min-width:120px">' + UI.meter(u.ocupacionM3, u.capacidadM3, { mode: 'ocupacion', label: 'Ocupación de ' + u.ubicacionId }) + '</div>'; } },
+      { key: 'sku', label: 'SKU', render: function (u) { var r = invOf(u); return r ? '<span class="mono">' + r.sku + '</span><div class="cell-sub truncate" style="max-width:220px">' + esc(prod(r.sku) ? prod(r.sku).descripcion : r.descripcion) + '</div>' : '<span class="subtle">—</span>'; } },
+      { key: 'estado', label: 'Estado', render: stChip }
+    ],
+    onRowClick: function (u) { openLoc(u.ubicacionId); },
+    actions: function (u) { return [{ label: 'Ver detalle', icon: 'eye', onClick: function () { openLoc(u.ubicacionId); } }, { label: 'Ver en el plano', icon: 'map-pin', onClick: function () { S.nivel = u.nivel; S.hits = [u.ubicacionId]; S.sku = null; $('#skuQ').value = ''; S.q = ''; goTab('pnPlano'); renderPlano(); setTimeout(function () { var c = $('.cell[data-id="' + u.ubicacionId + '"]'); if (c) c.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 60); } }, { label: 'Imprimir etiqueta', icon: 'file-text', onClick: function () { labelModal([u]); } }, { sep: true }, u.estado === 'Bloqueada' ? { label: 'Desbloquear', icon: 'lock', onClick: function () { unlockLoc(u); } } : { label: 'Bloquear', icon: 'lock', danger: true, disabled: u.estado === 'En conteo', onClick: function () { blockModal(u); } }]; },
+    bulkActions: [{ label: 'Generar etiquetas', icon: 'file-text', onClick: function (rows) { labelModal(rows); } }]
+  });
+  $('#zoneLblBtn').addEventListener('click', function (e) {
+    var zs = storageAreas(); if (!locs().length) { toast('Esta bodega no tiene ubicaciones para etiquetar.', 'info'); return; }
+    UI.menu(e.currentTarget, [{ heading: 'Etiquetas en lote' }].concat(zs.map(function (a) { var ids = locs().filter(function (u) { return u.zona === a.codigo; }); return { label: 'Zona ' + a.codigo + ' · ' + a.nombre + ' (' + ids.length + ')', disabled: !ids.length, onClick: function () { labelModal(ids); } }; })).concat([{ sep: true }, { label: 'Toda la bodega (' + locs().length + ')', onClick: function () { labelModal(locs()); } }]));
+  });
+
+  /* ---------- bodegas y áreas (HU-193) ---------- */
+  function renderBodegas() {
+    $('#bodGrid').innerHTML = BODS.map(function (b) {
+      var L = locs(b.id), cap = L.reduce(function (s, u) { return s + u.capacidadM3; }, 0), oc = L.reduce(function (s, u) { return s + u.ocupacionM3; }, 0), zs = areasOf(b.id).filter(function (a) { return a.tipo === 'Almacenamiento'; }).length;
+      return '<article class="card card-pad bod-card' + (b.id === S.bod ? ' is-current' : '') + '"><div class="bc-top"><span class="bc-ico">' + UI.icon('warehouse') + '</span><div class="min-w-0 grow"><div class="bc-name">' + esc(b.nombre) + '</div><div class="muted t-13">' + esc(b.ciudad) + ' · ' + esc(b.direccion) + '</div></div>' + UI.chip(b.tipo, { tone: b.tipo === 'CEDI' ? 'info' : 'neutral', noDot: true }) + '</div>' +
+        '<div class="bc-stats"><div><div class="v">' + F.num(b.capacidadM3) + ' m³</div><div class="l">Capacidad nominal</div></div><div><div class="v">' + L.length + '</div><div class="l">Ubicaciones configuradas</div></div></div>' +
+        (L.length ? UI.meter(oc, cap, { mode: 'ocupacion', label: 'Ocupación del layout', text: 'Layout ' + F.num(oc / cap * 100, 0) + ' % · ' + zs + ' zonas' }) : UI.chip('Layout sin configurar', { tone: 'warning' })) +
+        '<div class="row between mt-3"><span class="row gap-2 t-13">' + UI.avatar(b.responsable, { size: 'sm' }) + '<span class="truncate">' + esc(b.responsable) + '</span></span><span class="row gap-2"><button type="button" class="btn btn-ghost btn-sm" data-bedit="' + b.id + '">Editar</button><button type="button" class="btn btn-secondary btn-sm" data-bplan="' + b.id + '">' + (L.length ? 'Ver plano' : 'Configurar') + '</button></span></div></article>';
+    }).join('');
+  }
+  $('#bodGrid').addEventListener('click', function (e) {
+    var ed = e.target.closest('[data-bedit]'), pl = e.target.closest('[data-bplan]');
+    if (ed) bodModal(bod(ed.dataset.bedit));
+    if (pl) { switchBod(pl.dataset.bplan); goTab('pnPlano'); }
+  });
+  function bodModal(b) {
+    var edit = !!b; b = b || { nombre: '', tipo: 'Bodega', ciudad: '', direccion: '', responsable: '', capacidadM3: '', corteHora: '15:00' };
+    UI.modal({ title: edit ? 'Editar bodega' : 'Crear bodega', subtitle: edit ? b.nombre : 'Se sincroniza con el maestro de sedes', width: 580,
+      body: '<div class="form-grid c2"><div class="field span-2"><label class="label" for="bbN">Nombre</label><input class="input" id="bbN" value="' + esc(b.nombre) + '" placeholder="Ej. Bodega Mosquera"><span class="error-text" id="bbNE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="bbT">Tipo</label><select class="select" id="bbT">' + ['CEDI', 'Bodega', 'Sede'].map(function (t) { return '<option' + (b.tipo === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label class="label" for="bbC">Ciudad</label><input class="input" id="bbC" value="' + esc(b.ciudad) + '"><span class="error-text" id="bbCE" hidden></span></div>' +
+        '<div class="field span-2"><label class="label" for="bbD">Dirección</label><input class="input" id="bbD" value="' + esc(b.direccion) + '"><span class="error-text" id="bbDE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="bbR">Responsable</label><input class="input" id="bbR" value="' + esc(b.responsable) + '"><span class="error-text" id="bbRE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="bbV">Capacidad nominal (m³)</label><input class="input" id="bbV" type="number" min="100" step="50" value="' + b.capacidadM3 + '"><span class="error-text" id="bbVE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="bbH">Hora de corte de despacho</label><input class="input" id="bbH" type="time" value="' + (b.corteHora || '15:00') + '"></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: edit ? 'Guardar cambios' : 'Crear bodega', kind: 'primary', onClick: function (api) {
+        var B = api.body, g = function (i) { return $('#' + i, B); }, ok = true;
+        function chk(id, msg) { var e = g(id + 'E'), i = g(id); e.hidden = !msg; e.innerHTML = msg ? UI.icon('alert-circle', 'icon-sm') + esc(msg) : ''; i.setAttribute('aria-invalid', !!msg); if (msg) ok = false; }
+        var nom = g('bbN').value.trim();
+        chk('bbN', !nom ? 'Escribe el nombre de la bodega.' : BODS.some(function (x) { return x !== b && UI.norm(x.nombre) === UI.norm(nom); }) ? 'Ya existe una bodega con ese nombre.' : '');
+        chk('bbC', g('bbC').value.trim() ? '' : 'Indica la ciudad.'); chk('bbD', g('bbD').value.trim().length >= 6 ? '' : 'Escribe la dirección completa.'); chk('bbR', g('bbR').value.trim() ? '' : 'Asigna un responsable.');
+        var v = +g('bbV').value; chk('bbV', v >= 100 && v <= 20000 ? '' : 'La capacidad debe estar entre 100 y 20.000 m³.'); if (!ok) return false;
+        var data = { nombre: nom, tipo: g('bbT').value, ciudad: g('bbC').value.trim(), direccion: g('bbD').value.trim(), responsable: g('bbR').value.trim(), capacidadM3: v, corteHora: g('bbH').value };
+        if (edit) { Object.assign(b, data); toast('Bodega «' + nom + '» actualizada.', 'success'); }
+        else { var nb = Object.assign({ id: 'BOD-' + nom.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() + (BODS.length + 1), principal: false, activa: true, posiciones: 0, consolidacionMin: 60, lat: 4.7, lng: -74.1 }, data); BODS.push(nb); AREAS.push({ bodegaId: nb.id, codigo: 'MR', nombre: 'Muelle de recibo', tipo: 'Recibo' }, { bodegaId: nb.id, codigo: 'MD', nombre: 'Muelle de despacho', tipo: 'Despacho' }); toast('Bodega «' + nom + '» creada. Define su layout para empezar a recibir mercancía.', 'success'); }
+        fillSel(); refreshAll();
+      } }] });
+  }
+  $('#newBodBtn').addEventListener('click', function () { bodModal(); });
+
+  var areaTbl = UI.table($('#areaTable'), {
+    rows: [], pageSize: 8, rowKey: 'codigo', caption: 'Áreas de la bodega', emptyText: 'Esta bodega aún no tiene áreas.',
+    columns: [
+      { key: 'codigo', label: 'Código', mono: true, title: true, render: function (a) { return '<span class="mono strong">' + a.codigo + '</span>'; } },
+      { key: 'nombre', label: 'Nombre' },
+      { key: 'tipo', label: 'Tipo', render: function (a) { return UI.chip(a.tipo, { tone: a.tipo === 'Almacenamiento' ? 'info' : a.tipo === 'Cuarentena' ? 'warning' : 'neutral', noDot: true }); } },
+      { key: 'n', label: 'Ubicaciones', num: true, value: function (a) { return locs().filter(function (u) { return u.zona === a.codigo; }).length; }, render: function (a) { var n = locs().filter(function (u) { return u.zona === a.codigo; }).length; return a.tipo === 'Almacenamiento' ? (n || '<span class="muted">Sin ubicaciones</span>') : '<span class="subtle">—</span>'; } },
+      { key: 'o', label: 'Ocupación', value: function (a) { var z = locs().filter(function (u) { return u.zona === a.codigo; }), c = z.reduce(function (s, u) { return s + u.capacidadM3; }, 0); return c ? z.reduce(function (s, u) { return s + u.ocupacionM3; }, 0) / c : -1; }, render: function (a) { var z = locs().filter(function (u) { return u.zona === a.codigo; }), c = z.reduce(function (s, u) { return s + u.capacidadM3; }, 0); return c ? '<div style="min-width:130px">' + UI.meter(z.reduce(function (s, u) { return s + u.ocupacionM3; }, 0), c, { mode: 'ocupacion', label: 'Ocupación de zona ' + a.codigo }) + '</div>' : '<span class="subtle">—</span>'; } }
+    ],
+    actions: function (a) { return [{ label: 'Editar área', icon: 'edit', onClick: function () { areaModal(a); } }, { label: 'Crear ubicaciones', icon: 'plus', disabled: a.tipo !== 'Almacenamiento', onClick: function () { locModal({ zona: a.codigo }); } }]; }
+  });
+  function areaModal(a) {
+    var edit = !!a, b = bod(); a = a || { codigo: '', nombre: '', tipo: 'Almacenamiento' };
+    UI.modal({ title: edit ? 'Editar área' : 'Crear área', subtitle: b.nombre, width: 480,
+      body: '<div class="form-grid"><div class="field"><label class="label" for="arC">Código</label><input class="input mono" id="arC" maxlength="2" value="' + esc(a.codigo) + '"' + (edit ? ' disabled' : '') + ' placeholder="Ej. F"><span class="hint">Una o dos letras mayúsculas. Es el prefijo de las ubicaciones.</span><span class="error-text" id="arCE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="arN">Nombre</label><input class="input" id="arN" value="' + esc(a.nombre) + '" placeholder="Ej. Tubería de gran diámetro"><span class="error-text" id="arNE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="arT">Tipo</label><select class="select" id="arT">' + ['Almacenamiento', 'Recibo', 'Despacho', 'Cuarentena'].map(function (t) { return '<option' + (a.tipo === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: edit ? 'Guardar cambios' : 'Crear área', kind: 'primary', onClick: function (api) {
+        var B = api.body, g = function (i) { return $('#' + i, B); }, ok = true; function chk(id, msg) { var e = g(id + 'E'), i = g(id); e.hidden = !msg; e.innerHTML = msg ? UI.icon('alert-circle', 'icon-sm') + esc(msg) : ''; i.setAttribute('aria-invalid', !!msg); if (msg) ok = false; }
+        var c = g('arC').value.trim().toUpperCase(); if (!edit) chk('arC', !/^[A-Z]{1,2}$/.test(c) ? 'Usa una o dos letras, sin números ni espacios.' : areasOf().some(function (x) { return x.codigo === c; }) ? 'El código ' + c + ' ya existe en ' + b.nombre + '.' : '');
+        chk('arN', g('arN').value.trim().length >= 3 ? '' : 'Escribe un nombre de al menos 3 caracteres.'); if (!ok) return false;
+        if (edit) { a.nombre = g('arN').value.trim(); a.tipo = g('arT').value; locs().filter(function (u) { return u.zona === a.codigo; }).forEach(function (u) { u.zonaNombre = a.nombre; }); toast('Área ' + a.codigo + ' actualizada.', 'success'); }
+        else { AREAS.push({ bodegaId: S.bod, codigo: c, nombre: g('arN').value.trim(), tipo: g('arT').value }); toast('Área ' + c + ' creada en ' + b.nombre + '.' + (g('arT').value === 'Almacenamiento' ? ' Ahora puedes crear sus ubicaciones.' : ''), 'success'); }
+        refreshAll();
+      } }] });
+  }
+  $('#newAreaBtn').addEventListener('click', function () { areaModal(); });
+
+  /* ---------- movimientos ---------- */
+  var movTbl = UI.table($('#movTable'), {
+    rows: [], pageSize: 10, rowKey: 'id', caption: 'Movimientos de bodega', emptyText: 'No hay movimientos con esos filtros.',
+    searchable: { placeholder: 'Buscar por SKU, ubicación u operario' }, searchKeys: ['sku', 'desc', 'origen', 'destino', 'operario', 'ref'],
+    filters: [{ key: 'tipo', label: 'Tipo', all: 'Todos los tipos', options: ['Recepción', 'Reubicación', 'Salida a preparación', 'Asignación', 'Bloqueo', 'Desbloqueo', 'Ajuste de capacidad'] }],
+    sort: { key: 'fecha', dir: 'desc' },
+    columns: [
+      { key: 'fecha', label: 'Fecha y hora', render: function (m) { return '<span class="nowrap">' + F.fechaHora(m.fecha) + '</span>'; } },
+      { key: 'tipo', label: 'Tipo', title: true, render: function (m) { return UI.chip(m.tipo, { tone: MOV_TONE[m.tipo] }); } },
+      { key: 'sku', label: 'Producto', render: function (m) { return m.sku ? '<span class="mono">' + m.sku + '</span><div class="cell-sub truncate" style="max-width:240px">' + esc(m.desc) + '</div>' : '<span class="muted">' + esc(m.desc || '—') + '</span>'; } },
+      { key: 'origen', label: 'Origen → destino', render: function (m) { return '<span class="mono nowrap">' + esc(m.origen) + ' <span class="mv-arrow">→</span> ' + esc(m.destino) + '</span>'; } },
+      { key: 'cantidad', label: 'Cantidad', num: true, render: function (m) { return m.cantidad ? F.num(m.cantidad) : '<span class="subtle">—</span>'; } },
+      { key: 'operario', label: 'Responsable', hideMobile: true },
+      { key: 'ref', label: 'Referencia', mono: true, hideMobile: true }
+    ],
+    onRowClick: function (m) { var ids = [m.origen, m.destino].filter(function (x) { return /^[A-E]-\d\d-\d-\d\d$/.test(x); }); if (ids.length) openLoc(ids[ids.length - 1]); else toast('Este movimiento no tiene una ubicación de estantería.', 'info'); }
+  });
+
+  /* ---------- orquestación ---------- */
+  function refreshAll() {
+    renderHead(); renderKpis(); renderPlano(); renderBodegas();
+    locTbl.setRows(locs()); areaTbl.setRows(areasOf()); movTbl.setRows(MOVS.filter(function (m) { return m.bodegaId === S.bod; }));
+    $('#areasTitle').textContent = 'Áreas de ' + bod().nombre;
+  }
+  function switchBod(id) { S.bod = id; S.nivel = 1; S.sku = null; S.hits = []; S.q = ''; $('#skuQ').value = ''; fillSel(); refreshAll(); }
+  $('#bodSel').addEventListener('change', function (e) { switchBod(e.target.value); toast('Mostrando ' + bod().nombre + '.', 'info', { duration: 2200 }); });
+  var tabsApi = UI.tabs($('#tabs'));
+
+  var pb = UI.param('bodega'); S.bod = BODS.some(function (b) { return b.id === pb; }) ? pb : (BODS.some(function (b) { return b.id === UI.sede().id; }) ? UI.sede().id : 'CEDI-BOG');
+  if (!locs().length && !pb) S.bod = 'CEDI-BOG';
+  fillSel(); renderHead();
+  $('#kpiRow').innerHTML = [1, 2, 3, 4].map(function () { return '<div class="card kpi"><span class="skeleton sk-line" style="width:50%"></span><span class="skeleton" style="height:34px;width:60%"></span><span class="skeleton sk-line" style="width:70%"></span></div>'; }).join('');
+  $('#planoHost').innerHTML = '<div class="zones">' + [1, 2, 3].map(function () { return '<div class="zone" style="padding:16px">' + UI.skeleton(5) + '</div>'; }).join('') + '</div>';
+  setTimeout(function () {
+    refreshAll();
+    var sku = UI.param('sku'), ub = UI.param('ubicacion');
+    if (sku && prod(sku)) { $('#skuQ').value = sku; S.q = sku; setSku(sku); }
+    if (ub) { var f = locs().filter(function (u) { return u.ubicacionId === ub; })[0]; if (f) { S.nivel = f.nivel; renderPlano(); openLoc(ub); } }
+  }, 380);
+});
+</script>
+</body>
+</html>

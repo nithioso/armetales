@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maestro de clientes · Armetales</title>
+<meta name="description" content="Maestro de clientes de Armetales: datos logísticos, direcciones georreferenciadas, ventanas horarias y calidad de dirección antes de planear.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de la pantalla de clientes (tokens y componentes viven en app.css) */
+  .stk { display: block; } .stk .cell-sub { display: block; }
+  @media (max-width: 639px) { .stk { text-align: right; } }
+  .kpi, .kpi .kpi-foot, .kpi .kpi-note { white-space: normal; }
+  .select.input-sm { padding-right: 30px; }
+  .kpi-row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .kpi-row > :last-child:nth-child(odd) { grid-column: span 2; } .kpi .kpi-value { font-size: 28px; } .kpi { padding: 12px; } }
+  .cl-tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cl-tools .grp { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
+  .cl-tools .search { width: 260px; max-width: 100%; }
+  @media (max-width: 639px) { .cl-tools .search, .cl-tools .select { width: 100% !important; } }
+  .filter-bar { margin: 0; }
+  .cl-map .map { --h: 580px; border: 0; border-radius: 0; }
+  @media (max-width: 639px) { .cl-map .map { --h: 420px; } }
+  .cl-lock { display: inline-flex; align-items: center; gap: 4px; color: var(--text-3); font-size: 12px; }
+  .cl-lock .icon { width: 13px; height: 13px; }
+  .f-locked .input { padding-right: 34px; }
+  .f-locked { position: relative; }
+  .f-locked > .icon { position: absolute; right: 11px; bottom: 11px; width: 14px; height: 14px; color: var(--text-3); pointer-events: none; }
+  .cd-head { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); margin-bottom: 14px; }
+  .cd-head.is-blocked { border-color: var(--red-line, var(--border-strong)); background: var(--red-bg); }
+  .cd-head .grow { min-width: 200px; }
+  .cd-tabs { margin: 0 -20px 16px; padding: 0 20px; }
+  .sec-title { font-size: 13px; font-weight: 600; margin: 0 0 8px; }
+  .addr-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .addr-btn { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--r-ctl); background: var(--surface); text-align: left; min-height: 44px; font-size: 13px; }
+  .addr-btn[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink) inset; }
+  :root[data-theme="dark"] .addr-btn[aria-pressed="true"] { border-color: #E9EDF0; box-shadow: 0 0 0 1px #E9EDF0 inset; }
+  .addr-btn .a-sub { display: block; font-size: 12px; color: var(--text-2); }
+  .addr-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 760px) { .addr-grid.in-wide { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+  .pin-map .map { --h: 300px; }
+  .coord { font-family: var(--font-mono); font-size: 12.5px; }
+  .wk-head, .wk-row { display: grid; grid-template-columns: 130px 268px minmax(0, 1fr); gap: 14px; align-items: center; }
+  .wk-head { padding: 0 0 6px; font-size: 11.5px; color: var(--text-3); }
+  .wk-head .ticks { position: relative; height: 14px; } .wk-head .ticks span { position: absolute; transform: translateX(-50%); } .wk-head .ticks span:first-child { transform: none; } .wk-head .ticks span:last-child { transform: translateX(-100%); }
+  .wk-row { padding: 9px 0; border-top: 1px solid var(--border); }
+  .wk-row .times { display: flex; align-items: center; gap: 6px; }
+  .wk-row .times .input { width: 122px; padding: 0 8px; }
+  .wk-track { position: relative; height: 24px; border-radius: 6px; background: var(--surface-3); overflow: hidden; }
+  .wk-fill { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; border: 1px solid var(--blue); background-color: var(--blue-bg); }
+  .wk-row.is-off .wk-track { opacity: .55; }
+  .wk-row .wk-msg { grid-column: 1 / -1; }
+  @media (max-width: 719px) { .wk-head { display: none; } .wk-row { grid-template-columns: 1fr; gap: 8px; } }
+  .chk-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .chk-card { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface); min-height: 44px; }
+  .chk-card:has(input:checked) { border-color: var(--blue-line); background: var(--blue-bg); }
+  .stepper-num { display: inline-flex; align-items: center; gap: 6px; }
+  .stepper-num .input { width: 84px; text-align: center; font-variant-numeric: tabular-nums; }
+  .day-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .day-chips .filter-chip { min-width: 40px; justify-content: center; height: 36px; }
+  .mini-stat { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .mini-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .mini-stat .l { font-size: 12px; color: var(--text-2); }
+  .ck-list { display: grid; gap: 0; }
+  .ck-row { display: flex; gap: 12px; align-items: flex-start; padding: 11px 0; border-bottom: 1px solid var(--border); }
+  .ck-row:last-child { border-bottom: 0; }
+  .ck-ico { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+  .ck-ico .icon { width: 14px; height: 14px; }
+  .ck-ico.ok { background: var(--green-bg); color: var(--green-fg); } .ck-ico.warn { background: var(--amber-bg); color: var(--amber-fg); } .ck-ico.fail { background: var(--red-bg); color: var(--red-fg); }
+  .sync-steps { display: grid; gap: 10px; margin: 14px 0; }
+  .sync-step { display: flex; gap: 10px; align-items: center; font-size: 13.5px; color: var(--text-3); }
+  .sync-step.is-on { color: var(--text); font-weight: 500; } .sync-step.is-done { color: var(--text-2); }
+  .sync-step .ss-dot { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--border-strong); display: grid; place-items: center; flex: none; }
+  .sync-step.is-done .ss-dot { background: var(--green); border-color: var(--green); color: #fff; } .sync-step .ss-dot .icon { width: 12px; height: 12px; }
+  .sync-step.is-on .ss-dot { border-color: var(--blue); }
+  .cell-id { font-size: 12px; color: var(--text-2); font-family: var(--font-mono); }
+  .upd { font-size: 12.5px; color: var(--text-2); }
+  .map-pop { font-size: 13px; line-height: 1.45; min-width: 180px; }
+  .map-pop button { margin-top: 8px; }
+  :root[data-theme="dark"] a.btn { color: var(--b-fg); } /* el color de enlace del tema oscuro pisaba el de los botones-enlace */
+</style>
+</head>
+<body data-page="clientes">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Maestros</div>
+      <h1 class="page-title">Maestro de clientes</h1>
+      <p class="page-desc">Datos de SAP y coordenadas del Data Lake, más lo que el equipo logístico completa: direcciones, ventanas horarias y restricciones de acceso. <span id="syncInfo" class="upd"></span></p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-primary" id="syncBtn"></button>
+    </div>
+  </header>
+
+  <section aria-label="Resumen de calidad de datos"><div class="kpi-row" id="kpiRow"></div></section>
+
+  <div class="section" id="gateBanner"></div>
+
+  <section class="section" aria-label="Listado de clientes">
+    <div class="cl-tools">
+      <div class="grp">
+        <div class="filter-bar" id="calChips" role="group" aria-label="Filtrar por calidad de dirección"></div>
+      </div>
+      <div class="grp">
+        <div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="input" type="search" id="qInput" placeholder="Cliente, NIT, municipio o barrio" aria-label="Buscar cliente"></div>
+        <select class="select input-sm" id="zonaSel" aria-label="Filtrar por zona" style="width:auto;min-width:150px"></select>
+        <div class="segmented" role="group" aria-label="Vista" id="viewSeg">
+          <button type="button" data-v="tabla" aria-pressed="true">Tabla</button>
+          <button type="button" data-v="mapa" aria-pressed="false">Mapa</button>
+        </div>
+      </div>
+    </div>
+    <div id="viewTabla"><div id="cliTable"></div></div>
+    <div id="viewMapa" hidden>
+      <div class="card cl-map">
+        <div class="card-head"><div><h2 class="card-title">Clientes en el mapa</h2><p class="card-sub" id="mapSub"></p></div></div>
+        <div id="cliMap" role="region" aria-label="Mapa de clientes por calidad de dirección"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$;
+  var CAL = { 'Verificada': 'success', 'Aproximada': 'warning', 'Por validar': 'danger' };
+  var CAL_RANK = { 'Por validar': 0, 'Aproximada': 1, 'Verificada': 2 };
+  function calChip(q, small) { return UI.chip(q, { tone: CAL[q] || 'neutral', small: !!small }); }
+
+  /* ---------- utilidades locales (datos derivados, en memoria) ---------- */
+  function hash(s) { var h = 2166136261; s = String(s); for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function rng(seed) { var s = hash(seed) || 1; return function () { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+  function km(a, b, c, d) { var R = 6371, t = Math.PI / 180, dl = (c - a) * t, dg = (d - b) * t, x = Math.sin(dl / 2) * Math.sin(dl / 2) + Math.cos(a * t) * Math.cos(c * t) * Math.sin(dg / 2) * Math.sin(dg / 2); return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)); }
+  function hm(s) { var p = String(s || '0:0').split(':'); return (+p[0]) * 60 + (+p[1]); }
+  function dur(min) { var h = Math.floor(min / 60), m = min % 60; return (h ? h + ' h' : '') + (h && m ? ' ' : '') + (m ? m + ' min' : (h ? '' : '0 min')); }
+  function nowIso() { return new Date().toISOString(); }
+  var ZONAS = Array.from(new Set(A.clientes.map(function (c) { return c.zona; }))).sort();
+  var MUNIS = {};
+  A.clientes.forEach(function (c) { var m = MUNIS[c.municipio] || (MUNIS[c.municipio] = { n: 0, lat: 0, lng: 0, z: {} }); m.n++; m.lat += c.latitud; m.lng += c.longitud; m.z[c.zona] = (m.z[c.zona] || 0) + 1; });
+  Object.keys(MUNIS).forEach(function (k) { var m = MUNIS[k]; m.lat /= m.n; m.lng /= m.n; m.zona = Object.keys(m.z).sort(function (a, b) { return m.z[b] - m.z[a]; })[0]; m.radio = k === 'Bogotá' ? 35 : 18; });
+  var MUNI_LIST = Object.keys(MUNIS).sort(function (a, b) { return a.localeCompare(b, 'es'); });
+  var RESTR = ['Acceso máximo para turbo (calle estrecha)', 'Descargue con ayudante (sin montacargas)', 'Vía destapada en los últimos 600 m', 'Descargue restringido en horas pico (zona residencial)', 'Requiere montacargas del cliente', 'Ingreso con EPP y planilla de seguridad social', 'Portería exige cita previa'];
+  var VEH_MAX = ['Sin límite de tamaño', 'Hasta tractocamión', 'Hasta camión sencillo', 'Hasta turbo (4,5 t)'];
+  var DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'], DAYS_S = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+  var DIRS = {}, WEEK = {}, FREQD = {}, ACC = {}, state = { cal: '', zona: '', q: '', view: 'tabla' };
+
+  function mkPrincipal(c) {
+    return { id: 'principal', alias: 'Entrega principal', principal: true,
+      get direccion() { return c.direccionEntrega; }, set direccion(v) { c.direccionEntrega = v; },
+      get municipio() { return c.municipio; }, set municipio(v) { c.municipio = v; },
+      get barrio() { return c.barrio; }, set barrio(v) { c.barrio = v; },
+      get zona() { return c.zona; }, set zona(v) { c.zona = v; },
+      get lat() { return c.latitud; }, set lat(v) { c.latitud = v; },
+      get lng() { return c.longitud; }, set lng(v) { c.longitud = v; },
+      get calidad() { return c.calidadDireccion; }, set calidad(v) { c.calidadDireccion = v; } };
+  }
+  function dirsOf(c) {
+    if (!DIRS[c.clienteIdSAP]) {
+      var r = rng('dir' + c.clienteIdSAP), l = [mkPrincipal(c)];
+      if (r() < 0.34) { var mu = MUNIS[c.municipio]; l.push({ id: 'obra1', alias: c.tipoCodigo === 'C' ? 'Obra torre 2' : 'Bodega auxiliar', principal: false, direccion: 'Cra ' + Math.round(10 + r() * 90) + ' # ' + Math.round(10 + r() * 60) + '-' + Math.round(1 + r() * 90) + ', ' + c.barrio, municipio: c.municipio, barrio: c.barrio, zona: c.zona, lat: +(c.latitud + 0.006 + r() * 0.006).toFixed(5), lng: +(c.longitud - 0.005 - r() * 0.006).toFixed(5), calidad: r() < 0.5 ? 'Aproximada' : 'Verificada' }); }
+      DIRS[c.clienteIdSAP] = l;
+    }
+    return DIRS[c.clienteIdSAP];
+  }
+  function weekOf(c) {
+    if (!WEEK[c.clienteIdSAP]) {
+      var r = rng('wk' + c.clienteIdSAP), w = [];
+      for (var i = 0; i < 7; i++) w.push({ on: i < 5, ini: c.ventanaInicio, fin: c.ventanaFin });
+      if (r() < 0.55) { w[5] = { on: true, ini: c.ventanaInicio, fin: hm(c.ventanaFin) > 13 * 60 ? '13:00' : c.ventanaFin }; }
+      WEEK[c.clienteIdSAP] = w;
+    }
+    return WEEK[c.clienteIdSAP];
+  }
+  function freqOf(c) {
+    if (!FREQD[c.clienteIdSAP]) { var r = rng('fq' + c.clienteIdSAP), d = [false, false, false, false, false, false]; var k = c.frecuencia === 'Diaria' ? [0, 1, 2, 3, 4] : c.frecuencia === 'Semanal' ? [Math.floor(r() * 5)] : c.frecuencia === 'Quincenal' ? [Math.floor(r() * 5)] : []; k.forEach(function (i) { d[i] = true; }); FREQD[c.clienteIdSAP] = d; }
+    return FREQD[c.clienteIdSAP];
+  }
+  function accOf(c) { if (!ACC[c.clienteIdSAP]) { var r = rng('ac' + c.clienteIdSAP); ACC[c.clienteIdSAP] = { veh: c.restricciones.some(function (x) { return /turbo/i.test(x); }) ? VEH_MAX[3] : VEH_MAX[0] }; } return ACC[c.clienteIdSAP]; }
+  function observedUnload(c) { var r = rng('ob' + c.clienteIdSAP); return Math.max(8, Math.round(c.descargueMin * (0.82 + r() * 0.5))); }
+  function rutaName(c) { var r = A.idx.rutas[c.rutaId]; return r ? r.nombre : '—'; }
+  function planeable(c) { return c.calidadDireccion !== 'Por validar'; }
+
+  /* ---------- lista de verificación antes de planear (HU-051) ---------- */
+  function checks(c) {
+    var q = c.calidadDireccion, tel = c.contacto && c.contacto.telefono;
+    return [
+      { k: 'geo', label: 'Georreferencia de la dirección de entrega', state: q === 'Verificada' ? 'ok' : q === 'Aproximada' ? 'warn' : 'fail',
+        detail: q === 'Verificada' ? 'Punto confirmado: ' + c.latitud.toFixed(5) + ', ' + c.longitud.toFixed(5) + '.' : q === 'Aproximada' ? 'El punto es aproximado. Se puede planear, pero confirma la ubicación para evitar paradas mal secuenciadas.' : 'El Data Lake no entregó coordenadas válidas. El cliente no puede entrar a planeación hasta ubicarlo en el mapa.' },
+      { k: 'zona', label: 'Zona, municipio y barrio', state: c.zona && c.municipio && c.barrio ? 'ok' : 'fail', detail: c.zona && c.municipio && c.barrio ? c.barrio + ', ' + c.municipio + ' · zona ' + c.zona + '.' : 'Falta la zona, el municipio o el barrio.' },
+      { k: 'ruta', label: 'Ruta poblacional asignada', state: c.rutaId && A.idx.rutas[c.rutaId] ? 'ok' : 'fail', detail: c.rutaId ? rutaName(c) + ' (' + c.rutaId + ').' : 'Asigna una ruta para que el cliente aparezca agrupado en planeación.' },
+      { k: 'vent', label: 'Ventana horaria de atención', state: hm(c.ventanaInicio) < hm(c.ventanaFin) ? 'ok' : 'fail', detail: c.ventanaInicio + '–' + c.ventanaFin + ' de lunes a viernes.' },
+      { k: 'desc', label: 'Tiempo promedio de descargue', state: c.descargueMin > 0 ? 'ok' : 'fail', detail: c.descargueMin + ' min por parada.' },
+      { k: 'cont', label: 'Contacto de recepción', state: tel ? 'ok' : 'warn', detail: tel ? c.contacto.nombre + ' · ' + tel : 'Sin teléfono: el conductor no podrá avisar su llegada.' }
+    ];
+  }
+  function completeness(c) { var ch = checks(c), pts = ch.reduce(function (s, x) { return s + (x.state === 'ok' ? 1 : x.state === 'warn' ? 0.5 : 0); }, 0); return Math.round(pts / ch.length * 100); }
+
+  /* ---------- KPIs y filtros ---------- */
+  function stats() {
+    var l = A.clientes, v = l.filter(function (c) { return c.calidadDireccion === 'Verificada'; }).length, a = l.filter(function (c) { return c.calidadDireccion === 'Aproximada'; }).length, p = l.length - v - a;
+    return { n: l.length, v: v, a: a, p: p, listos: v + a };
+  }
+  function renderKpis() {
+    var s = stats();
+    $('#kpiRow').innerHTML =
+      UI.kpi({ id: 'tot', label: 'Clientes activos', icon: 'users', value: s.n, note: 'Origen SAP · coordenadas Data Lake', onClick: true }) +
+      UI.kpi({ id: 'listos', label: 'Listos para planear', icon: 'check-circle', valueHtml: s.listos + '<small>de ' + s.n + '</small>', note: Math.round(s.listos / s.n * 100) + ' % del maestro', onClick: true }) +
+      UI.kpi({ id: 'aprox', label: 'Ubicación aproximada', icon: 'map-pin', value: s.a, note: 'Planeables, pero conviene confirmar', onClick: true }) +
+      UI.kpi({ id: 'pend', label: 'Sin georreferencia', icon: 'alert-triangle', valueHtml: '<span style="color:' + (s.p ? 'var(--red-fg)' : 'inherit') + '">' + s.p + '</span>', note: s.p ? 'Bloqueados para planeación' : 'Todo el maestro es planeable', onClick: true });
+    var ch = [['', 'Todos', s.n], ['Verificada', 'Verificada', s.v], ['Aproximada', 'Aproximada', s.a], ['Por validar', 'Por validar', s.p]];
+    $('#calChips').innerHTML = ch.map(function (x) { return '<button type="button" class="filter-chip" data-cal="' + x[0] + '" aria-pressed="' + (state.cal === x[0]) + '">' + x[1] + ' <span class="n">' + x[2] + '</span></button>'; }).join('');
+    $('#gateBanner').innerHTML = s.p ? UI.banner({ tone: 'warning', title: s.p + ' cliente' + (s.p === 1 ? '' : 's') + ' sin georreferencia no entra' + (s.p === 1 ? '' : 'n') + ' a planeación', html: 'La planeación excluye a los clientes con dirección «Por validar» porque el motor de rutas no puede secuenciar sus paradas. <button type="button" class="link-btn" id="gateFilter">Ver pendientes</button> · <a href="integraciones.html">Revisar cola del Data Lake</a>' }) : UI.banner({ tone: 'success', title: 'Maestro listo para planear', text: 'Todos los clientes tienen una ubicación utilizable. ' + s.a + ' tienen punto aproximado.' });
+    var g = $('#gateFilter'); if (g) g.onclick = function () { setCal('Por validar'); };
+    $('#syncBtn').innerHTML = UI.icon('refresh') + 'Sincronizar desde SAP / Data Lake';
+    $('#syncInfo').textContent = 'Última sincronización ' + F.relativo(lastSync()) + '.';
+  }
+  function lastSync() { return A.clientes.reduce(function (m, c) { return c.sincronizado > m ? c.sincronizado : m; }, ''); }
+  $('#kpiRow').addEventListener('click', function (e) {
+    var k = e.target.closest('[data-kpi]'); if (!k) return;
+    var m = { tot: '', listos: '', aprox: 'Aproximada', pend: 'Por validar' }[k.dataset.kpi]; if (k.dataset.kpi === 'listos') { checklistSummary(); return; } setCal(m);
+  });
+  function setCal(v) { state.cal = v; renderKpis(); applyFilters(); }
+  $('#calChips').addEventListener('click', function (e) { var b = e.target.closest('[data-cal]'); if (b) setCal(b.dataset.cal); });
+  $('#zonaSel').innerHTML = '<option value="">Todas las zonas</option>' + ZONAS.map(function (z) { return '<option>' + esc(z) + '</option>'; }).join('');
+  $('#zonaSel').addEventListener('change', function (e) { state.zona = e.target.value; applyFilters(); });
+  $('#qInput').addEventListener('input', function (e) { state.q = e.target.value; applyFilters(); });
+
+  function filtered() {
+    var q = UI.norm(state.q);
+    return A.clientes.filter(function (c) {
+      if (state.cal && c.calidadDireccion !== state.cal) return false;
+      if (state.zona && c.zona !== state.zona) return false;
+      if (q && UI.norm([c.razonSocial, c.nit, c.clienteIdSAP, c.municipio, c.barrio, c.localidad, c.direccionEntrega].join(' ')).indexOf(q) < 0) return false;
+      return true;
+    });
+  }
+  function checklistSummary() {
+    var s = stats();
+    UI.modal({ title: 'Clientes listos para planear', width: 520,
+      body: '<div class="stack-lg"><div class="grid c2 gap-3"><div class="mini-stat"><div class="v">' + s.listos + '</div><div class="l">Planeables</div></div><div class="mini-stat"><div class="v" style="color:var(--red-fg)">' + s.p + '</div><div class="l">Bloqueados</div></div></div>' +
+        UI.meter(s.listos, s.n, { level: 'ok', label: 'Clientes planeables', text: s.listos + ' de ' + s.n }) +
+        '<div><h3 class="sec-title">Regla de planeación</h3><p class="muted t-13">Un cliente entra a planeación cuando cumple la lista de verificación: georreferencia válida, zona y barrio, ruta asignada, ventana horaria, tiempo de descargue y contacto. Si falta la georreferencia queda bloqueado; si el punto es aproximado se permite con aviso.</p></div></div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Ver bloqueados', kind: 'secondary', onClick: function () { setCal('Por validar'); } }, { label: 'Ir a planeación', kind: 'primary', icon: 'arrow-right', onClick: function () { location.href = 'planeacion.html'; } }] });
+  }
+
+  /* ---------- tabla ---------- */
+  var tbl = UI.table($('#cliTable'), {
+    rows: A.clientes, pageSize: 12, rowKey: 'clienteIdSAP', caption: 'Maestro de clientes', emptyText: 'Ningún cliente coincide con los filtros.',
+    sort: { key: 'razonSocial', dir: 'asc' },
+    columns: [
+      { key: 'razonSocial', label: 'Cliente', title: true, render: function (c) { return esc(c.razonSocial); } },
+      { key: 'nit', label: 'NIT', render: function (c) { return '<span class="mono t-13 nowrap">' + esc(c.nit) + '</span><div class="cell-sub hide-mobile">' + esc(c.tipo) + '</div>'; } },
+      { key: 'municipio', label: 'Municipio', render: function (c) { return '<span class="stk">' + esc(c.localidad ? c.municipio + ' · ' + c.localidad : c.municipio) + '<span class="cell-sub">' + esc(c.barrio) + '</span></span>'; } },
+      { key: 'zona', label: 'Zona' },
+      { key: 'ventanaInicio', label: 'Ventana', render: function (c) { return '<span class="mono nowrap">' + c.ventanaInicio + '–' + c.ventanaFin + '</span>'; }, hideMobile: false },
+      { key: 'calidadDireccion', label: 'Dirección', value: function (c) { return CAL_RANK[c.calidadDireccion]; }, render: function (c) { return calChip(c.calidadDireccion); } },
+      { key: 'planea', label: 'Planeación', value: function (c) { return planeable(c) ? 1 : 0; }, render: function (c) { return planeable(c) ? '<span class="muted t-13">' + (c.calidadDireccion === 'Aproximada' ? 'Con aviso' : 'Lista') + '</span>' : '<span class="chip chip-danger chip-sm">' + UI.icon('lock', 'icon-sm') + 'Bloqueado</span>'; } },
+      { key: 'sincronizado', label: 'Origen y sincronización', render: function (c) { return '<span class="t-13">SAP + Data Lake</span><div class="cell-sub">' + F.relativo(c.sincronizado) + '</div>'; }, hideMobile: true }
+    ],
+    onRowClick: function (c) { openClient(c.clienteIdSAP); },
+    actions: function (c) { return [
+      { label: 'Abrir ficha', icon: 'eye', onClick: function () { openClient(c.clienteIdSAP); } },
+      { label: 'Georreferenciar', icon: 'map-pin', onClick: function () { openClient(c.clienteIdSAP, 'cd-dir'); } },
+      { label: 'Verificar para planear', icon: 'clipboard-check', onClick: function () { verifyModal(c); } },
+      { sep: true }, { label: 'Ver en el mapa', icon: 'map', onClick: function () { showOnMap(c); } }]; }
+  });
+  function applyFilters() {
+    var l = filtered(); tbl.setRows(l);
+    if (state.view === 'mapa') drawMap();
+  }
+
+  /* ---------- mapa de clientes ---------- */
+  var mapApi = null, mapPins = {}, lastPts = [];
+  function drawMap() {
+    if (!mapApi) { mapApi = UI.map($('#cliMap'), { center: [4.68, -74.12], zoom: 10 }); var lg = document.createElement('div'); lg.className = 'map-legend'; lg.innerHTML = '<span><i class="dot ok"></i> Verificada</span><span><i class="dot warn"></i> Aproximada</span><span><i class="dot bad"></i> Por validar</span>'; $('#cliMap').appendChild(lg);
+      $('#cliMap').addEventListener('click', function (e) { var b = e.target.closest('[data-open]'); if (b) openClient(b.dataset.open); }); }
+    mapApi.clear(); mapPins = {}; var l = filtered(), pts = [];
+    l.forEach(function (c) {
+      var st = c.calidadDireccion === 'Verificada' ? 'done' : c.calidadDireccion === 'Aproximada' ? 'partial' : 'failed';
+      mapPins[c.clienteIdSAP] = mapApi.pin({ lat: c.latitud, lng: c.longitud, state: st, title: c.razonSocial, popup: '<div class="map-pop"><strong>' + esc(c.razonSocial) + '</strong><br>' + esc(c.direccionEntrega) + '<br>' + calChip(c.calidadDireccion, true) + ' <span class="mono t-12">' + c.latitud.toFixed(4) + ', ' + c.longitud.toFixed(4) + '</span><br><button type="button" class="btn btn-secondary btn-sm" data-open="' + c.clienteIdSAP + '">Abrir ficha</button></div>' });
+      pts.push([c.latitud, c.longitud]);
+    });
+    $('#mapSub').textContent = l.length + ' cliente' + (l.length === 1 ? '' : 's') + ' en el mapa · ' + l.filter(function (c) { return !planeable(c); }).length + ' bloqueados para planear';
+    lastPts = pts; if (pts.length) mapApi.fit(pts, { padding: 30, maxZoom: 12 });
+  }
+  function setView(v) {
+    state.view = v; $$('#viewSeg button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === v); });
+    $('#viewTabla').hidden = v !== 'tabla'; $('#viewMapa').hidden = v !== 'mapa';
+    if (v === 'mapa') { drawMap(); setTimeout(function () { if (!mapApi) return; mapApi.invalidate(); if (lastPts.length) mapApi.fit(lastPts, { padding: 30, maxZoom: 12 }); }, 120); }
+  }
+  $('#viewSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) setView(b.dataset.v); });
+  function showOnMap(c) { setView('mapa'); setTimeout(function () { var m = mapPins[c.clienteIdSAP]; if (m) { mapApi.map.setView([c.latitud, c.longitud], 14); m.openPopup(); } $('#cliMap').scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 150); }
+
+  /* ---------- verificación antes de planear ---------- */
+  function checkRows(c) { return '<div class="ck-list">' + checks(c).map(function (x) { return '<div class="ck-row"><span class="ck-ico ' + x.state + '">' + UI.icon(x.state === 'ok' ? 'check' : x.state === 'warn' ? 'alert-triangle' : 'x') + '</span><div><div class="strong t-14">' + esc(x.label) + '</div><div class="muted t-13">' + esc(x.detail) + '</div></div></div>'; }).join('') + '</div>'; }
+  function verifyModal(c) {
+    var blocked = !planeable(c);
+    UI.modal({ title: 'Verificación para planear', subtitle: c.razonSocial, width: 560,
+      body: '<div class="stack">' + (blocked ? UI.banner({ tone: 'danger', title: 'No se puede incluir en el plan', text: 'Falta la georreferencia de la dirección de entrega. Ubica el punto en el mapa y vuelve a verificar.' }) : c.calidadDireccion === 'Aproximada' ? UI.banner({ tone: 'warning', title: 'Se puede planear con aviso', text: 'La ubicación es aproximada; el ETA de esta parada puede variar.' }) : UI.banner({ tone: 'success', title: 'Listo para planear', text: 'Cumple todos los requisitos de la lista de verificación.' })) + checkRows(c) + '</div>',
+      footer: blocked ? [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Georreferenciar ahora', kind: 'primary', icon: 'map-pin', onClick: function () { openClient(c.clienteIdSAP, 'cd-dir'); } }] : [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Ir a planeación', kind: 'primary', icon: 'arrow-right', onClick: function () { location.href = 'planeacion.html'; } }] });
+  }
+
+  /* ---------- ficha del cliente (drawer) ---------- */
+  var cur = null;
+  function refreshAll() { renderKpis(); applyFilters(); }
+  function fld(id, label, val, o) {
+    o = o || {}; var err = o.err ? '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + esc(o.err) + '</span>' : '';
+    return '<div class="field' + (o.locked ? ' f-locked' : '') + (o.cls ? ' ' + o.cls : '') + '"><label class="label" for="' + id + '">' + label + (o.opt ? ' <span class="opt">(opcional)</span>' : '') + '</label>' +
+      (o.textarea ? '<textarea class="textarea" id="' + id + '" rows="' + (o.rows || 3) + '"' + (o.max ? ' maxlength="' + o.max + '"' : '') + (o.ph ? ' placeholder="' + esc(o.ph) + '"' : '') + (o.err ? ' aria-invalid="true"' : '') + '>' + esc(val) + '</textarea>'
+        : o.select ? '<select class="select" id="' + id + '"' + (o.err ? ' aria-invalid="true"' : '') + '>' + o.select.map(function (x) { var v = typeof x === 'object' ? x.v : x, l = typeof x === 'object' ? x.l : x; return '<option value="' + esc(v) + '"' + (v === val ? ' selected' : '') + '>' + esc(l) + '</option>'; }).join('') + '</select>'
+        : '<input class="input' + (o.mono ? ' mono' : '') + '" id="' + id + '" type="' + (o.type || 'text') + '" value="' + esc(val) + '"' + (o.locked ? ' disabled' : '') + (o.err ? ' aria-invalid="true"' : '') + (o.ph ? ' placeholder="' + esc(o.ph) + '"' : '') + '>') +
+      (o.locked ? UI.icon('lock') : '') + (o.hint && !err ? '<span class="hint">' + o.hint + '</span>' : '') + err + '</div>';
+  }
+  function headStrip(c) {
+    var ch = checks(c), bad = ch.filter(function (x) { return x.state === 'fail'; }).length, warn = ch.filter(function (x) { return x.state === 'warn'; }).length, pct = completeness(c), blocked = bad > 0;
+    return '<div class="cd-head' + (blocked ? ' is-blocked' : '') + '"><div class="grow">' + (blocked ? '<div class="strong">' + UI.icon('lock', 'icon-sm') + ' Bloqueado para planear</div><div class="t-13 muted">' + bad + ' requisito' + (bad === 1 ? '' : 's') + ' sin cumplir. Corrígelo en las pestañas de abajo.</div>' : '<div class="strong">' + UI.icon('check-circle', 'icon-sm') + ' Listo para planear</div><div class="t-13 muted">' + (warn ? warn + ' aviso' + (warn === 1 ? '' : 's') + ' por revisar.' : 'Cumple todos los requisitos.') + '</div>') + '</div><div style="min-width:150px;flex:0 1 190px">' + UI.meter(pct, 100, { level: pct >= 95 ? 'ok' : pct >= 70 ? 'info' : 'warn', label: 'Completitud de datos logísticos', text: pct + ' % completo' }) + '</div><button type="button" class="btn btn-secondary btn-sm" id="cdVerify">' + UI.icon('clipboard-check') + 'Ver verificación</button></div>';
+  }
+  function openClient(id, tab) {
+    var c = A.idx.clientes[id];
+    if (!c) { UI.toast('No encontramos el cliente ' + id + ' en el maestro.', 'error'); return; }
+    if (cur) { cleanupMap(); try { cur.api.close(); } catch (e) {} }
+    var tabs = [['cd-datos', 'Datos logísticos'], ['cd-dir', 'Direcciones'], ['cd-vent', 'Ventanas horarias'], ['cd-acc', 'Acceso'], ['cd-frec', 'Frecuencia'], ['cd-cont', 'Contacto'], ['cd-hist', 'Historial']];
+    var html = '<div id="cdHead"></div><div class="tabs cd-tabs" role="tablist" id="cdTabs" aria-label="Secciones de la ficha">' + tabs.map(function (t, i) { return '<button class="tab" role="tab" type="button" aria-controls="' + t[0] + '" aria-selected="' + (i === 0) + '" id="t-' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' + tabs.map(function (t) { return '<div class="tab-panel" role="tabpanel" id="' + t[0] + '" aria-labelledby="t-' + t[0] + '" hidden></div>'; }).join('');
+    var api = UI.drawer({ title: c.razonSocial, subtitleHtml: '<span class="mono">' + c.clienteIdSAP + '</span> · ' + esc(c.municipio) + ' · ' + calChip(c.calidadDireccion, true), width: 800, body: html,
+      onClose: function () { cleanupMap(); cur = null; if (UI.param('id')) { try { history.replaceState(null, '', location.pathname); } catch (e) {} } },
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Ver pedidos', kind: 'secondary', icon: 'package', onClick: function () { var p = A.pedidos.filter(function (x) { return x.clienteId === c.clienteIdSAP; })[0]; location.href = 'pedidos.html' + (p ? '?id=' + encodeURIComponent(p.pedidoId) : ''); } }] });
+    cur = { api: api, c: c, map: null, panels: {}, addr: 'principal' };
+    try { history.replaceState(null, '', 'clientes.html?id=' + encodeURIComponent(id)); } catch (e) {}
+    var P = { 'cd-datos': pDatos, 'cd-dir': pDir, 'cd-vent': pVent, 'cd-acc': pAcc, 'cd-frec': pFrec, 'cd-cont': pCont, 'cd-hist': pHist };
+    cur.render = function (pid) { cleanupMapIf(pid); P[pid]($('#' + pid, api.body)); };
+    cur.refreshHead = function () { $('#cdHead', api.body).innerHTML = headStrip(c); $('#cdVerify', api.body).onclick = function () { verifyModal(c); }; api.el.querySelector('.ov-sub').innerHTML = '<span class="mono">' + c.clienteIdSAP + '</span> · ' + esc(c.municipio) + ' · ' + calChip(c.calidadDireccion, true); };
+    cur.refreshHead();
+    UI.tabs($('#cdTabs', api.body), { onChange: function (pid) { if (!cur) return; if (!cur.panels[pid] || pid === 'cd-dir' || pid === 'cd-hist') { cur.panels[pid] = true; cur.render(pid); } if (pid === 'cd-dir' && cur.map) setTimeout(function () { cur.map.invalidate(); }, 60); } });
+    if (tab) $('#t-' + tab, api.body).click();
+  }
+  function cleanupMap() { if (cur && cur.map) { try { cur.map.destroy(); } catch (e) {} cur.map = null; } }
+  function cleanupMapIf(pid) { if (pid === 'cd-dir') cleanupMap(); }
+  function saved(msg) { UI.toast(msg, 'success'); cur.refreshHead(); refreshAll(); }
+
+  /* --- Datos logísticos (HU-041) --- */
+  function pDatos(el) {
+    var c = cur.c, rutas = A.rutas, sedes = A.sedes.filter(function (s) { return s.activa; });
+    el.innerHTML = '<div class="stack-lg"><section><div class="row between mb-2"><h3 class="sec-title" style="margin:0">Datos de origen</h3><span class="cl-lock">' + UI.icon('lock') + 'Se editan en SAP</span></div><div class="form-grid c2">' +
+      fld('dRaz', 'Razón social', c.razonSocial, { locked: true }) + fld('dNit', 'NIT', c.nit, { locked: true, mono: true }) + fld('dId', 'Código de cliente SAP', c.clienteIdSAP, { locked: true, mono: true }) + fld('dTipo', 'Tipo de cliente', c.tipo, { locked: true }) +
+      fld('dCupo', 'Cupo de crédito', F.cop(c.cupoCreditoCOP), { locked: true }) + fld('dDep', 'Departamento', c.departamento, { locked: true }) + '</div></section>' +
+      '<section><h3 class="sec-title">Datos logísticos</h3><p class="muted t-13 mb-2">Los completa el equipo logístico; alimentan la planeación y el motor de rutas.</p><div class="form-grid c2">' +
+      fld('dZona', 'Zona de reparto', c.zona, { select: ZONAS }) + fld('dRuta', 'Ruta poblacional', c.rutaId, { select: A.rutas.map(function (r) { return { v: r.rutaId, l: r.rutaId + ' · ' + r.nombre }; }) }) +
+      fld('dSede', 'Sede de despacho', 'CEDI-BOG', { select: sedes.map(function (s) { return { v: s.id, l: s.nombre }; }) }) + fld('dSeg', 'Vendedor asignado', c.vendedor || A.asesores && A.asesores[0] || 'Julián Ospina', { hint: 'Recibe las alertas de entregas fallidas.' }) +
+      '</div></section>' +
+      '<section><h3 class="sec-title">Completitud</h3>' + checkRows(c) + '</section>' +
+      '<div class="row gap-3"><button type="button" class="btn btn-primary" id="dSave">Guardar cambios</button><span class="muted t-13" id="dMsg"></span></div></div>';
+    $('#dSave', el).onclick = function () {
+      var z = $('#dZona', el).value, r = $('#dRuta', el).value;
+      c.zona = z; c.rutaId = r; saved('Datos logísticos de ' + c.razonSocial + ' actualizados.'); cur.render('cd-datos');
+    };
+  }
+
+  /* --- Direcciones y georreferenciación (HU-042/043/044) --- */
+  function pDir(el) {
+    var c = cur.c, list = dirsOf(c), a = list.filter(function (x) { return x.id === cur.addr; })[0] || list[0]; cur.addr = a.id;
+    var draft = { lat: a.lat, lng: a.lng, cal: a.calidad, moved: false };
+    var mu = MUNIS[a.municipio];
+    el.innerHTML = '<div class="stack"><div class="addr-list" role="group" aria-label="Direcciones de entrega">' +
+      list.map(function (x) { return '<button type="button" class="addr-btn" data-a="' + x.id + '" aria-pressed="' + (x.id === a.id) + '">' + UI.icon('map-pin', 'icon-sm') + '<span><strong>' + esc(x.alias) + '</strong>' + (x.principal ? ' <span class="tag">Principal</span>' : '') + '<span class="a-sub">' + esc(x.direccion) + '</span></span>' + calChip(x.calidad, true) + '</button>'; }).join('') +
+      '<button type="button" class="btn btn-secondary" id="aAdd" style="min-height:44px">' + UI.icon('plus') + 'Agregar dirección</button></div>' +
+      '<div class="addr-grid in-wide"><div class="stack"><div class="form-grid">' +
+      fld('aAlias', 'Nombre de la dirección', a.alias, { hint: 'Por ejemplo: obra, bodega, sucursal.' }) + fld('aDir', 'Dirección de entrega', a.direccion) +
+      '<div class="form-grid c2">' + fld('aMun', 'Municipio', a.municipio, { select: MUNI_LIST }) + fld('aBar', 'Barrio', a.barrio) + '</div>' + fld('aZona', 'Zona de reparto', a.zona, { select: ZONAS, hint: 'Sugerida para <span id="aSug">' + esc(mu ? mu.zona : '—') + '</span>.' }) +
+      '</div><div class="row gap-3"><button type="button" class="btn btn-secondary" id="aSaveData">Guardar datos</button></div></div>' +
+      '<div class="stack pin-map"><div class="row between"><h3 class="sec-title" style="margin:0">Ubicación en el mapa</h3><span id="aCal"></span></div><div id="aMap" role="region" aria-label="Mapa para ubicar la dirección"></div>' +
+      '<div class="muted t-13">Arrastra el pin hasta el acceso de la obra o la bodega. <span class="coord" id="aCoord"></span></div><div id="aMsg"></div>' +
+      '<div class="row gap-2"><button type="button" class="btn btn-secondary btn-sm" id="aGeo">' + UI.icon('search') + 'Geocodificar dirección</button><button type="button" class="btn btn-ghost btn-sm" id="aReset">' + UI.icon('undo') + 'Restablecer</button><button type="button" class="btn btn-primary btn-sm ml-auto" id="aSavePin">' + UI.icon('check') + 'Guardar ubicación</button></div></div></div></div>';
+    function paint() {
+      var far = km(draft.lat, draft.lng, mu.lat, mu.lng), over = far > mu.radio;
+      $('#aCoord', el).textContent = draft.lat.toFixed(5) + ', ' + draft.lng.toFixed(5);
+      $('#aCal', el).innerHTML = draft.moved ? UI.chip('Sin guardar', { tone: 'info', small: true }) : calChip(draft.cal, true);
+      $('#aMsg', el).innerHTML = over ? UI.banner({ tone: 'danger', text: 'El punto queda a ' + F.num(far, 0) + ' km del centro de ' + a.municipio + '. Muévelo dentro del municipio para poder guardarlo.' }) : (a.calidad === 'Por validar' && !draft.moved ? UI.banner({ tone: 'warning', text: 'Esta dirección no tiene georreferencia válida' + (a.principal ? ': mientras tanto el cliente no puede entrar a planeación.' : '.') }) : '');
+      var sp = $('#aSavePin', el), lab = draft.moved ? 'Guardar ubicación' : a.calidad === 'Aproximada' ? 'Confirmar ubicación' : a.calidad === 'Verificada' ? 'Ubicación confirmada' : 'Ubica el punto para guardar';
+      sp.disabled = over || (!draft.moved && a.calidad !== 'Aproximada'); sp.innerHTML = UI.icon('check') + lab;
+    }
+    cur.map = UI.map($('#aMap', el), { center: [draft.lat, draft.lng], zoom: 15 });
+    var mk = cur.map.pin({ lat: draft.lat, lng: draft.lng, state: 'current', n: '' }); mk.dragging.enable();
+    mk.on('dragend', function () { var ll = mk.getLatLng(); draft.lat = +ll.lat.toFixed(5); draft.lng = +ll.lng.toFixed(5); draft.moved = true; draft.cal = 'Verificada'; paint(); });
+    $('#aGeo', el).onclick = function () { var r = rng('geo' + a.direccion), la = +(mu.lat + (r() - 0.5) * 0.01).toFixed(5), ln = +(mu.lng + (r() - 0.5) * 0.01).toFixed(5); if (a.calidad !== 'Por validar') { la = +(a.lat + (r() - 0.5) * 0.0008).toFixed(5); ln = +(a.lng + (r() - 0.5) * 0.0008).toFixed(5); } draft.lat = la; draft.lng = ln; draft.moved = true; draft.cal = 'Aproximada'; mk.setLatLng([la, ln]); cur.map.map.setView([la, ln], 15); paint(); UI.toast('El geocodificador ubicó la dirección con precisión aproximada. Ajusta el pin y confirma.', 'info'); };
+    $('#aReset', el).onclick = function () { draft = { lat: a.lat, lng: a.lng, cal: a.calidad, moved: false }; mk.setLatLng([a.lat, a.lng]); cur.map.map.setView([a.lat, a.lng], 15); paint(); };
+    $('#aSavePin', el).onclick = function () { a.lat = draft.lat; a.lng = draft.lng; a.calidad = draft.moved ? draft.cal : 'Verificada'; saved('Ubicación de «' + a.alias + '» guardada como ' + a.calidad.toLowerCase() + '.'); cur.render('cd-dir'); };
+    $('#aMun', el).onchange = function () { var m = MUNIS[this.value]; $('#aZona', el).value = m.zona; $('#aSug', el).textContent = m.zona; UI.toast('Zona ajustada a «' + m.zona + '» según el municipio.', 'info'); };
+    $('#aSaveData', el).onclick = function () {
+      var d = $('#aDir', el), b = $('#aBar', el), al = $('#aAlias', el), ok = true;
+      [d, b, al].forEach(function (x) { x.removeAttribute('aria-invalid'); var e = x.parentNode.querySelector('.error-text'); if (e) e.remove(); });
+      function bad(x, m) { ok = false; x.setAttribute('aria-invalid', 'true'); x.parentNode.insertAdjacentHTML('beforeend', '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + m + '</span>'); }
+      if (al.value.trim().length < 3) bad(al, 'Escribe un nombre de al menos 3 caracteres.');
+      if (!/\d/.test(d.value) || d.value.trim().length < 8) bad(d, 'Incluye la nomenclatura con número, por ejemplo «Cra 45 # 12-30».');
+      if (b.value.trim().length < 3) bad(b, 'Indica el barrio.');
+      if (!ok) return;
+      a.alias = al.value.trim(); a.direccion = d.value.trim(); a.barrio = b.value.trim(); a.municipio = $('#aMun', el).value; a.zona = $('#aZona', el).value;
+      if (a.principal && a.calidad === 'Verificada') { a.calidad = 'Aproximada'; UI.toast('Cambió la dirección principal: confirma de nuevo la ubicación en el mapa.', 'warning'); }
+      saved('Datos de la dirección guardados.'); cur.render('cd-dir');
+    };
+    $$('[data-a]', el).forEach(function (b) { b.onclick = function () { cur.addr = b.dataset.a; cur.render('cd-dir'); }; });
+    $('#aAdd', el).onclick = function () { addAddrModal(); };
+    paint();
+  }
+  function addAddrModal() {
+    var c = cur.c;
+    var m = UI.modal({ title: 'Agregar dirección de entrega', subtitle: c.razonSocial, width: 520,
+      body: '<div class="form-grid">' + fld('nAlias', 'Nombre de la dirección', '', { ph: 'Obra Torre 3' }) + fld('nDir', 'Dirección', '', { ph: 'Cra 45 # 12-30' }) + '<div class="form-grid c2">' + fld('nMun', 'Municipio', c.municipio, { select: MUNI_LIST }) + fld('nBar', 'Barrio', '') + '</div></div><p class="hint mt-2">La nueva dirección queda «Por validar» hasta que ubiques el punto en el mapa.</p>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Agregar dirección', kind: 'primary', onClick: function () {
+        var al = $('#nAlias', m.body), d = $('#nDir', m.body), b = $('#nBar', m.body), ok = true;
+        $$('.error-text', m.body).forEach(function (e) { e.remove(); }); [al, d, b].forEach(function (x) { x.removeAttribute('aria-invalid'); });
+        function bad(x, t) { ok = false; x.setAttribute('aria-invalid', 'true'); x.parentNode.insertAdjacentHTML('beforeend', '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + t + '</span>'); }
+        if (al.value.trim().length < 3) bad(al, 'Escribe un nombre de al menos 3 caracteres.');
+        if (!/\d/.test(d.value) || d.value.trim().length < 8) bad(d, 'Incluye la nomenclatura con número, por ejemplo «Cra 45 # 12-30».');
+        if (b.value.trim().length < 3) bad(b, 'Indica el barrio.');
+        if (dirsOf(c).some(function (x) { return UI.norm(x.alias) === UI.norm(al.value); })) bad(al, 'Ya existe una dirección con ese nombre.');
+        if (!ok) return false;
+        var mu = $('#nMun', m.body).value, mm = MUNIS[mu], id = 'x' + Date.now();
+        dirsOf(c).push({ id: id, alias: al.value.trim(), principal: false, direccion: d.value.trim(), municipio: mu, barrio: b.value.trim(), zona: mm.zona, lat: +mm.lat.toFixed(5), lng: +mm.lng.toFixed(5), calidad: 'Por validar' });
+        cur.addr = id; UI.toast('Dirección agregada. Ubícala en el mapa para validarla.', 'success'); cur.render('cd-dir');
+      } }] });
+  }
+
+  /* --- Ventanas horarias (HU-045) --- */
+  function pVent(el) {
+    var c = cur.c, wk = weekOf(c).map(function (x) { return { on: x.on, ini: x.ini, fin: x.fin }; });
+    var T0 = 4 * 60, T1 = 20 * 60;
+    function msgOf(d, i) {
+      var x = wk[i]; if (!x.on) return '';
+      if (!x.ini || !x.fin) return '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + 'Indica la hora de apertura y de cierre.</span>';
+      if (hm(x.fin) <= hm(x.ini)) return '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + 'La hora de cierre debe ser posterior a la de apertura.</span>';
+      var w = hm(x.fin) - hm(x.ini); if (w < c.descargueMin + 30) return '<span class="hint" style="color:var(--amber-fg)">' + UI.icon('alert-triangle', 'icon-sm') + ' Ventana de ' + dur(w) + ': menor al descargue promedio (' + dur(c.descargueMin) + ') más 30 min de margen.</span>';
+      return '';
+    }
+    function barOf(x) { if (!x.on || !x.ini || !x.fin || hm(x.fin) <= hm(x.ini)) return ''; var l = (hm(x.ini) - T0) / (T1 - T0) * 100, w = (hm(x.fin) - hm(x.ini)) / (T1 - T0) * 100; return '<span class="wk-fill hatch-soft" style="left:' + Math.max(0, l) + '%;width:' + Math.min(100 - Math.max(0, l), w) + '%"></span>'; }
+    function draw() {
+      el.innerHTML = '<div class="stack-lg"><div><p class="muted t-13 mb-3">Define cuándo recibe mercancía el cliente. La planeación solo propone paradas dentro de estas ventanas.</p>' +
+        '<div class="wk-head"><span>Día</span><span>Horario</span><span class="ticks" aria-hidden="true"><span style="left:0">4:00</span><span style="left:25%">8:00</span><span style="left:50%">12:00</span><span style="left:75%">16:00</span><span style="left:100%">20:00</span></span></div>' +
+        wk.map(function (x, i) { return '<div class="wk-row' + (x.on ? '' : ' is-off') + '" data-i="' + i + '"><label class="switch"><input type="checkbox" data-k="on"' + (x.on ? ' checked' : '') + ' aria-label="Atiende el ' + DAYS[i].toLowerCase() + '"><span class="strong">' + DAYS[i] + '</span></label><div class="times"><input class="input" type="time" data-k="ini" value="' + (x.ini || '') + '" aria-label="Apertura ' + DAYS[i].toLowerCase() + '"' + (x.on ? '' : ' disabled') + (x.on && (!x.ini || hm(x.fin) <= hm(x.ini)) ? ' aria-invalid="true"' : '') + '><span class="muted">a</span><input class="input" type="time" data-k="fin" value="' + (x.fin || '') + '" aria-label="Cierre ' + DAYS[i].toLowerCase() + '"' + (x.on ? '' : ' disabled') + (x.on && (!x.fin || hm(x.fin) <= hm(x.ini)) ? ' aria-invalid="true"' : '') + '></div><div class="wk-track" role="img" aria-label="' + (x.on ? 'Atiende de ' + x.ini + ' a ' + x.fin : 'No atiende') + '">' + barOf(x) + '</div><div class="wk-msg">' + msgOf(x, i) + '</div></div>'; }).join('') + '</div>' +
+        '<div class="row gap-2"><button type="button" class="btn btn-secondary btn-sm" id="wCopy">' + UI.icon('copy') + 'Copiar lunes a toda la semana laboral</button><button type="button" class="btn btn-ghost btn-sm" id="wSun">Cerrar fines de semana</button></div>' +
+        '<div class="row gap-3"><button type="button" class="btn btn-primary" id="wSave">Guardar ventanas</button><span class="muted t-13">Lunes a viernes de referencia: <span class="mono">' + (wk[0].ini || '—') + '–' + (wk[0].fin || '—') + '</span></span></div></div>';
+      $$('.wk-row', el).forEach(function (row) { var i = +row.dataset.i; $$('input', row).forEach(function (inp) { inp.onchange = function () { var k = inp.dataset.k; if (k === 'on') { wk[i].on = inp.checked; if (inp.checked && !wk[i].ini) { wk[i].ini = c.ventanaInicio; wk[i].fin = c.ventanaFin; } } else wk[i][k] = inp.value; draw(); }; }); });
+      $('#wCopy', el).onclick = function () { for (var i = 1; i < 5; i++) wk[i] = { on: wk[0].on, ini: wk[0].ini, fin: wk[0].fin }; draw(); UI.toast('Horario del lunes copiado a martes–viernes.', 'info'); };
+      $('#wSun', el).onclick = function () { wk[5].on = false; wk[6].on = false; draw(); };
+      $('#wSave', el).onclick = function () {
+        var errs = wk.map(function (x, i) { return x.on && (!x.ini || !x.fin || hm(x.fin) <= hm(x.ini)) ? DAYS[i] : null; }).filter(Boolean);
+        if (!wk.some(function (x) { return x.on; })) { UI.toast('Activa al menos un día de atención.', 'error'); return; }
+        if (errs.length) { UI.toast('Corrige el horario de: ' + errs.join(', ') + '.', 'error'); return; }
+        WEEK[c.clienteIdSAP] = wk.map(function (x) { return { on: x.on, ini: x.ini, fin: x.fin }; });
+        var ref = wk.filter(function (x) { return x.on; })[0]; c.ventanaInicio = ref.ini; c.ventanaFin = ref.fin; saved('Ventanas horarias guardadas.');
+      };
+    }
+    draw();
+  }
+
+  /* --- Restricciones de acceso (HU-046) --- */
+  function pAcc(el) {
+    var c = cur.c, acc = accOf(c), sel = c.restricciones.slice(), extra = sel.filter(function (x) { return RESTR.indexOf(x) < 0; });
+    function draw() {
+      el.innerHTML = '<div class="stack-lg"><div><p class="muted t-13 mb-3">El motor de rutas descarta los vehículos que no cumplen estas restricciones y avisa al conductor en la parada.</p><div class="chk-grid">' +
+        RESTR.concat(extra).map(function (r, i) { return '<label class="chk-card check"><input type="checkbox" data-r="' + esc(r) + '"' + (sel.indexOf(r) > -1 ? ' checked' : '') + '><span>' + esc(r) + '</span></label>'; }).join('') + '</div></div>' +
+        '<div class="form-grid c2">' + fld('xVeh', 'Vehículo más grande permitido', acc.veh, { select: VEH_MAX, hint: 'Ver <a href="vehiculos.html">flota y restricciones</a>.' }) + '<div class="field"><label class="label" for="xNew">Otra restricción <span class="opt">(opcional)</span></label><div class="input-group row nowrap gap-2"><input class="input" id="xNew" placeholder="Ej. Entrada solo por la calle 12"><button type="button" class="btn btn-secondary" id="xAdd">Agregar</button></div></div></div>' +
+        '<div class="row gap-3"><button type="button" class="btn btn-primary" id="xSave">Guardar restricciones</button><span class="muted t-13">' + sel.length + ' restricción' + (sel.length === 1 ? '' : 'es') + ' activa' + (sel.length === 1 ? '' : 's') + '</span></div></div>';
+      $$('[data-r]', el).forEach(function (cb) { cb.onchange = function () { var r = cb.dataset.r, i = sel.indexOf(r); if (cb.checked && i < 0) sel.push(r); if (!cb.checked && i > -1) sel.splice(i, 1); }; });
+      $('#xAdd', el).onclick = function () { var inp = $('#xNew', el), v = inp.value.trim(); $$('.error-text', inp.parentNode.parentNode).forEach(function (e) { e.remove(); }); inp.removeAttribute('aria-invalid'); if (v.length < 6) { inp.setAttribute('aria-invalid', 'true'); inp.parentNode.parentNode.insertAdjacentHTML('beforeend', '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + 'Describe la restricción con al menos 6 caracteres.</span>'); return; } if (sel.concat(extra).indexOf(v) > -1) { UI.toast('Esa restricción ya está registrada.', 'warning'); return; } extra.push(v); sel.push(v); draw(); };
+      $('#xSave', el).onclick = function () { c.restricciones = sel.slice(); acc.veh = $('#xVeh', el).value; saved('Restricciones de acceso guardadas.'); };
+    }
+    draw();
+  }
+
+  /* --- Frecuencia (HU-047) y tiempo de descargue (HU-048) --- */
+  function pFrec(el) {
+    var c = cur.c, days = freqOf(c).slice(), freq = c.frecuencia, mins = c.descargueMin, obs = observedUnload(c);
+    function draw() {
+      var need = freq === 'Semanal' ? 1 : freq === 'Quincenal' ? 1 : 0, dis = freq === 'Bajo demanda', err = (freq === 'Semanal' || freq === 'Quincenal') && !days.some(Boolean);
+      el.innerHTML = '<div class="stack-lg"><section><h3 class="sec-title">Frecuencia de entrega</h3><div class="segmented" role="group" aria-label="Frecuencia">' + ['Diaria', 'Semanal', 'Quincenal', 'Bajo demanda'].map(function (f) { return '<button type="button" data-f="' + f + '" aria-pressed="' + (f === freq) + '">' + f + '</button>'; }).join('') + '</div>' +
+        '<h3 class="sec-title" style="margin-top:20px">Días preferidos</h3><div class="day-chips" role="group" aria-label="Días preferidos">' + DAYS_S.slice(0, 6).map(function (d, i) { return '<button type="button" class="filter-chip" data-d="' + i + '" aria-pressed="' + (!!days[i] && !dis) + '" aria-label="' + DAYS[i] + '"' + (dis ? ' disabled' : '') + '>' + d + '</button>'; }).join('') + '</div>' +
+        (err ? '<span class="error-text mt-2">' + UI.icon('alert-circle', 'icon-sm') + 'Elige al menos un día preferido para la frecuencia ' + freq.toLowerCase() + '.</span>' : '<span class="hint">' + (dis ? 'Los pedidos de este cliente se planean cuando los solicita.' : freq === 'Diaria' ? 'Se considera para planear todos los días hábiles marcados.' : 'La planeación prioriza estos días al agrupar pedidos.') + '</span>') + '</section>' +
+        '<section><h3 class="sec-title">Tiempo promedio de descargue</h3><div class="row gap-3"><div class="stepper-num"><button type="button" class="btn btn-secondary btn-icon" id="mMinus" aria-label="Restar 5 minutos">' + UI.icon('minus') + '</button><input class="input" id="mIn" type="number" min="5" max="240" step="5" value="' + mins + '" aria-label="Minutos de descargue"' + (mins < 5 || mins > 240 ? ' aria-invalid="true"' : '') + '><button type="button" class="btn btn-secondary btn-icon" id="mPlus" aria-label="Sumar 5 minutos">' + UI.icon('plus') + '</button><span class="muted">min por parada</span></div></div>' +
+        (mins < 5 || mins > 240 ? '<span class="error-text mt-2">' + UI.icon('alert-circle', 'icon-sm') + 'Ingresa un valor entre 5 y 240 minutos.</span>' : '') +
+        '<div class="grid c2 gap-3" style="margin-top:14px"><div class="mini-stat"><div class="v">' + mins + ' <small class="t-14">min</small></div><div class="l">Configurado</div></div><div class="mini-stat"><div class="v">' + obs + ' <small class="t-14">min</small></div><div class="l">Observado en las últimas 10 entregas</div></div></div>' +
+        (Math.abs(obs - mins) >= 8 ? '<div class="mt-3">' + UI.banner({ tone: 'warning', title: 'El descargue real difiere ' + Math.abs(obs - mins) + ' min', html: 'El tiempo observado es ' + (obs > mins ? 'mayor' : 'menor') + ' que el configurado, lo que ' + (obs > mins ? 'puede generar retrasos en paradas siguientes' : 'deja tiempo muerto en el viaje') + '. <button type="button" class="link-btn" id="mUse">Usar ' + obs + ' min</button>' }) + '</div>' : '') + '</section>' +
+        '<div class="row gap-3"><button type="button" class="btn btn-primary" id="fSave">Guardar cambios</button></div></div>';
+      $$('[data-f]', el).forEach(function (b) { b.onclick = function () { freq = b.dataset.f; if (freq === 'Diaria') days = [true, true, true, true, true, false]; draw(); }; });
+      $$('[data-d]', el).forEach(function (b) { b.onclick = function () { var i = +b.dataset.d; if (freq === 'Semanal') days = [false, false, false, false, false, false]; days[i] = !days[i]; draw(); }; });
+      $('#mMinus', el).onclick = function () { mins = Math.max(0, mins - 5); draw(); }; $('#mPlus', el).onclick = function () { mins = mins + 5; draw(); };
+      $('#mIn', el).onchange = function () { mins = Math.round(+this.value || 0); draw(); };
+      var u = $('#mUse', el); if (u) u.onclick = function () { mins = obs; draw(); };
+      $('#fSave', el).onclick = function () { if (mins < 5 || mins > 240) { UI.toast('El tiempo de descargue debe estar entre 5 y 240 minutos.', 'error'); return; } if ((freq === 'Semanal' || freq === 'Quincenal') && !days.some(Boolean)) { UI.toast('Elige al menos un día preferido.', 'error'); return; } c.frecuencia = freq; c.descargueMin = mins; FREQD[c.clienteIdSAP] = days.slice(); saved('Frecuencia y tiempo de descargue guardados.'); cur.render('cd-frec'); };
+    }
+    draw();
+  }
+
+  /* --- Contacto y observaciones (HU-049) --- */
+  function pCont(el) {
+    var c = cur.c, k = c.contacto, obsTxt = (c._obs != null ? c._obs : (A.idx.pedidos && A.pedidos.filter(function (p) { return p.clienteId === c.clienteIdSAP && p.observaciones; })[0] || { observaciones: '' }).observaciones) || '';
+    el.innerHTML = '<div class="stack-lg"><div class="form-grid c2">' + fld('kNom', 'Nombre de quien recibe', k.nombre) + fld('kCar', 'Cargo', k.cargo) + fld('kTel', 'Teléfono', k.telefono, { mono: true, type: 'tel', hint: 'Celular de 10 dígitos o fijo con indicativo.' }) + fld('kMail', 'Correo', k.correo, { type: 'email' }) + '</div>' +
+      fld('kObs', 'Observaciones para el conductor', obsTxt, { textarea: true, rows: 4, max: 280, opt: true, ph: 'Ej. Llamar 30 minutos antes de llegar; entrar por la portería 2.', hint: '<span id="kCnt">' + obsTxt.length + '</span>/280 caracteres' }) +
+      '<div class="row gap-3"><button type="button" class="btn btn-primary" id="kSave">Guardar contacto</button><a class="btn btn-ghost" href="tel:' + esc(String(k.telefono).replace(/\D/g, '')) + '">' + UI.icon('phone') + 'Llamar</a></div></div>';
+    $('#kObs', el).oninput = function () { $('#kCnt', el).textContent = this.value.length; };
+    $('#kSave', el).onclick = function () {
+      var n = $('#kNom', el), t = $('#kTel', el), m = $('#kMail', el), ok = true;
+      $$('.error-text', el).forEach(function (e) { e.remove(); }); [n, t, m].forEach(function (x) { x.removeAttribute('aria-invalid'); });
+      function bad(x, msg) { ok = false; x.setAttribute('aria-invalid', 'true'); x.parentNode.insertAdjacentHTML('beforeend', '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + msg + '</span>'); }
+      if (n.value.trim().length < 3) bad(n, 'Escribe el nombre de quien recibe.');
+      var d = t.value.replace(/\D/g, ''); if (!(d.length === 10 && /^3/.test(d)) && !(d.length === 10 && /^60/.test(d)) && d.length !== 7) bad(t, 'Ingresa un celular de 10 dígitos (3xx xxx xxxx) o un fijo válido.');
+      if (m.value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(m.value.trim())) bad(m, 'El correo no tiene un formato válido.');
+      if (!ok) return;
+      k.nombre = n.value.trim(); k.cargo = $('#kCar', el).value.trim(); k.telefono = t.value.trim(); k.correo = m.value.trim(); c._obs = $('#kObs', el).value.trim(); saved('Contacto actualizado.');
+    };
+  }
+
+  /* --- Historial de entregas (HU-050) --- */
+  function histOf(c) {
+    var r = rng('hist' + c.clienteIdSAP), rows = [], d = new Date(); d.setHours(8, 0, 0, 0);
+    var step = c.frecuencia === 'Diaria' ? 3 : c.frecuencia === 'Semanal' ? 7 : c.frecuencia === 'Quincenal' ? 14 : 11;
+    for (var i = 0; i < 12; i++) {
+      d = new Date(d.getTime() - (step + Math.floor(r() * 3)) * 864e5);
+      var wd = d.getDay(); if (wd === 0) d = new Date(d.getTime() - 864e5);
+      var x = r(), res = x < 0.84 ? 'Entregado' : x < 0.94 ? 'Entrega parcial' : 'Fallido', late = r() < 0.12, kg = Math.round((900 + r() * 5200) / 10) * 10, desc = Math.max(8, Math.round(c.descargueMin * (0.7 + r() * 0.7)));
+      var win = hm(c.ventanaInicio), arr = win + Math.round(r() * (hm(c.ventanaFin) - win - 25)) + (late ? 40 : 0);
+      rows.push({ fecha: new Date(d), res: res, tiempo: !late, kg: res === 'Fallido' ? 0 : kg, desc: res === 'Fallido' ? 0 : desc, pedido: 'ES-' + (400000 + Math.floor(r() * 99999)), llegada: String(Math.floor(arr / 60)).padStart(2, '0') + ':' + String(arr % 60).padStart(2, '0'), despacho: null });
+    }
+    return rows;
+  }
+  function pHist(el) {
+    var c = cur.c, h = histOf(c), n = h.length, ent = h.filter(function (x) { return x.res === 'Entregado'; }).length, ok = h.filter(function (x) { return x.res === 'Entregado' && x.tiempo; }).length, fail = h.filter(function (x) { return x.res === 'Fallido'; }).length, otif = Math.round(ok / n * 1000) / 10;
+    var avgDesc = Math.round(h.filter(function (x) { return x.desc; }).reduce(function (s, x) { return s + x.desc; }, 0) / Math.max(1, n - fail));
+    var abiertos = A.pedidos.filter(function (p) { return p.clienteId === c.clienteIdSAP; });
+    el.innerHTML = '<div class="stack-lg"><div class="grid c4 gap-3" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))"><div class="mini-stat"><div class="v" style="color:' + (otif >= 90 ? 'var(--green-fg)' : otif >= 80 ? 'var(--amber-fg)' : 'var(--red-fg)') + '">' + F.num(otif, 1) + '<small class="t-14"> %</small></div><div class="l">OTIF del cliente (meta ' + A.kpis.metas.otifPct + ' %)</div></div><div class="mini-stat"><div class="v">' + n + '</div><div class="l">Entregas en 90 días</div></div><div class="mini-stat"><div class="v">' + F.num(ent / n * 100, 0) + '<small class="t-14"> %</small></div><div class="l">Completas</div></div><div class="mini-stat"><div class="v">' + avgDesc + '<small class="t-14"> min</small></div><div class="l">Descargue promedio</div></div></div>' +
+      (abiertos.length ? '<section><h3 class="sec-title">Pedidos recientes</h3><div class="stack-sm">' + abiertos.slice(0, 4).map(function (p) { return '<div class="row between nowrap" style="padding:8px 0;border-bottom:1px solid var(--border)"><span><a class="mono" href="pedidos.html?id=' + encodeURIComponent(p.pedidoId) + '">' + p.pedidoId + '</a> <span class="muted t-13">· ' + F.kg(p.pesoKg) + ' · entrega ' + F.fecha(p.entregaSolicitada) + '</span></span>' + UI.chip(p.estado, { small: true }) + '</div>'; }).join('') + '</div></section>' : '') +
+      '<section><h3 class="sec-title">Entregas realizadas</h3><div id="hTbl"></div></section></div>';
+    UI.table($('#hTbl', el), { rows: h, pageSize: 6, dense: true, caption: 'Historial de entregas', emptyText: 'Este cliente aún no tiene entregas.',
+      columns: [
+        { key: 'fecha', label: 'Fecha', value: function (r) { return r.fecha.getTime(); }, render: function (r) { return F.fecha(r.fecha); }, title: true },
+        { key: 'pedido', label: 'Pedido', render: function (r) { return '<span class="mono">' + r.pedido + '</span>'; } },
+        { key: 'llegada', label: 'Llegada', render: function (r) { return '<span class="mono">' + r.llegada + '</span><div class="cell-sub">' + (r.tiempo ? 'Dentro de la ventana' : 'Fuera de la ventana') + '</div>'; } },
+        { key: 'kg', label: 'Peso', num: true, render: function (r) { return r.kg ? F.kg(r.kg) : '—'; } },
+        { key: 'res', label: 'Resultado', render: function (r) { return UI.chip(r.res, { small: true }); } }
+      ] });
+  }
+
+  /* ---------- sincronizar desde SAP / Data Lake (HU-040) ---------- */
+  var synced = false, NUEVOS = [['Ferretería Los Álamos Sopó', 'F', 'sop', 'Los Álamos'], ['Construcciones Andina Cajicá S.A.S.', 'C', 'caj', 'Río Grande']];
+  function addNewClients() {
+    NUEVOS.forEach(function (n, i) {
+      var mu = MUNIS[{ sop: 'Sopó', caj: 'Cajicá' }[n[2]]]; if (!mu) mu = MUNIS['Chía'] || MUNIS[MUNI_LIST[0]];
+      var nm = i ? { n: 'Fabio Quintero', c: 'Residente de obra' } : { n: 'Rocío Acosta', c: 'Almacenista' }, mname = { sop: 'Sopó', caj: 'Cajicá' }[n[2]] || 'Chía', ref = A.clientes.filter(function (x) { return x.municipio === mname; })[0] || A.clientes[0];
+      var c = { clienteIdSAP: 'CL' + (1005800 + i * 23), nit: i ? '901.482.337-5' : '860.511.904-2', razonSocial: n[0], tipo: n[1] === 'C' ? 'Constructora' : 'Ferretería', tipoCodigo: n[1], direccionEntrega: i ? 'Autopista Norte Km 28, vereda Río Grande' : 'Cra 4 # 3-20, Centro', municipio: mname, localidad: null, departamento: 'Cundinamarca', barrio: n[3], zona: mu.zona, rutaId: ref.rutaId, municipioKey: n[2], latitud: +mu.lat.toFixed(5), longitud: +mu.lng.toFixed(5), ventanaInicio: '07:00', ventanaFin: '16:00', restricciones: [], contacto: { nombre: nm.n, cargo: nm.c, telefono: '31' + (i ? '8' : '2') + ' 604 ' + (i ? '1129' : '7740'), correo: nm.n.split(' ')[0].toLowerCase() + '@' + (i ? 'andina.com.co' : 'losalamos.com.co') }, descargueMin: i ? 45 : 25, frecuencia: 'Semanal', calidadDireccion: 'Por validar', estado: 'Activo', sincronizado: nowIso(), vendedor: null, cupoCreditoCOP: 80000000 };
+      A.clientes.push(c); A.idx.clientes[c.clienteIdSAP] = c;
+    });
+  }
+  function syncModal() {
+    var running = false, done = false, retried = false;
+    var steps = ['Conectando con SAP por el canal seguro', 'Leyendo el maestro de clientes (ZSD_CLIENTES_GET)', 'Cruzando coordenadas con el Data Lake', 'Aplicando cambios al maestro'];
+    function stepsHtml(k) { return '<div class="sync-steps" aria-live="polite">' + steps.map(function (s, i) { return '<div class="sync-step ' + (i < k ? 'is-done' : i === k ? 'is-on' : '') + '"><span class="ss-dot">' + (i < k ? UI.icon('check') : i === k ? '<span class="spin"></span>' : '') + '</span>' + s + '</div>'; }).join('') + '</div>'; }
+    var m = UI.modal({ title: 'Sincronizar maestro de clientes', width: 540, dismissible: true,
+      body: '<div id="syBody"><p class="muted t-14">Trae los cambios del maestro desde SAP y las coordenadas normalizadas del Data Lake. Los datos logísticos que editaste en esta pantalla no se sobrescriben.</p><div class="mt-3">' + UI.kv([['Última sincronización', F.fechaHora(lastSync())], ['Origen', 'SAP (on premises) + Data Lake'], ['Frecuencia automática', 'Cada 15 minutos']]) + '</div></div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Iniciar sincronización', kind: 'primary', id: 'syGo', keepOpen: true, onClick: function () { if (running) return false; if (done) { m.close(); return false; } run(); return false; } }] });
+    var go = $('#syGo', m.el);
+    function run() {
+      running = true; go.disabled = true; go.innerHTML = '<span class="spin"></span>Sincronizando…'; var k = 0, body = $('#syBody', m.el);
+      body.innerHTML = '<div class="meter-cap"><span>Progreso</span></div>' + UI.meter(5, 100, { level: 'info', showValue: false, label: 'Progreso de la sincronización' }) + stepsHtml(0);
+      var t = setInterval(function () {
+        k++; var pct = Math.min(100, k * 25); body.innerHTML = '<div class="meter-cap"><span>Progreso</span><span>' + pct + ' %</span></div>' + UI.meter(pct, 100, { level: 'info', showValue: false, label: 'Progreso de la sincronización' }) + stepsHtml(k);
+        if (k >= steps.length) { clearInterval(t); finish(); }
+      }, 750);
+    }
+    function finish() {
+      var body = $('#syBody', m.el), first = !synced; running = false; done = true;
+      var now = nowIso(); A.clientes.forEach(function (c) { c.sincronizado = now; });
+      var nuevos = 0, dl = 0;
+      if (first) { addNewClients(); synced = true; nuevos = NUEVOS.length; dl = 2; }
+      var n = A.clientes.length;
+      body.innerHTML = '<div class="stack">' + (first ? UI.banner({ tone: 'warning', title: 'Sincronización terminada con avisos', html: 'El Data Lake respondió con retraso: ' + nuevos + ' clientes nuevos llegaron sin coordenadas y quedaron «Por validar». <button type="button" class="link-btn" id="syRetry">Reintentar coordenadas</button>' }) : UI.banner({ tone: 'success', title: 'Maestro al día', text: 'No hubo clientes nuevos ni cambios en SAP desde la última sincronización.' })) +
+        '<div class="grid c3 gap-3"><div class="mini-stat"><div class="v">' + (n - nuevos) + '</div><div class="l">Revisados</div></div><div class="mini-stat"><div class="v">' + (first ? 6 : 0) + '</div><div class="l">Actualizados</div></div><div class="mini-stat"><div class="v">' + nuevos + '</div><div class="l">Nuevos</div></div></div>' +
+        UI.kv([['Duplicados descartados', first ? '1 (idempotencia por código SAP)' : '0'], ['Sin georreferencia', stats().p + ' clientes'], ['Finalizó', F.hora(now)]]) + '</div>';
+      go.disabled = false; go.textContent = 'Listo'; refreshAll();
+      UI.toast(first ? 'Sincronización completa: ' + nuevos + ' clientes nuevos, ' + stats().p + ' sin georreferencia.' : 'El maestro ya estaba al día.', first ? 'warning' : 'success');
+      var rr = $('#syRetry', m.el); if (rr) rr.onclick = function () {
+        rr.disabled = true; rr.textContent = 'Reintentando…';
+        setTimeout(function () { NUEVOS.forEach(function (x, i) { var c = A.clientes[A.clientes.length - NUEVOS.length + i]; if (i === 0) { c.calidadDireccion = 'Aproximada'; c.latitud = +(c.latitud + 0.004).toFixed(5); c.longitud = +(c.longitud - 0.003).toFixed(5); } }); refreshAll(); body.innerHTML = '<div class="stack">' + UI.banner({ tone: 'success', title: 'Coordenadas recibidas para 1 de 2 clientes', text: 'Construcciones Andina Cajicá sigue sin coordenadas válidas en el Data Lake. Ubícalo manualmente desde su ficha.' }) + '<div class="row gap-2"><button type="button" class="btn btn-secondary btn-sm" id="syOpen">Abrir ficha</button><a class="btn btn-ghost btn-sm" href="integraciones.html">Ver cola del Data Lake</a></div></div>'; $('#syOpen', m.el).onclick = function () { m.close(); openClient(A.clientes[A.clientes.length - 1].clienteIdSAP, 'cd-dir'); }; UI.toast('Reintento terminado: 1 cliente recibió coordenadas aproximadas.', 'success'); }, 900);
+      };
+    }
+  }
+  $('#syncBtn').addEventListener('click', syncModal);
+
+  /* ---------- arranque ---------- */
+  var load = [1, 2, 3, 4].map(function () { return '<div class="card kpi"><span class="skeleton sk-line" style="width:50%"></span><span class="skeleton" style="height:34px;width:60%"></span><span class="skeleton sk-line" style="width:70%"></span></div>'; }).join('');
+  $('#kpiRow').innerHTML = load; tbl.setLoading(true);
+  setTimeout(function () { renderKpis(); tbl.setLoading(false); applyFilters(); var id = UI.param('id'); if (id) openClient(id, UI.param('tab') ? 'cd-' + UI.param('tab') : undefined); }, 350);
+});
+</script>
+</body>
+</html>

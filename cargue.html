@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optimización de cargue · Armetales</title>
+<meta name="description" content="Plano de cargue por vehículo: bloques por pedido, orden inverso a la entrega, utilización de capacidad, instrucciones de acomodación y confirmación de cargue.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  select.select.input-sm { padding-right: 32px; }
+  .opt-row .od .icon { display: inline-block; vertical-align: -3px; }
+
+  /* Layout específico del plano de cargue (tokens y componentes viven en app.css) */
+  .s1 { --bc: var(--blue); } .s2 { --bc: var(--green); } .s3 { --bc: var(--amber); }
+  .s4 { --bc: color-mix(in srgb, var(--blue) 50%, var(--red)); } .s5 { --bc: color-mix(in srgb, var(--blue) 55%, var(--green)); }
+  .s6 { --bc: color-mix(in srgb, var(--red) 62%, var(--amber)); } .s7 { --bc: var(--steel); } .s8 { --bc: color-mix(in srgb, var(--green) 55%, var(--amber)); }
+
+  .trip-sel { min-width: 320px; max-width: 100%; }
+  @media (max-width: 639px) { .trip-sel { min-width: 0; width: 100%; } .page-actions { width: 100%; } .page-actions .btn { flex: 1; } }
+  .cg { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+  .cg-main, .cg-side { display: contents; }
+  .cg .o1 { order: 1; } .cg .o2 { order: 2; } .cg .o3 { order: 3; } .cg .o4 { order: 4; } .cg .o5 { order: 5; } .cg .o6 { order: 6; }
+  @media (min-width: 1200px) {
+    .cg { grid-template-columns: minmax(0, 1fr) 400px; align-items: start; }
+    .cg-main, .cg-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  }
+  .ctx { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+  .ctx .ctx-plate { display: flex; align-items: center; gap: 12px; }
+  .ctx .ctx-meta { font-size: 13px; color: var(--text-2); line-height: 1.4; }
+  .ctx .ctx-meta b { color: var(--text); font-weight: 600; }
+  .ctx-links { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+
+  /* camión visto desde arriba */
+  .truck-stage { padding: 22px 16px 8px; --cab: 70px; --bed-h: 168px; }
+  @media (max-width: 639px) { .truck-stage { --cab: 46px; --bed-h: 118px; padding: 18px 12px 6px; } }
+  .truck { position: relative; display: flex; align-items: stretch; }
+  .cab { flex: none; width: var(--cab); margin: 12px 0; border: 2px solid var(--steel); border-right: 0; border-radius: 22px 0 0 22px; background: var(--surface-3); position: relative; display: grid; place-items: center; }
+  .cab::before { content: ""; position: absolute; left: 10px; right: 8px; top: 12%; bottom: 12%; border-radius: 14px 4px 4px 14px; border: 2px solid var(--border-strong); background: color-mix(in srgb, var(--blue) 10%, var(--surface)); }
+  .cab span { position: relative; font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); writing-mode: vertical-rl; transform: rotate(180deg); }
+  @media (max-width: 639px) { .cab span { font-size: 9px; } }
+  .bed { position: relative; flex: 1; min-width: 0; height: var(--bed-h); border: 2px solid var(--steel); border-radius: 0 6px 6px 0; background: var(--surface-2); background-image: linear-gradient(to right, color-mix(in srgb, var(--steel) 14%, transparent) 1px, transparent 1px); background-size: calc(100% / var(--cols, 6)) 100%; margin: 12px 0; }
+  .door { position: absolute; right: -2px; top: -2px; bottom: -2px; width: 10px; border-radius: 0 6px 6px 0; background: repeating-linear-gradient(0deg, var(--steel) 0 6px, transparent 6px 10px); opacity: .65; }
+  .free { position: absolute; top: 6px; bottom: 6px; border: 1.5px dashed var(--border-strong); border-radius: 6px; display: grid; place-items: center; text-align: center; color: var(--text-3); font-size: 12px; padding: 0 6px; }
+  .free b { display: block; font-family: var(--font-display); font-size: 16px; color: var(--text-2); }
+  .blk { position: absolute; top: 6px; bottom: 6px; border: 2px solid var(--bc); border-radius: 5px; background-color: color-mix(in srgb, var(--bc) 14%, var(--surface)); --hc: color-mix(in srgb, var(--bc) 60%, transparent); container-type: inline-size; display: grid; place-items: center; cursor: pointer; padding: 0; transition: transform .12s, box-shadow .12s; overflow: hidden; }
+  .blk:hover { box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc) 30%, transparent); z-index: 4; }
+  .blk:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; z-index: 5; }
+  .blk.is-sel { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--bc); z-index: 3; }
+  .blk.is-pending { border-style: dashed; --hc: color-mix(in srgb, var(--bc) 28%, transparent); }
+  .blk .lb { background: var(--surface); border: 1.5px solid var(--bc); border-radius: 7px; padding: 3px 8px 4px; text-align: center; line-height: 1.1; color: var(--text); max-width: calc(100% - 6px); }
+  .blk .lb b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 19px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .blk .lb small { display: block; font-size: 10.5px; color: var(--text-2); white-space: nowrap; margin-top: 1px; }
+  .blk .ok { position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; }
+  .blk .ok .icon { width: 11px; height: 11px; stroke-width: 3; }
+  @container (max-width: 78px) { .blk .lb small { display: none; } .blk .lb { padding: 2px 5px; } .blk .lb b { font-size: 16px; } .blk .ok { width: 14px; height: 14px; top: 2px; right: 2px; } .blk .ok .icon { width: 9px; height: 9px; } }
+  @container (max-width: 44px) { .blk .lb b { font-size: 13px; } .blk .lb { padding: 1px 3px; } }
+  .wheel { position: absolute; width: 28px; height: 9px; border-radius: 3px; background: var(--ink); transform: translateX(-50%); }
+  :root[data-theme="dark"] .wheel { background: var(--text-3); }
+  .wheel.t { top: 4px; } .wheel.b { bottom: 4px; }
+  @media (max-width: 639px) { .wheel { width: 18px; height: 7px; } }
+  .ruler { position: relative; margin-left: var(--cab); height: 34px; margin-top: 4px; }
+  .ruler i { position: absolute; top: 0; width: 1px; height: 7px; background: var(--steel); }
+  .ruler span { white-space: nowrap; position: absolute; top: 9px; transform: translateX(-50%); font: 500 11px var(--font-mono); color: var(--text-2); }
+  .ruler .edge-l { transform: none; } .ruler .edge-r { transform: translateX(-100%); }
+  .truck-cap { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--text-2); padding: 0 2px 8px; margin-left: 0; }
+  .truck-tip { position: absolute; z-index: 20; pointer-events: none; background: var(--ink); color: #fff; border-radius: 8px; padding: 7px 10px; font-size: 12px; line-height: 1.35; box-shadow: var(--shadow-pop); max-width: 260px; transform: translate(-50%, calc(-100% - 8px)); white-space: normal; }
+  :root[data-theme="dark"] .truck-tip { background: var(--surface-3); color: var(--text); border: 1px solid var(--border-strong); }
+  .truck-tip b { font-weight: 600; } .truck-tip .mono { color: inherit; opacity: .85; }
+  .stops-legend { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 16px; }
+  .stops-legend button { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 8px; border: 1px solid var(--border-strong); border-radius: var(--r-pill); font-size: 12.5px; background: var(--surface); color: var(--text-2); max-width: 100%; }
+  .stops-legend button:hover { background: var(--surface-3); color: var(--text); }
+  .stops-legend button[aria-pressed="true"] { border-color: var(--bc); color: var(--text); box-shadow: inset 0 0 0 1px var(--bc); font-weight: 600; }
+  .stops-legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--bc); flex: none; }
+  .stops-legend span.t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px; }
+  .blk-detail { margin: 0 16px 16px; padding: 14px 16px; border: 1px solid var(--border); border-left: 4px solid var(--bc); border-radius: var(--r-ctl); background: var(--surface-2); display: grid; gap: 10px 20px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); align-items: start; }
+  .blk-detail .k { font-size: 11.5px; color: var(--text-2); }
+  .blk-detail .v { font-weight: 600; font-size: 14px; }
+  .blk-detail .full { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+  .out-strip { margin: 0 16px 16px; padding: 10px 14px; border: 1px dashed var(--border-strong); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .out-strip .o { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 0; font-size: 13px; }
+
+  /* secuencia */
+  .seq { list-style: none; padding: 0; margin: 0; counter-reset: s; }
+  .seq > li { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; gap: 4px 14px; padding: 14px 16px; border-bottom: 1px solid var(--border); align-items: start; position: relative; cursor: pointer; transition: background .12s; }
+  .seq > li:last-child { border-bottom: 0; }
+  .seq > li:hover { background: var(--surface-2); }
+  .seq > li.is-sel { background: color-mix(in srgb, var(--bc) 7%, var(--surface)); box-shadow: inset 3px 0 0 var(--bc); }
+  .seq .sn { text-align: center; line-height: 1.05; }
+  .seq .sn b { display: grid; place-items: center; width: 40px; height: 40px; margin: 0 auto 3px; border-radius: 10px; background-color: color-mix(in srgb, var(--bc) 16%, var(--surface)); border: 2px solid var(--bc); font-family: var(--font-display); font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .seq .sn small { font-size: 10.5px; color: var(--text-2); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+  .seq .sh { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+  .seq .sc { font-weight: 600; font-size: 14px; }
+  .seq .sm { font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
+  .seq .si { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; }
+  .seq .si li { display: flex; gap: 8px; font-size: 13px; line-height: 1.4; position: static; padding: 0; border: 0; cursor: default; background: none; box-shadow: none; }
+  .seq .si li:hover { background: none; }
+  .seq .si li .icon { width: 15px; height: 15px; margin-top: 2px; color: var(--text-3); }
+  .seq .sx { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .seq .sx .conf-meta { font-size: 11.5px; color: var(--text-2); text-align: right; }
+  .seq .check input:disabled + span { opacity: .8; }
+  @media (max-width: 639px) { .seq > li { grid-template-columns: 44px minmax(0, 1fr); padding: 12px; } .seq .sx { grid-column: 2; flex-direction: row; align-items: center; justify-content: space-between; margin-top: 8px; } .seq .sn b { width: 34px; height: 34px; font-size: 17px; } }
+
+  /* lado: totales */
+  .big { font-family: var(--font-display); font-weight: 600; font-size: 40px; line-height: 1; letter-spacing: -.015em; font-variant-numeric: tabular-nums; }
+  .big small { font-size: 16px; font-weight: 500; color: var(--text-2); margin-left: 4px; letter-spacing: 0; }
+  .mrow + .mrow { margin-top: 16px; }
+  .mrow .cap { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--text-2); margin-bottom: 6px; }
+  .mrow .cap b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .rule-list { display: grid; gap: 8px; }
+  .rule-list .r { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .rule-list .r .rn { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .bn-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .banner .b-body { min-width: 0; }
+  @keyframes nudge { 0%, 100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  .nudge { animation: nudge .35s 2; }
+
+  /* distribución del día */
+  .kpi-row { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-bottom: 16px; }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .kpi-row > :last-child:nth-child(odd) { grid-column: span 2; } .kpi .kpi-value { font-size: 28px; } .kpi { padding: 12px; } }
+  .day-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); }
+  .trip-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
+  .trip-card .tc-top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+  .trip-card .tc-id { font-size: 12px; color: var(--text-2); margin-top: 4px; }
+  .mini { position: relative; height: 34px; border: 1.5px solid var(--steel); border-radius: 5px; background: var(--surface-2); margin-left: 16px; }
+  .mini::before { content: ""; position: absolute; left: -17px; top: 4px; bottom: 4px; width: 14px; border: 1.5px solid var(--steel); border-right: 0; border-radius: 8px 0 0 8px; background: var(--surface-3); }
+  .mini i { position: absolute; top: 3px; bottom: 3px; border: 1.5px solid var(--bc); border-radius: 3px; background-color: color-mix(in srgb, var(--bc) 18%, var(--surface)); --hc: color-mix(in srgb, var(--bc) 55%, transparent); }
+  .trip-card .tc-m { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+  .trip-card .tc-m .l { font-size: 11.5px; color: var(--text-2); margin-bottom: 3px; }
+  .trip-card .tc-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border); margin-top: auto; }
+  .trip-card.is-current { border-color: var(--red-line); box-shadow: 0 0 0 1px var(--red-line), var(--shadow-1); }
+  .sugg { font-size: 12.5px; color: var(--text-2); }
+  .field-note { font-size: 12.5px; color: var(--text-2); }
+  .opt-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); cursor: pointer; }
+  .opt-row + .opt-row { margin-top: 8px; }
+  .opt-row:has(input:checked) { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 6%, var(--surface)); }
+  .opt-row:has(input:disabled) { opacity: .6; cursor: not-allowed; background: var(--surface-2); }
+  .opt-row input { margin-top: 3px; accent-color: var(--red); }
+  .opt-row .on { font-weight: 600; font-size: 13.5px; }
+  .opt-row .od { font-size: 12.5px; color: var(--text-2); }
+  .dec-block { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-ctl); }
+  .dec-block + .dec-block { margin-top: 10px; }
+  .dec-block.is-invalid { border-color: var(--red); background: color-mix(in srgb, var(--red) 4%, var(--surface)); }
+</style>
+</head>
+<body data-page="cargue">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow" id="phEyebrow">Operación</div>
+      <h1 class="page-title">Optimización de cargue</h1>
+      <p class="page-desc">Cómo va la carga en cada vehículo: qué pedido va dónde, en qué orden se sube al camión y si cabe sin sobrepasar peso, volumen ni compatibilidad de carrocería.</p>
+    </div>
+    <div class="page-actions">
+      <label class="sr-only" for="tripSel">Despacho o viaje</label>
+      <select class="select trip-sel" id="tripSel"></select>
+      <button type="button" class="btn btn-primary" id="mainBtn"></button>
+    </div>
+  </header>
+
+  <div id="banners" class="stack mb-4" aria-live="polite"></div>
+
+  <div class="tabs" role="tablist" id="mainTabs" aria-label="Vistas de cargue">
+    <button class="tab" role="tab" id="tabPlano" aria-controls="pPlano" aria-selected="true">Plano de cargue</button>
+    <button class="tab" role="tab" id="tabDia" aria-controls="pDia" aria-selected="false">Distribución del día <span class="count" id="cDia"></span></button>
+  </div>
+
+  <div class="tab-panel" id="pPlano" role="tabpanel" aria-labelledby="tabPlano">
+    <div class="cg" id="cg"></div>
+  </div>
+  <div class="tab-panel" id="pDia" role="tabpanel" aria-labelledby="tabDia" hidden></div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$, ic = UI.icon;
+  var USER = A.usuarioActual;
+
+  /* ---------- modelo de viajes (despachos abiertos + viajes propuestos) ---------- */
+  var trips = [];
+  A.despachos.filter(function (d) { return d.estado !== 'Cerrado'; }).forEach(function (d) { trips.push(mk(d, 'despacho')); });
+  A.plan.viajes.forEach(function (v) { trips.push(mk(v, 'plan')); });
+  function mk(x, kind) {
+    var id = kind === 'despacho' ? x.despachoId : x.viajeId, conf = {};
+    A.cargue.filter(function (c) { return c.despachoId === id; }).forEach(function (c) { if (c.estado === 'Cargado') conf[c.pedidoId] = { por: kind === 'despacho' && x.cargue ? 'Operario · muelle ' + x.cargue.muelle : 'Operario de bodega', ts: new Date(A.ahora.getTime ? A.ahora.getTime() - (20 + Object.keys(conf).length * 9) * 60000 : Date.now()) }; });
+    return { id: id, kind: kind, estado: kind === 'despacho' ? x.estado : 'Propuesto', placa: x.vehiculoId, rutaId: x.rutaId, peds: x.pedidoIds.slice(), out: [], conf: conf, exc: null, cerrado: kind === 'despacho' && x.estado === 'En ruta', distOk: false, sel: null, src: x, muelle: x.cargue ? x.cargue.muelle : null };
+  }
+  function tripById(id) { return trips.filter(function (t) { return t.id === id; })[0]; }
+  var cur = (tripById(UI.param('id')) || tripById('DSP-2611-019') || trips[0]);
+  function veh(p) { return A.idx.vehiculos[p]; }
+  function ped(id) { return A.idx.pedidos[id]; }
+  function prod(sku) { return A.idx.productos[sku]; }
+  function fn(n, d) { return F.num(n, d == null ? 1 : d); }
+  function active(t) { return t.peds.filter(function (id) { return t.out.indexOf(id) === -1; }); }
+  var DIAC = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes'];
+
+  /* ---------- cálculo: totales, bloques, ejes, incompatibilidades ---------- */
+  function calc(t) {
+    var v = veh(t.placa), act = active(t), seq = act.slice().reverse(), kg = 0, m3 = 0;
+    act.forEach(function (id) { kg += ped(id).pesoKg; m3 += ped(id).volumenM3; });
+    var pPct = kg / v.pesoMaxKg * 100, vPct = m3 / v.volumenMaxM3 * 100, Fl = act.length ? Math.min(1, Math.max(pPct, vPct, 6) / 100) : 0;
+    var ws = seq.map(function (id) { return Fl * ped(id).pesoKg / (kg || 1); }).map(function (w) { return Math.max(w, 0.075); }), tot = ws.reduce(function (a, b) { return a + b; }, 0);
+    if (tot > 1) ws = ws.map(function (w) { return w / tot; });
+    var pos = 0, blocks = seq.map(function (id, i) {
+      var p = ped(id), a = pos, b = pos + ws[i]; pos = b; var mid = (a + b) / 2, n = act.indexOf(id) + 1;
+      return { id: id, ped: p, load: i + 1, drop: n, a: a, b: b, mid: mid, m0: a * v.largoM, m1: b * v.largoM, pos: mid < 0.33 ? 'Frente' : mid < 0.66 ? 'Centro' : 'Puerta', cls: 's' + (((n - 1) % 8) + 1) };
+    });
+    var issues = [];
+    act.forEach(function (id) { ped(id).lineas.forEach(function (l) { var pr = prod(l.sku); if (pr.restricciones.indexOf('LARGA') > -1 && !v.compatibilidad.largaMas6m) issues.push({ id: id, desc: pr.descripcion, largo: pr.largoM }); }); });
+    var overhang = 0; act.forEach(function (id) { ped(id).lineas.forEach(function (l) { overhang = Math.max(overhang, prod(l.sku).largoM - v.largoM); }); });
+    var capIssue = kg > v.pesoMaxKg || m3 > v.volumenMaxM3;
+    var cog = blocks.length ? blocks.reduce(function (s, b) { return s + b.ped.pesoKg * (b.m0 + b.m1) / 2; }, 0) / (kg || 1) : 0, L = v.largoM, groups;
+    function sh(x, f, r) { return Math.max(0, Math.min(1, (x - f) / (r - f))); }
+    if (v.ejes <= 3) { var rs = sh(cog, -0.18 * L, (v.ejes === 2 ? 0.78 : 0.74) * L); groups = [{ n: 'Eje delantero', kg: kg * (1 - rs), lim: v.pesoMaxKg * (v.ejes === 2 ? 0.40 : 0.30) }, { n: v.ejes === 2 ? 'Eje trasero' : 'Tándem trasero (2 ejes)', kg: kg * rs, lim: v.pesoMaxKg * (v.ejes === 2 ? 0.85 : 0.90) }]; }
+    else { var ts = sh(cog, 0.04 * L, 0.84 * L); groups = [{ n: 'Eje direccional', kg: 0, lim: 0, na: true }, { n: 'Tracción (quinta rueda)', kg: kg * (1 - ts), lim: v.pesoMaxKg * 0.32 }, { n: 'Semirremolque (' + (v.ejes - 3) + ' ejes)', kg: kg * ts, lim: v.pesoMaxKg * 0.85 }]; }
+    return { v: v, act: act, blocks: blocks, kg: kg, m3: m3, pPct: pPct, vPct: vPct, F: Fl, issues: issues, overhang: overhang, capIssue: capIssue, blocked: !t.cerrado && ((issues.length > 0 && !t.exc) || capIssue), groups: groups, cog: cog, free: Math.max(0, (1 - (blocks.length ? blocks[blocks.length - 1].b : 0))) * v.largoM };
+  }
+
+  /* ---------- instrucciones de acomodación (HU-109) ---------- */
+  function instr(id) {
+    var out = [], seen = {}; function add(k, t) { if (!seen[k]) { seen[k] = 1; out.push(t); } }
+    ped(id).lineas.forEach(function (l) {
+      var pr = prod(l.sku), r = pr.restricciones, f = pr.familia, d = pr.descripcion;
+      if (f === 'Varilla') { if (/^Estribo/.test(d)) add('est', 'Estribos en cajas sobre estiba, siempre sobre la varilla y nunca debajo.'); else if (r.indexOf('LARGA') > -1) add('v12', 'Varilla de 12 m al piso, centrada sobre durmientes; zunchar cada 2 m y señalizar el voladizo.'); else add('v6', 'Varilla de 6 m al piso, centrada; zunchar los atados cada 2 m.'); }
+      else if (f === 'Malla') add('malla', 'Malla electrosoldada encima de la varilla; no apilar otra carga sobre ella.');
+      else if (f === 'Perfil') { if (r.indexOf('LARGA') > -1) add('viga', 'Vigas IPE de 12 m con montacargas o grúa, sobre estibas de madera y amarradas con eslingas.'); else add('perfil', 'Perfiles, ángulos y platinas sobre durmientes, en paquetes amarrados.'); }
+      else if (f === 'Tubería') { add('tubo', 'Tubería en paquetes sobre durmientes; calzar los extremos para que no ruede.'); }
+      else if (f === 'Lámina') add('lamina', r.indexOf('HUMEDAD') > -1 ? 'Lámina fina bajo carpa, separada con listones de madera.' : 'Lámina en estiba plana con montacargas; no apilar más de una estiba.');
+      else if (f === 'Teja') add('teja', 'Teja de último y arriba de todo; cubrir con carpa y no apilar nada sobre ella.');
+      else if (f === 'Alambre') add('alambre', 'Rollos y cajas de alambre en estiba, cubiertos con carpa y hacia la puerta.');
+      else if (f === 'Cemento') add('cemento', 'Cemento y mortero en estibas bajo carpa; máximo 10 bolsas de altura, no apilar estibas.');
+      if (r.indexOf('SEPARAR') > -1) add('sep', A.restriccionesProducto.SEPARAR + '.');
+      if (r.indexOf('DOS_OPERARIOS') > -1) add('2op', 'Requiere dos operarios para el cargue.');
+      if (r.indexOf('MONTACARGAS') > -1) add('mc', 'Cargar y descargar con montacargas o grúa.');
+    });
+    return out.slice(0, 6);
+  }
+
+  /* ---------- candidatos de vehículo (cambio por incompatibilidad) ---------- */
+  function cands(t) {
+    var k = calc(t), need = k.act.some(function (id) { return ped(id).lineas.some(function (l) { return prod(l.sku).restricciones.indexOf('LARGA') > -1; }); });
+    var used = {}; trips.forEach(function (x) { if (x !== t && !x.cerrado) used[x.placa] = x.id; });
+    return A.vehiculos.map(function (v) {
+      var r = { v: v, ok: true, why: [], warn: [] };
+      if (v.placa === t.placa) { r.ok = false; r.why.push('Vehículo actual'); }
+      if (v.estado === 'Mantenimiento' || v.estado === 'Inactivo') { r.ok = false; r.why.push(v.estado); }
+      else if (v.estado !== 'Disponible' && v.placa !== t.placa) { r.ok = false; r.why.push(v.estado === 'Cargando' ? 'En cargue' : v.estado); }
+      if (used[v.placa]) { r.ok = false; r.why.push('Asignado a ' + used[v.placa]); }
+      if (need && !v.compatibilidad.largaMas6m) { r.ok = false; r.why.push('No admite carga mayor a 6 m'); }
+      if (k.kg > v.pesoMaxKg) { r.ok = false; r.why.push('Peso excede ' + F.kg(v.pesoMaxKg)); }
+      if (k.m3 > v.volumenMaxM3) { r.ok = false; r.why.push('Volumen excede ' + F.m3(v.volumenMaxM3, 0)); }
+      if (v.rutasCobertura.indexOf(t.rutaId) === -1) r.warn.push('No cubre ' + t.rutaId + ' (' + A.idx.rutas[t.rutaId].nombre + ')');
+      return r;
+    }).sort(function (a, b) { return (b.ok - a.ok) || (a.warn.length - b.warn.length) || (a.v.pesoMaxKg - b.v.pesoMaxKg); });
+  }
+  function swapVehicle(t, placa) {
+    var old = t.placa; t.placa = placa; if (t.src) t.src.vehiculoId = placa;
+    var nv = veh(placa), c = A.idx.conductores[nv.conductorId]; if (c && t.src) t.src.conductorId = c.conductorId;
+    UI.toast('Vehículo cambiado de ' + old + ' a ' + placa + '. Se recalculó el plano de cargue.', 'success');
+  }
+
+  /* ---------- selector ---------- */
+  function tripLabel(t) { var r = A.idx.rutas[t.rutaId]; return t.id + ' · ' + t.placa + ' · ' + r.nombre + ' · ' + active(t).length + ' pedidos'; }
+  function drawSelect() {
+    var groups = [['En cargue', function (t) { return t.kind === 'despacho' && !t.cerrado && t.estado === 'Cargando'; }], ['Cargue cerrado · en ruta', function (t) { return t.kind === 'despacho' && (t.cerrado || t.estado === 'En ruta'); }], ['Viajes propuestos de hoy', function (t) { return t.kind === 'plan'; }]];
+    $('#tripSel').innerHTML = groups.map(function (g) { var l = trips.filter(g[1]); return l.length ? '<optgroup label="' + g[0] + '">' + l.map(function (t) { return '<option value="' + t.id + '"' + (t === cur ? ' selected' : '') + '>' + esc(tripLabel(t)) + '</option>'; }).join('') + '</optgroup>' : ''; }).join('');
+    $('#tripSel').setAttribute('aria-label', 'Despacho o viaje');
+  }
+  $('#tripSel').addEventListener('change', function (e) { cur = tripById(e.target.value); try { history.replaceState(null, '', '?id=' + encodeURIComponent(cur.id)); } catch (x) {} renderAll(); });
+
+  /* ---------- banners (HU-110) ---------- */
+  function bannersHtml(t, k) {
+    var h = '';
+    if (k.capIssue) h += '<div class="banner is-danger" role="alert">' + ic('alert-circle') + '<div class="b-body"><div class="b-title">La carga excede la capacidad del vehículo</div>' + (k.kg > k.v.pesoMaxKg ? 'Peso ' + F.kg(k.kg) + ' sobre un máximo de ' + F.kg(k.v.pesoMaxKg) + '. ' : '') + (k.m3 > k.v.volumenMaxM3 ? 'Volumen ' + F.m3(k.m3) + ' sobre un máximo de ' + F.m3(k.v.volumenMaxM3, 0) + '.' : '') + '<div class="bn-actions"><button type="button" class="btn btn-secondary btn-sm" data-act="swap">' + ic('truck') + 'Cambiar vehículo</button><button type="button" class="btn btn-secondary btn-sm" data-act="retire">' + ic('undo') + 'Retirar pedidos</button></div></div></div>';
+    if (k.issues.length && !t.exc && !t.cerrado) {
+      var ds = {}; k.issues.forEach(function (i) { ds[i.desc] = (ds[i.desc] || 0); }); var peds = {}; k.issues.forEach(function (i) { peds[i.id] = 1; });
+      h += '<div class="banner is-danger" role="alert" id="blockBanner">' + ic('ban') + '<div class="b-body"><div class="b-title">Cargue bloqueado por incompatibilidad</div>' +
+        'Hay piezas de <b>' + fn(Math.max.apply(null, k.issues.map(function (i) { return i.largo; })), 0) + ' m</b> (' + Object.keys(ds).map(esc).join(', ') + ') en ' + Object.keys(peds).length + ' ' + (Object.keys(peds).length === 1 ? 'pedido' : 'pedidos') + ' y este vehículo no está habilitado para carga mayor a 6 m: ' + esc(k.v.tipo.toLowerCase()) + ' de ' + esc(k.v.carroceria.toLowerCase()) + ' con plataforma de ' + fn(k.v.largoM) + ' m. ' +
+        (t.kind === 'despacho' ? 'No se puede cerrar el cargue hasta resolverlo.' : 'No se puede confirmar la distribución hasta resolverlo.') +
+        '<div class="bn-actions"><button type="button" class="btn btn-primary btn-sm" data-act="swap">' + ic('truck') + 'Cambiar vehículo</button><button type="button" class="btn btn-secondary btn-sm" data-act="retire">' + ic('undo') + 'Retirar pedidos incompatibles</button><button type="button" class="btn btn-secondary btn-sm" data-act="exc">' + ic('shield-check') + 'Autorizar excepción</button></div></div></div>';
+    } else if (t.exc && k.issues.length) {
+      h += '<div class="banner is-warning" role="status">' + ic('alert-triangle') + '<div class="b-body"><div class="b-title">Excepción autorizada por ' + esc(t.exc.por) + '</div>' + esc(t.exc.medida) + '. Motivo: ' + esc(t.exc.motivo) + ' <span class="muted">(' + F.fechaHora(t.exc.ts) + ')</span><div class="bn-actions"><button type="button" class="btn btn-secondary btn-sm" data-act="revoke">Revocar excepción</button></div></div></div>';
+    } else if (k.overhang > 0.01 && !t.cerrado) {
+      h += UI.banner({ tone: 'warning', title: 'Voladizo de ' + fn(k.overhang) + ' m', text: 'Hay piezas más largas que la plataforma (' + fn(k.v.largoM) + ' m). Asegura con eslingas y señaliza con bandera roja; el límite legal es 2 m.' });
+    }
+    if (t.cerrado) h += UI.banner({ tone: 'success', title: t.estado === 'En ruta' ? 'Cargue cerrado: el vehículo ya está en ruta' : 'Cargue cerrado', html: (t.cerrado && t.closedAt ? 'Cerrado por ' + esc(t.closedBy) + ' ' + F.fechaHora(t.closedAt) + '. ' : 'Todos los pedidos se confirmaron antes de la salida. ') + (t.kind === 'despacho' ? '<a href="despachos.html?id=' + t.id + '">Registrar salida en despachos</a> · <a href="seguimiento.html">Ver seguimiento</a>' : '') });
+    if (t.kind === 'plan') h += t.distOk ? UI.banner({ tone: 'success', title: 'Distribución confirmada', html: 'El viaje ' + t.id + ' queda listo para generar la orden de despacho. <a href="planeacion.html">Volver a planeación</a> · <a href="despachos.html">Generar orden de despacho</a>' }) : UI.banner({ tone: 'info', title: 'Simulación previa al despacho', html: 'Este viaje aún está <b>propuesto</b> en planeación. El plano es la distribución sugerida; el cargue real empieza con la orden de despacho. <a href="planeacion.html">Abrir planeación</a>' });
+    return h;
+  }
+
+  /* ---------- plano ---------- */
+  function truckHtml(t, k) {
+    var v = k.v, L = v.largoM, step = L > 9 ? 2 : 1, ticks = '', i;
+    for (i = 0; i <= Math.floor(L / step) * step; i += step) ticks += '<i style="left:' + (i / L * 100) + '%"></i><span style="left:' + (i / L * 100) + '%" class="' + (i === 0 ? 'edge-l' : '') + '">' + i + ' m</span>';
+    var axs = v.ejes <= 2 ? [0.1, 0.78] : v.ejes === 3 ? [0.1, 0.68, 0.82] : v.ejes === 4 ? [0.1, 0.55, 0.68, 0.86] : [0.1, 0.34, 0.45, 0.78, 0.9];
+    var wheels = axs.map(function (f, ix) { var left = ix === 0 ? 'calc(var(--cab) * 0.42)' : 'calc(var(--cab) + (100% - var(--cab)) * ' + (f - 0.04) + ')'; if (v.ejes > 3 && ix === 1) left = 'calc(var(--cab) * 0.8)'; if (v.ejes > 3 && ix === 2) left = 'calc(var(--cab) * 1.2)'; return '<i class="wheel t" style="left:' + left + '"></i><i class="wheel b" style="left:' + left + '"></i>'; }).join('');
+    var blocks = k.blocks.map(function (b) {
+      var conf = !!t.conf[b.id];
+      return '<button type="button" class="blk hatch ' + b.cls + (conf ? '' : ' is-pending') + (t.sel === b.id ? ' is-sel' : '') + '" data-pid="' + b.id + '" style="left:' + (b.a * 100) + '%;width:' + ((b.b - b.a) * 100) + '%" aria-label="Pedido ' + b.id + ', ' + esc(b.ped.cliente) + ': cargar ' + b.load + '.º, entregar ' + b.drop + '.º, ' + F.kg(b.ped.pesoKg) + ', ' + (conf ? 'cargado' : 'pendiente de cargue') + '"><span class="lb"><b>' + b.load + '.º</b><small>entrega ' + b.drop + '.º</small></span>' + (conf ? '<span class="ok" aria-hidden="true">' + ic('check') + '</span>' : '') + '</button>';
+    }).join('');
+    var lastB = k.blocks.length ? k.blocks[k.blocks.length - 1].b : 0, free = lastB < 0.97 ? '<div class="free" style="left:' + (lastB * 100 + 0.8) + '%;right:14px" aria-label="Espacio libre"><div><b>' + fn(k.free) + ' m</b>libres hacia la puerta</div></div>' : '';
+    if (!k.blocks.length) free = '<div class="free" style="left:8px;right:14px"><div><b>Plataforma vacía</b>No quedan pedidos en este cargue</div></div>';
+    return '<div class="truck-stage"><div class="truck" id="truck" style="--cols:' + Math.max(2, Math.round(L)) + '"><div class="cab" aria-hidden="true"><span>Cabina</span></div><div class="bed" role="group" aria-label="Plataforma de ' + fn(L) + ' metros, vista superior. La cabina queda a la izquierda y la puerta a la derecha">' + blocks + free + '<span class="door" aria-hidden="true"></span></div>' + wheels + '</div>' +
+      '<div class="ruler" aria-hidden="true">' + ticks + '</div><div class="truck-cap"><span>← Cabina · se carga primero</span><span>Puerta trasera · se descarga primero →</span></div></div>';
+  }
+  function legendHtml(t, k) {
+    return '<div class="stops-legend" role="group" aria-label="Paradas de entrega">' + k.act.map(function (id, i) { var p = ped(id), n = i + 1; return '<button type="button" class="s' + (((n - 1) % 8) + 1) + '" data-pid="' + id + '" aria-pressed="' + (t.sel === id) + '"><i></i><span class="t">Entrega ' + n + '.º · ' + esc(p.cliente) + '</span></button>'; }).join('') + '</div>';
+  }
+  function detailHtml(t, k) {
+    var b = k.blocks.filter(function (x) { return x.id === t.sel; })[0]; if (!b) return '';
+    var p = b.ped, conf = t.conf[b.id], canConf = t.kind === 'despacho' && !t.cerrado;
+    return '<div class="blk-detail ' + b.cls + '" id="blkDetail"><div><div class="k">Pedido</div><div class="v"><a class="mono" href="pedidos.html?id=' + p.pedidoId + '">' + p.pedidoId + '</a></div></div>' +
+      '<div><div class="k">Cliente</div><div class="v"><a href="clientes.html?id=' + p.clienteId + '">' + esc(p.cliente) + '</a></div><div class="muted t-13">' + esc(p.municipio) + '</div></div>' +
+      '<div><div class="k">Peso y volumen</div><div class="v">' + F.kg(p.pesoKg) + ' · ' + F.m3(p.volumenM3, 2) + '</div></div>' +
+      '<div><div class="k">Posición en la plataforma</div><div class="v">' + b.pos + '</div><div class="muted t-13">de ' + fn(b.m0) + ' a ' + fn(b.m1) + ' m desde la cabina</div></div>' +
+      '<div><div class="k">Orden</div><div class="v">Cargar ' + b.load + '.º · entregar ' + b.drop + '.º</div></div>' +
+      '<div><div class="k">Estado de cargue</div><div class="v">' + (conf ? UI.chip('Cargado', { tone: 'success', small: true }) : UI.chip('Pendiente', { tone: 'neutral', small: true })) + '</div></div>' +
+      '<div class="full"><span class="muted t-13">' + p.lineas.length + ' líneas · ' + esc(p.lineas.slice(0, 2).map(function (l) { return l.cantidad + ' ' + l.unidad.toLowerCase() + ' ' + l.descripcion.split(' x ')[0]; }).join(' · ')) + (p.lineas.length > 2 ? ' · +' + (p.lineas.length - 2) : '') + '</span><span class="row gap-2"><a class="btn btn-secondary btn-sm" href="pedidos.html?id=' + p.pedidoId + '">' + ic('eye') + 'Ver pedido</a>' + (canConf ? '<button type="button" class="btn ' + (conf ? 'btn-secondary' : 'btn-primary') + ' btn-sm" data-conf="' + b.id + '">' + ic(conf ? 'undo' : 'check') + (conf ? 'Deshacer confirmación' : 'Confirmar cargado') + '</button>' : '') + '</span></div></div>';
+  }
+  function outHtml(t) {
+    if (!t.out.length) return '';
+    return '<div class="out-strip"><div class="strong t-13 mb-1">Pedidos retirados de este cargue</div>' + t.out.map(function (id) { var p = ped(id); return '<div class="o"><span class="mono">' + id + '</span> ' + esc(p.cliente) + ' · ' + F.kg(p.pesoKg) + ' <span class="muted">· pendiente de reasignar en planeación</span><button type="button" class="btn btn-ghost btn-sm ml-auto" data-back="' + id + '">Reincorporar</button></div>'; }).join('') + '</div>';
+  }
+  function planCard(t, k) {
+    var v = k.v, c = A.idx.conductores[v.conductorId], r = A.idx.rutas[t.rutaId];
+    var links = t.kind === 'despacho' ? '<a class="btn btn-secondary btn-sm" href="despachos.html?id=' + t.id + '">' + ic('truck') + 'Despacho</a>' + (t.estado === 'En ruta' ? '<a class="btn btn-secondary btn-sm" href="seguimiento.html">' + ic('navigation') + 'Seguimiento</a>' : '') + '<a class="btn btn-secondary btn-sm" href="motor-rutas.html">' + ic('route') + 'Ruta</a>' : '<a class="btn btn-secondary btn-sm" href="planeacion.html">' + ic('route') + 'Planeación</a><a class="btn btn-secondary btn-sm" href="motor-rutas.html">' + ic('map') + 'Ruta</a>';
+    return '<section class="card o1" aria-label="Plano de cargue"><div class="card-head"><div class="ctx" style="width:100%"><div class="ctx-plate">' + UI.plate(v.placa, { large: true }) + '<div class="ctx-meta"><b>' + esc(v.tipo) + ' · ' + esc(v.carroceria) + '</b><br>Plataforma ' + fn(v.largoM) + ' × ' + fn(v.anchoM) + ' × ' + fn(v.altoM) + ' m · ' + v.ejes + ' ejes</div></div>' +
+      '<div class="ctx-meta"><b>' + esc(r.nombre) + '</b> <span class="mono">' + t.rutaId + '</span><br>' + (c ? esc(c.nombre) : 'Sin conductor') + (t.muelle ? ' · muelle ' + t.muelle : '') + '</div><div>' + UI.chip(t.cerrado ? 'Cargue cerrado' : t.estado, { tone: t.cerrado ? 'success' : t.kind === 'plan' ? 'info' : 'warning' }) + '</div><div class="ctx-links">' + links + '<a class="btn btn-ghost btn-sm" href="vehiculos.html?placa=' + encodeURIComponent(v.placa) + '">' + ic('wrench') + 'Ficha del vehículo</a></div></div></div>' +
+      truckHtml(t, k) + legendHtml(t, k) + detailHtml(t, k) + outHtml(t) + '</section>';
+  }
+  function seqCard(t, k) {
+    var canConf = t.kind === 'despacho' && !t.cerrado, done = k.blocks.filter(function (b) { return t.conf[b.id]; }).length, n = k.blocks.length;
+    var items = k.blocks.map(function (b) {
+      var conf = t.conf[b.id], ins = instr(b.id), p = b.ped;
+      return '<li class="' + b.cls + (t.sel === b.id ? ' is-sel' : '') + '" data-pid="' + b.id + '"><div class="sn"><b>' + b.load + '</b><small>Cargar</small></div><div><div class="sh"><span class="sc">' + esc(p.cliente) + '</span><a class="mono" href="pedidos.html?id=' + p.pedidoId + '">' + p.pedidoId + '</a></div><div class="sm">Entrega ' + b.drop + '.º · ' + F.kg(p.pesoKg) + ' · ' + F.m3(p.volumenM3, 2) + ' · ' + b.pos.toLowerCase() + ', a ' + fn(b.m0) + '–' + fn(b.m1) + ' m de la cabina</div>' +
+        '<ul class="si">' + ins.map(function (x) { return '<li>' + ic('chevron-right') + '<span>' + esc(x) + '</span></li>'; }).join('') + '</ul></div>' +
+        '<div class="sx"><label class="check"><input type="checkbox" data-conf="' + b.id + '"' + (conf ? ' checked' : '') + (canConf ? '' : ' disabled') + ' aria-label="Pedido ' + b.id + ' cargado"><span>Cargado</span></label>' + (conf ? '<span class="conf-meta">' + esc(conf.por) + ' · ' + F.hora(conf.ts) + '</span>' : (canConf ? '<span class="conf-meta">Pendiente</span>' : '')) + '</div></li>';
+    }).join('');
+    return '<section class="card o3" aria-label="Secuencia de cargue"><div class="card-head"><div><h2 class="card-title">Secuencia de cargue</h2><p class="card-sub">Se carga en orden inverso a la entrega: lo último en entregar va primero, contra la cabina.</p></div>' +
+      (n ? '<div style="min-width:200px;flex:0 1 240px">' + UI.meter(done, n, { level: done === n ? 'ok' : 'info', text: done + ' de ' + n + ' cargados', label: 'Pedidos cargados' }) + '</div>' : '') + '</div>' +
+      (n ? '<ol class="seq">' + items + '</ol>' : '<div class="card-body">' + UI.empty({ icon: 'box', title: 'No hay pedidos para cargar', text: 'Todos los pedidos de este viaje se retiraron. Reincorpóralos o vuelve a planeación para reasignarlos.' }) + '</div>') + '</section>';
+  }
+  function sideCards(t, k) {
+    var v = k.v, lvl = function (p) { return p > 100 ? 'crit' : p >= 95 ? 'warn' : p < 50 ? 'low' : 'ok'; };
+    var limita = k.pPct >= k.vPct ? 'peso' : 'volumen';
+    var tot = '<section class="card o2" aria-label="Totales de carga"><div class="card-head"><div><h2 class="card-title">Carga total</h2><p class="card-sub">Suma de ' + k.act.length + ' pedidos</p></div>' + UI.chip(k.capIssue ? 'Excede capacidad' : 'Cabe en el vehículo', { tone: k.capIssue ? 'danger' : 'success' }) + '</div><div class="card-body">' +
+      '<div class="mrow"><div class="row between nowrap" style="align-items:flex-end"><div class="big">' + fn(k.kg / 1000, 2) + '<small>t</small></div><div class="muted t-13 right">de ' + F.ton(v.pesoMaxKg) + ' de capacidad<br>' + F.kg(k.kg) + '</div></div><div class="cap mt-2"><span>Utilización de peso</span></div>' + UI.meter(Math.round(k.pPct), 100, { size: 'lg', label: 'Utilización de peso', level: lvl(k.pPct) }) + '</div>' +
+      '<div class="mrow"><div class="row between nowrap" style="align-items:flex-end"><div class="big">' + fn(k.m3, 1) + '<small>m³</small></div><div class="muted t-13 right">de ' + F.m3(v.volumenMaxM3, 0) + ' de capacidad</div></div><div class="cap mt-2"><span>Utilización de volumen</span></div>' + UI.meter(Math.round(k.vPct), 100, { size: 'lg', label: 'Utilización de volumen', low: 30, level: k.vPct > 100 ? 'crit' : k.vPct >= 95 ? 'warn' : 'info' }) + '</div>' +
+      '<p class="muted t-13 mt-3">' + (k.act.length ? 'Limita el <b>' + limita + '</b>: ' + (limita === 'peso' ? 'es carga densa de acero, se llena por kilos antes que por espacio.' : 'la carga es voluminosa para su peso.') : 'Sin carga asignada.') + '</p></div></section>';
+    var estUse = Math.min(v.estibas, Math.ceil(k.F * v.estibas));
+    var cap = '<section class="card o4" aria-label="Capacidad útil"><div class="card-head"><div><h2 class="card-title">Capacidad útil</h2><p class="card-sub">Lo que el vehículo puede llevar</p></div></div><div class="card-body" style="padding-top:4px;padding-bottom:4px">' + UI.kv([['Peso útil', F.kg(v.pesoMaxKg)], ['Volumen útil', F.m3(v.volumenMaxM3, 1)], ['Holgura de peso', '<span class="' + (k.kg > v.pesoMaxKg ? 'strong" style="color:var(--red-fg)' : '') + '">' + F.kg(v.pesoMaxKg - k.kg) + '</span>'], ['Holgura de volumen', F.m3(v.volumenMaxM3 - k.m3, 1)], ['Estibas ocupadas (aprox.)', estUse + ' de ' + v.estibas], ['Largo libre hacia la puerta', fn(k.free) + ' m'], ['Ayudante', v.requiereAyudante ? UI.chip('Requerido', { tone: 'warning', small: true }) : UI.chip('No requiere', { tone: 'neutral', small: true })]]) + '</div></section>';
+    var ax = '<section class="card o5" aria-label="Distribución por eje"><div class="card-head"><div><h2 class="card-title">Distribución por eje</h2><p class="card-sub">Aproximada, según la posición de cada bloque</p></div></div><div class="card-body stack">' +
+      k.groups.map(function (g) { if (g.na) return '<div class="mrow"><div class="cap"><span>' + g.n + '</span><b>Solo tara</b></div></div>'; var p = g.lim ? g.kg / g.lim * 100 : 0; return '<div class="mrow"><div class="cap"><span>' + g.n + '</span><b>' + F.kg(Math.round(g.kg)) + '</b></div>' + UI.meter(Math.round(p), 100, { label: g.n, level: p > 100 ? 'crit' : p >= 85 ? 'warn' : 'info', text: Math.round(p) + ' % del límite' }) + '</div>'; }).join('') +
+      '<p class="muted t-13" style="margin-top:-4px">Centro de gravedad a ' + fn(k.cog) + ' m de la cabina. Estimación con peso uniforme por pedido; el pesaje en báscula manda.</p></div></section>';
+    var flags = {}; k.act.forEach(function (id) { ped(id).lineas.forEach(function (l) { prod(l.sku).restricciones.forEach(function (r) { (flags[r] = flags[r] || {})[id] = 1; }); }); });
+    var order = ['LARGA', 'MONTACARGAS', 'DOS_OPERARIOS', 'HUMEDAD', 'NO_APILAR', 'SEPARAR', 'ZUNCHAR'], comp = { LARGA: v.compatibilidad.largaMas6m, MONTACARGAS: v.compatibilidad.montacargas, HUMEDAD: v.compatibilidad.protegeHumedad };
+    var rl = order.filter(function (r) { return flags[r]; }).map(function (r) { var n = Object.keys(flags[r]).length, okc = r in comp ? comp[r] : null; return '<div class="r"><span class="rn">' + (okc === null ? ic('info', 'icon-sm') : okc ? '<span style="color:var(--green)">' + ic('check-circle', 'icon-sm') + '</span>' : '<span style="color:var(--red)">' + ic('x-circle', 'icon-sm') + '</span>') + '<span>' + esc(A.restriccionesProducto[r]) + '</span></span><span class="chip chip-sm no-dot chip-neutral">' + n + (n === 1 ? ' pedido' : ' pedidos') + '</span></div>'; }).join('');
+    var rules = '<section class="card o6" aria-label="Reglas de la carga"><div class="card-head"><div><h2 class="card-title">Reglas de manipulación</h2><p class="card-sub">Restricciones de producto frente a la carrocería</p></div></div><div class="card-body"><div class="rule-list">' + (rl || '<span class="muted">Sin restricciones especiales.</span>') + '</div></div></section>';
+    return tot + cap + ax + rules;
+  }
+
+  /* ---------- botón principal ---------- */
+  function drawMainBtn(t, k) {
+    var b = $('#mainBtn');
+    if (t.cerrado) { b.disabled = true; b.innerHTML = ic('check-circle') + 'Cargue cerrado'; }
+    else if (t.kind === 'plan') { b.disabled = !!t.distOk; b.innerHTML = ic('check') + (t.distOk ? 'Distribución confirmada' : 'Confirmar distribución'); }
+    else { b.disabled = false; b.innerHTML = ic('check-circle') + 'Cerrar cargue'; }
+    var pri = !t.cerrado && !(k && k.blocked); b.classList.toggle('btn-primary', pri); b.classList.toggle('btn-secondary', !pri);
+  }
+
+  /* ---------- distribución del día (HU-108) ---------- */
+  function drawDay() {
+    var ks = trips.map(function (t) { return { t: t, k: calc(t) }; }), conflicts = ks.filter(function (x) { return x.k.blocked; }).length, peds = ks.reduce(function (s, x) { return s + x.k.act.length; }, 0), kg = ks.reduce(function (s, x) { return s + x.k.kg; }, 0), ut = ks.reduce(function (s, x) { return s + Math.min(100, x.k.pPct); }, 0) / ks.length;
+    $('#cDia').textContent = trips.length;
+    var kp = '<div class="kpi-row">' + UI.kpi({ label: 'Viajes del día', icon: 'truck', value: trips.length, note: trips.filter(function (t) { return t.kind === 'despacho'; }).length + ' despachos · ' + trips.filter(function (t) { return t.kind === 'plan'; }).length + ' propuestos' }) +
+      UI.kpi({ label: 'Pedidos distribuidos', icon: 'package', value: peds, note: F.ton(kg) + ' en total' }) + UI.kpi({ label: 'Utilización promedio', icon: 'gauge', valueHtml: fn(ut, 0) + '<small>%</small>', note: 'Meta 80 %' }) +
+      UI.kpi({ label: 'Cargues con conflicto', icon: 'alert-triangle', value: conflicts, note: conflicts ? 'Incompatibilidad o exceso de capacidad' : 'Todo compatible' }) + '</div>';
+    var cards = ks.map(function (x) {
+      var t = x.t, k = x.k, v = k.v, r = A.idx.rutas[t.rutaId], sg = k.blocked ? cands(t).filter(function (c) { return c.ok; })[0] : null;
+      var mini = '<div class="mini" aria-hidden="true">' + k.blocks.map(function (b) { return '<i class="hatch ' + b.cls + '" style="left:' + (b.a * 100) + '%;width:' + ((b.b - b.a) * 100) + '%"></i>'; }).join('') + '</div>';
+      return '<article class="card trip-card' + (t === cur ? ' is-current' : '') + '"><div class="tc-top"><div>' + UI.plate(v.placa) + '<div class="tc-id"><span class="mono">' + t.id + '</span> · ' + esc(v.tipo) + ' · ' + esc(v.carroceria) + '</div></div><div class="row gap-2">' + (k.blocked ? UI.chip('Incompatible', { tone: 'danger' }) : t.exc && k.issues.length ? UI.chip('Con excepción', { tone: 'warning' }) : UI.chip('Compatible', { tone: 'success' })) + UI.chip(t.cerrado ? 'Cargue cerrado' : t.estado, { tone: t.cerrado ? 'success' : t.kind === 'plan' ? 'info' : 'warning' }) + '</div></div>' +
+        '<div><div class="strong t-13 mb-1">' + esc(r.nombre) + ' <span class="muted">· ' + k.act.length + ' pedidos</span></div>' + mini + '</div>' +
+        '<div class="tc-m"><div><div class="l">Peso · ' + F.kg(k.kg) + ' de ' + F.kg(v.pesoMaxKg) + '</div>' + UI.meter(Math.round(k.pPct), 100, { label: 'Peso' }) + '</div><div><div class="l">Volumen · ' + F.m3(k.m3, 1) + ' de ' + F.m3(v.volumenMaxM3, 0) + '</div>' + UI.meter(Math.round(k.vPct), 100, { label: 'Volumen', low: 30 }) + '</div></div>' +
+        '<div class="tc-foot"><span class="sugg">' + (k.blocked ? (sg ? 'Sugerido: <b>' + esc(sg.v.placa) + '</b> (' + esc(sg.v.tipo.toLowerCase() + ' ' + sg.v.carroceria.toLowerCase()) + ')' + (sg.warn.length ? ' · ' + sg.warn[0].toLowerCase() : '') : 'Sin vehículo compatible disponible: retira pedidos o autoriza excepción.') : (t.exc && k.issues.length) ? 'Excepción de ' + esc(t.exc.por) : k.issues.length ? 'Cargue cerrado con carga larga autorizada' : 'Sin conflictos de compatibilidad') + '</span><span class="row gap-2">' +
+        (sg && !t.cerrado ? '<button type="button" class="btn btn-secondary btn-sm" data-apply="' + t.id + '|' + sg.v.placa + '">Aplicar sugerencia</button>' : '') + '<button type="button" class="btn btn-secondary btn-sm" data-open="' + t.id + '">Abrir plano ' + ic('arrow-right') + '</button></span></div></article>';
+    }).join('');
+    $('#pDia').innerHTML = kp + '<div class="section-head"><h2 class="section-title">Propuesta de distribución por vehículo</h2><span class="muted t-13">Los bloques muestran el orden de cargue de cada viaje, de la cabina hacia la puerta.</span></div><div class="day-grid">' + cards + '</div>';
+  }
+  $('#pDia').addEventListener('click', function (e) {
+    var o = e.target.closest('[data-open]'); if (o) { cur = tripById(o.dataset.open); drawSelect(); renderAll(); mainTabs.select('pPlano'); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    var a = e.target.closest('[data-apply]'); if (a) { var p = a.dataset.apply.split('|'); swapVehicle(tripById(p[0]), p[1]); drawSelect(); renderAll(); }
+  });
+
+  /* ---------- render principal ---------- */
+  function renderAll() {
+    var t = cur, k = calc(t);
+    if (!t.sel || t.out.indexOf(t.sel) > -1 || k.act.indexOf(t.sel) === -1) t.sel = k.blocks.length ? k.blocks[0].id : null;
+    $('#banners').innerHTML = bannersHtml(t, k); $('#phEyebrow').textContent = t.kind === 'plan' ? 'Operación · viaje propuesto' : 'Operación · ' + t.id;
+    $('#cg').innerHTML = '<div class="cg-main">' + planCard(t, k) + seqCard(t, k) + '</div><div class="cg-side">' + sideCards(t, k) + '</div>';
+    drawMainBtn(t, k); drawDay();
+  }
+  var tip = null;
+  function showTip(btn) {
+    hideTip(); var t = cur, k = calc(t), b = k.blocks.filter(function (x) { return x.id === btn.dataset.pid; })[0]; if (!b) return;
+    var wrap = $('#truck'); tip = document.createElement('div'); tip.className = 'truck-tip'; tip.setAttribute('role', 'tooltip');
+    tip.innerHTML = '<span class="mono">' + b.id + '</span><br><b>' + esc(b.ped.cliente) + '</b><br>' + F.kg(b.ped.pesoKg) + ' · ' + F.m3(b.ped.volumenM3, 2) + '<br>Cargar ' + b.load + '.º · entregar ' + b.drop + '.º · ' + b.pos.toLowerCase();
+    wrap.appendChild(tip); var wr = wrap.getBoundingClientRect(), br = btn.getBoundingClientRect(), cx = br.left - wr.left + br.width / 2; cx = Math.max(tip.offsetWidth / 2, Math.min(wr.width - tip.offsetWidth / 2, cx));
+    tip.style.left = cx + 'px'; tip.style.top = (br.top - wr.top) + 'px';
+  }
+  function hideTip() { if (tip) { tip.remove(); tip = null; } }
+  function select(pid, scroll) { cur.sel = pid; var k = calc(cur); $$('[data-pid]', $('#cg')).forEach(function (n) { var on = n.dataset.pid === pid; if (n.matches('.blk')) n.classList.toggle('is-sel', on); else if (n.matches('.seq > li')) n.classList.toggle('is-sel', on); else if (n.closest('.stops-legend')) n.setAttribute('aria-pressed', on); });
+    var d = $('#blkDetail'), html = detailHtml(cur, k); if (d) { var tmp = document.createElement('div'); tmp.innerHTML = html; if (tmp.firstChild) d.replaceWith(tmp.firstChild); } if (scroll) { var li = $('.seq > li.is-sel'); if (li) li.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } }
+  var cg = $('#cg');
+  cg.addEventListener('mouseover', function (e) { var b = e.target.closest('.blk'); if (b) showTip(b); });
+  cg.addEventListener('mouseout', function (e) { if (e.target.closest('.blk')) hideTip(); });
+  cg.addEventListener('focusin', function (e) { var b = e.target.closest('.blk'); if (b) showTip(b); });
+  cg.addEventListener('focusout', hideTip);
+  cg.addEventListener('click', function (e) {
+    var c = e.target.closest('[data-conf]'); if (c) { if (c.tagName === 'INPUT') { toggleConf(c.dataset.conf, c.checked); } else toggleConf(c.dataset.conf); return; }
+    var bk = e.target.closest('[data-back]'); if (bk) { cur.out.splice(cur.out.indexOf(bk.dataset.back), 1); UI.toast('Pedido ' + bk.dataset.back + ' reincorporado al cargue.', 'success'); renderAll(); return; }
+    if (e.target.closest('a,label')) return;
+    var b = e.target.closest('[data-pid]'); if (b) { hideTip(); select(b.dataset.pid, !b.matches('.seq > li')); }
+  });
+  function toggleConf(pid, to) {
+    var t = cur; if (t.kind !== 'despacho' || t.cerrado) return; var on = to == null ? !t.conf[pid] : to;
+    if (on) { t.conf[pid] = { por: USER.nombre, ts: new Date() }; UI.toast('Cargue confirmado: ' + pid + ' por ' + USER.nombre + '.', 'success'); } else { delete t.conf[pid]; UI.toast('Se deshizo la confirmación de ' + pid + '.', 'info'); }
+    t.sel = pid; renderAll();
+  }
+  $('#banners').addEventListener('click', function (e) { var b = e.target.closest('[data-act]'); if (b) act(b.dataset.act); });
+  function act(a) { if (a === 'swap') swapModal(); else if (a === 'retire') retireModal(); else if (a === 'exc') excModal(); else if (a === 'revoke') { cur.exc = null; UI.toast('Excepción revocada: vuelve el bloqueo por incompatibilidad.', 'warning'); renderAll(); } }
+
+  /* ---------- cambiar vehículo ---------- */
+  function swapModal() {
+    var t = cur, rows = cands(t), pick = null;
+    var html = '<p class="muted t-13 mb-3">Se listan los vehículos de la flota con la verificación de capacidad y compatibilidad para los ' + calc(t).act.length + ' pedidos de este ' + (t.kind === 'plan' ? 'viaje' : 'despacho') + '.</p><div role="radiogroup" aria-label="Vehículos">' +
+      rows.map(function (r) { var v = r.v; return '<label class="opt-row"><input type="radio" name="veh" value="' + esc(v.placa) + '"' + (r.ok ? '' : ' disabled') + '><div class="grow"><div class="row gap-2">' + UI.plate(v.placa) + '<span class="on">' + esc(v.tipo) + ' · ' + esc(v.carroceria) + '</span></div><div class="od">' + F.kg(v.pesoMaxKg) + ' · ' + F.m3(v.volumenMaxM3, 0) + ' · plataforma ' + fn(v.largoM) + ' m</div>' + (r.ok ? (r.warn.length ? '<div class="od" style="color:var(--amber-fg)">' + ic('alert-triangle', 'icon-sm') + ' ' + esc(r.warn[0]) + ': requiere autorización de cobertura.</div>' : '<div class="od" style="color:var(--green-fg)">' + ic('check-circle', 'icon-sm') + ' Compatible y disponible.</div>') : '<div class="od" style="color:var(--red-fg)">' + esc(r.why.join(' · ')) + '</div>') + '</div></label>'; }).join('') + '</div><span class="error-text mt-2" id="swErr" hidden></span>';
+    UI.modal({ title: 'Cambiar vehículo', subtitle: (t.kind === 'plan' ? 'Viaje ' : 'Despacho ') + t.id + ' · actual ' + t.placa, width: 600, body: html,
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Asignar vehículo', kind: 'primary', icon: 'check', onClick: function (api) {
+        var r = $('input[name=veh]:checked', api.body), er = $('#swErr', api.body);
+        if (!r) { er.hidden = false; er.innerHTML = ic('alert-circle', 'icon-sm') + 'Elige uno de los vehículos habilitados para continuar.'; return false; }
+        swapVehicle(t, r.value); drawSelect(); renderAll();
+      } }] });
+  }
+  /* ---------- retirar pedidos incompatibles ---------- */
+  function retireModal() {
+    var t = cur, k = calc(t), ids = {}; k.issues.forEach(function (i) { ids[i.id] = 1; });
+    var list = Object.keys(ids).length ? Object.keys(ids) : k.act.slice(-1);
+    var html = '<p class="muted t-13 mb-3">Marca los pedidos que saldrán de este cargue. Quedan pendientes de reasignar en planeación y no se pierden.</p>' + k.act.map(function (id) { var p = ped(id); return '<label class="opt-row"><input type="checkbox" value="' + id + '"' + (list.indexOf(id) > -1 ? ' checked' : '') + '><div class="grow"><div class="on"><span class="mono">' + id + '</span> · ' + esc(p.cliente) + '</div><div class="od">' + F.kg(p.pesoKg) + ' · ' + F.m3(p.volumenM3, 2) + (ids[id] ? ' · contiene carga mayor a 6 m' : '') + '</div></div></label>'; }).join('') + '<span class="error-text mt-2" id="rtErr" hidden></span>';
+    UI.modal({ title: 'Retirar pedidos del cargue', subtitle: (t.kind === 'plan' ? 'Viaje ' : 'Despacho ') + t.id, width: 560, body: html,
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Retirar pedidos', kind: 'danger-outline', icon: 'undo', onClick: function (api) {
+        var sel = $$('input:checked', api.body).map(function (i) { return i.value; }), er = $('#rtErr', api.body);
+        if (!sel.length) { er.hidden = false; er.innerHTML = ic('alert-circle', 'icon-sm') + 'Selecciona al menos un pedido.'; return false; }
+        if (sel.length === k.act.length && t.kind === 'despacho' && false) return false;
+        sel.forEach(function (id) { t.out.push(id); delete t.conf[id]; }); UI.toast(sel.length + (sel.length === 1 ? ' pedido retirado' : ' pedidos retirados') + ' del cargue. Quedan pendientes de reasignar en planeación.', 'warning'); drawSelect(); renderAll();
+      } }] });
+  }
+  /* ---------- excepción ---------- */
+  function excModal() {
+    var t = cur, k = calc(t);
+    var body = '<div class="stack">' + UI.banner({ tone: 'warning', text: 'Estás autorizando cargar piezas de hasta ' + fn(Math.max.apply(null, k.issues.map(function (i) { return i.largo; })), 0) + ' m en un vehículo no habilitado para carga larga. Queda registrado en auditoría con tu usuario.' }) +
+      '<div class="field" data-f="medida"><label class="label" for="ex-m">Medida de seguridad</label><select class="select" id="ex-m"><option>Voladizo con bandera roja y eslingas</option><option>Cargar en diagonal con escolta</option><option>Dividir la carga en dos viajes</option></select></div>' +
+      '<div class="field" data-f="motivo"><label class="label" for="ex-t">Motivo de la excepción</label><textarea class="textarea" id="ex-t" placeholder="Ej. Cliente recibe hoy y no hay planchón disponible en la ruta"></textarea><span class="error-text" hidden></span></div></div>';
+    UI.modal({ title: 'Autorizar excepción de cargue', subtitle: 'Solo jefe de logística y coordinador', width: 520, body: body,
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Autorizar excepción', kind: 'primary', icon: 'shield-check', onClick: function (api) {
+        var m = $('#ex-t', api.body).value.trim(), f = $('[data-f=motivo]', api.body), er = $('.error-text', f);
+        if (m.length < 20) { f.classList.add('is-invalid'); er.hidden = false; er.innerHTML = ic('alert-circle', 'icon-sm') + 'Describe el motivo con al menos 20 caracteres (' + m.length + ' escritos).'; $('#ex-t', api.body).focus(); return false; }
+        t.exc = { por: USER.nombre, motivo: m, medida: $('#ex-m', api.body).value, ts: new Date() }; UI.toast('Excepción autorizada. El cargue ya no está bloqueado.', 'warning'); renderAll();
+      } }] });
+  }
+
+  /* ---------- cerrar cargue / confirmar distribución (HU-112) ---------- */
+  $('#mainBtn').addEventListener('click', function () {
+    var t = cur, k = calc(t);
+    if (k.blocked) { var bb = $('#blockBanner') || $('#banners .banner'); UI.toast('No se puede ' + (t.kind === 'plan' ? 'confirmar la distribución' : 'cerrar el cargue') + ' mientras haya una incompatibilidad. Elige una de las opciones del aviso.', 'error', { title: 'Cargue bloqueado' }); if (bb) { bb.scrollIntoView({ behavior: 'smooth', block: 'center' }); bb.classList.remove('nudge'); void bb.offsetWidth; bb.classList.add('nudge'); } return; }
+    if (t.kind === 'plan') { t.distOk = true; UI.toast('Distribución confirmada para ' + t.id + '.', 'success'); renderAll(); return; }
+    var missing = k.act.filter(function (id) { return !t.conf[id]; });
+    if (!k.act.length) { UI.toast('No hay pedidos en este cargue para cerrar.', 'error'); return; }
+    if (!missing.length) { UI.confirm({ tone: 'primary', title: 'Cerrar el cargue de ' + t.id, html: 'Los <b>' + k.act.length + ' pedidos</b> están confirmados como cargados (' + F.ton(k.kg) + ', ' + fn(k.pPct, 0) + ' % de utilización). Después podrás registrar la salida del vehículo.', confirmLabel: 'Cerrar cargue' }).then(function (ok) { if (ok) finish(t); }); return; }
+    missingModal(t, k, missing);
+  });
+  function finish(t) { t.cerrado = true; t.closedAt = new Date(); t.closedBy = USER.nombre; if (t.src) t.src.cargue = Object.assign({}, t.src.cargue, { avancePct: 100 }); UI.toast('Cargue de ' + t.id + ' cerrado. Ya puedes registrar la salida en despachos.', 'success', { title: 'Cargue cerrado' }); drawSelect(); renderAll(); }
+  function missingModal(t, k, missing) {
+    var html = '<p class="muted t-13 mb-3">Quedan ' + missing.length + (missing.length === 1 ? ' pedido' : ' pedidos') + ' sin confirmar de ' + k.act.length + '. Decide qué hacer con cada uno antes de cerrar; no se puede cerrar con pedidos sin resolver.</p>' + missing.map(function (id) { var p = ped(id); return '<div class="dec-block" data-d="' + id + '"><div class="strong t-13"><span class="mono">' + id + '</span> · ' + esc(p.cliente) + '</div><div class="muted t-13 mb-2">' + F.kg(p.pesoKg) + ' · ' + F.m3(p.volumenM3, 2) + ' · entrega ' + (k.act.indexOf(id) + 1) + '.º</div>' +
+      '<div class="stack-sm"><label class="radio"><input type="radio" name="d-' + id + '" value="cargar"><span>Ya está en el camión: confirmar como cargado</span></label><label class="radio"><input type="radio" name="d-' + id + '" value="excluir"><span>No se cargó: dejarlo fuera y enviarlo a reprogramación</span></label></div><span class="error-text mt-2" hidden></span></div>'; }).join('');
+    UI.modal({ title: 'Faltan pedidos por confirmar', subtitle: 'Cierre de cargue ' + t.id + ' · ' + t.placa, width: 560, body: html,
+      footer: [{ label: 'Volver al plano', kind: 'ghost' }, { label: 'Cerrar cargue', kind: 'primary', icon: 'check-circle', onClick: function (api) {
+        var bad = 0, dec = {};
+        missing.forEach(function (id) { var r = $('input[name="d-' + id + '"]:checked', api.body), blk = $('[data-d="' + id + '"]', api.body), er = $('.error-text', blk); if (!r) { bad++; blk.classList.add('is-invalid'); er.hidden = false; er.innerHTML = ic('alert-circle', 'icon-sm') + 'Elige qué pasa con este pedido para poder cerrar.'; } else { blk.classList.remove('is-invalid'); er.hidden = true; dec[id] = r.value; } });
+        if (bad) return false;
+        var out = 0; missing.forEach(function (id) { if (dec[id] === 'cargar') t.conf[id] = { por: USER.nombre, ts: new Date() }; else { t.out.push(id); out++; } });
+        if (out) UI.toast(out + (out === 1 ? ' pedido quedó fuera' : ' pedidos quedaron fuera') + ' del despacho y pasan a reprogramación.', 'warning');
+        finish(t);
+      } }] });
+  }
+
+  /* ---------- arranque ---------- */
+  var mainTabs = UI.tabs($('#mainTabs'));
+  drawSelect(); renderAll();
+});
+</script>
+</body>
+</html>

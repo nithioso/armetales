@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maestro de productos · Armetales</title>
+<meta name="description" content="Maestro de SKU con ficha logística: empaque, peso, dimensiones, restricciones de manipulación y compatibilidad de transporte, con control de cambios.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de la pantalla (tokens y componentes viven en app.css) */
+  .select.input-sm { padding-right: 30px; }
+  .kpi-row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .kpi-row > :last-child:nth-child(odd) { grid-column: span 2; } .kpi .kpi-value { font-size: 28px; } .kpi { padding: 12px; } }
+  .kpi .kpi-note, .kpi .kpi-foot { white-space: normal; min-width: 0; }
+  .table td.num { white-space: nowrap; }
+  @media (min-width: 900px) { .table td:nth-child(2) { min-width: 215px; } }
+  .chip-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .rtags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .sync-cell { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
+  .sync-cell .icon { width: 13px; height: 13px; }
+
+  /* Ficha */
+  .f-tabs { margin: -20px -20px 16px; padding: 12px 20px 0; position: sticky; top: -20px; background: var(--surface); z-index: 2; }
+  .f-sec { display: grid; gap: 10px; }
+  .f-sec-head { display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
+  .f-sec-head h3 { font-size: 15px; display: flex; align-items: center; gap: 6px; }
+  .f-sec-head .icon { width: 15px; height: 15px; color: var(--text-3); }
+  .lock-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-2); background: var(--surface-3); border-radius: 999px; padding: 0 9px; height: 22px; font-weight: 500; }
+  .lock-pill .icon { width: 12px; height: 12px; }
+  .kv .lk { display: inline-flex; align-items: center; gap: 6px; }
+  .kv .lk .icon { width: 12px; height: 12px; color: var(--text-3); }
+  .cmp-list { display: grid; gap: 6px; }
+  .cmp-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-ctl); font-size: 13.5px; background: var(--surface); }
+  .cmp-item .ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--green-bg); color: var(--green-fg); flex: none; }
+  .cmp-item.miss .ic { background: var(--amber-bg); color: var(--amber-fg); } .cmp-item .ic .icon { width: 12px; height: 12px; }
+  .cmp-item .grow { min-width: 0; }
+  .piece { border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface-2); padding: 12px; display: grid; gap: 6px; justify-items: center; }
+  .piece svg { max-width: 100%; height: auto; display: block; color: var(--steel); }
+  .piece .cap { font-size: 12px; color: var(--text-2); text-align: center; }
+  .piece text { font-family: var(--font-mono); font-size: 11px; fill: var(--text-2); }
+  .edit-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .edit-grid .span-2 { grid-column: 1 / -1; }
+  .edit-grid.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 479px) { .edit-grid, .edit-grid.c3 { grid-template-columns: minmax(0, 1fr); } }
+  .u-in { position: relative; } .u-in .input { padding-right: 38px; } .u-in .u { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text-3); pointer-events: none; }
+  .check-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); } @media (max-width: 479px) { .check-grid { grid-template-columns: minmax(0, 1fr); } }
+  .rest-line { display: flex; gap: 8px; align-items: flex-start; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+  .rest-line:last-child { border-bottom: 0; } .rest-line .icon { width: 15px; height: 15px; color: var(--amber); margin-top: 2px; flex: none; }
+  .tbl-sm { font-size: 13px; }
+  .mini-stat { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .mini-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; } .mini-stat .l { font-size: 12px; color: var(--text-2); }
+  .diff-line { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; } .diff-line:last-child { border: 0; }
+  .diff-line s { color: var(--text-3); } .diff-line b { font-weight: 600; }
+  .hist-act { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  /* importación */
+  .imp-steps { display: grid; gap: 8px; margin: 12px 0; }
+  .imp-step { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; font-size: 13.5px; color: var(--text-3); }
+  .imp-step .ic { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border-strong); display: grid; place-items: center; }
+  .imp-step.is-run { color: var(--text); } .imp-step.is-run .ic { border-color: var(--blue); } .imp-step.is-done { color: var(--text); } .imp-step.is-done .ic { background: var(--green); border-color: var(--green); color: #fff; } .imp-step.is-fail { color: var(--red-fg); } .imp-step.is-fail .ic { border-color: var(--red); background: var(--red-bg); color: var(--red-fg); }
+  .imp-step .icon { width: 12px; height: 12px; }
+  .res-grid { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); } @media (max-width: 559px) { .res-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  :root[data-theme="dark"] a.btn { color: var(--b-fg); } /* el color de enlace del tema oscuro pisaba el de los botones-enlace */
+</style>
+</head>
+<body data-page="productos">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Maestros</div>
+      <h1 class="page-title">Maestro de productos</h1>
+      <p class="page-desc">SKU sincronizados desde SAP con su ficha logística: empaque, peso, dimensiones, restricciones y compatibilidad de transporte. Los datos de origen son de solo lectura.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-primary" id="btnImport"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Importar desde SAP / Data Lake</button>
+    </div>
+  </header>
+
+  <section aria-label="Resumen del maestro"><div class="kpi-row" id="kpiRow"></div></section>
+
+  <section class="section" aria-label="Listado de SKU">
+    <div class="chip-bar" id="chipBar" role="group" aria-label="Filtrar por estado de los datos"></div>
+    <div id="tbl"></div>
+  </section>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$, I = UI.icon, me = A.usuarioActual;
+  var RS = { LARGA: 'Larga', NO_APILAR: 'No apilar', HUMEDAD: 'Humedad', MONTACARGAS: 'Montacargas', DOS_OPERARIOS: '2 operarios', ZUNCHAR: 'Zunchar', SEPARAR: 'Separar' };
+  var RCODES = Object.keys(A.restriccionesProducto);
+  var EMPS = ['Atado', 'Paquete', 'Estiba', 'Rollo', 'Caja', 'Bolsa', 'Unidad'];
+  var CHECKS = [['emp', 'Unidad de empaque y factor'], ['peso', 'Peso logístico consistente con SAP'], ['dim', 'Dimensiones y volumen'], ['rest', 'Restricciones de manipulación revisadas'], ['comp', 'Compatibilidad de transporte']];
+  var SINDIM = ['1006604', '1005502'], PESODIF = { '1004404': 1.12, '1007701': 0.88, '1000242': 1.12 };
+  var st = { chip: 'todos', imp: 0, dlTried: false };
+
+  /* ---------- modelo local (copia en memoria de ARM.productos; ARM no se muta) ---------- */
+  var P = A.productos.map(function (p) {
+    var o = { sku: p.skuSAP, desc: p.descripcion, fam: p.familia, ub: p.unidadBase, emp: p.unidadEmpaque, fac: p.factorEmpaque, peso: p.pesoKg, pesoLog: p.pesoKg, L: p.largoM, An: p.anchoM, H: p.altoM, restr: p.restricciones.slice(), rev: true, sync: new Date(p.sincronizado), stock: p.stock, nuevo: false, estado: p.estado };
+    if (SINDIM.indexOf(o.sku) > -1) { o.L = o.An = o.H = null; }
+    if (PESODIF[o.sku]) o.pesoLog = Math.round(o.peso * PESODIF[o.sku] * 100) / 100;
+    return o;
+  });
+  var byS = {}; P.forEach(function (p) { byS[p.sku] = p; });
+  var HIST = [];  /* solicitudes de cambio */
+  var hid = 0;
+  function seedHist() {
+    function mk(sku, by, hAgo, motivo, estado, cambios, patch, res) { HIST.push({ id: ++hid, sku: sku, by: by, when: new Date(Date.now() - hAgo * 3600000), motivo: motivo, estado: estado, cambios: cambios, patch: patch, res: res || null }); }
+    mk('1000237', 'USR-003', 5, 'Pesaje en báscula del CEDI: promedio de 30 atados de 15 barras.', 'Pendiente de aprobación', [{ k: 'Peso logístico', de: '13,40 kg', a: '13,90 kg' }], { pesoLog: 13.9 });
+    mk('1004400', 'USR-002', 20, 'La lámina se desplazó en dos viajes con carga mixta; se exige zunchado.', 'Pendiente de aprobación', [{ k: 'Restricciones', de: 'No apilar · Montacargas', a: 'No apilar · Montacargas · Zunchar' }], { restr: ['NO_APILAR', 'MONTACARGAS', 'ZUNCHAR'] });
+    mk('1000236', 'USR-004', 24 * 6, 'Ajuste del empaque por cambio del proveedor de zunchos.', 'Aprobado', [{ k: 'Unidad de empaque', de: 'Atado x 25', a: 'Atado x 20' }], { emp: 'Atado x 20', fac: 20 }, { by: 'USR-001', when: new Date(Date.now() - 24 * 5.5 * 3600000), nota: 'Aprobado' });
+    mk('1001101', 'USR-004', 24 * 12, 'Dimensiones de la ficha técnica del fabricante.', 'Rechazado', [{ k: 'Alto', de: '0,0060 m', a: '0,0090 m' }], { H: 0.009 }, { by: 'USR-001', when: new Date(Date.now() - 24 * 11.5 * 3600000), nota: 'No coincide con el calibre medido en bodega.' });
+  }
+  seedHist();
+  P.forEach(function (p) { if (p.sku === '1000236') { p.emp = 'Atado x 20'; } });
+
+  /* ---------- cálculos ---------- */
+  function vol(p) { return p.L && p.An && p.H ? p.L * p.An * p.H : null; }
+  function empTipo(p) { return (p.emp.match(/^([A-Za-zÁ-ú]+)/) || [])[1] || 'Unidad'; }
+  function desvPeso(p) { return (p.pesoLog - p.peso) / p.peso * 100; }
+  function checks(p) {
+    var dim = !!(p.L && p.An && p.H), peso = p.pesoLog > 0 && Math.abs(desvPeso(p)) <= 10;
+    return { emp: !!(p.emp && p.fac > 0), peso: peso, dim: dim, rest: p.rev !== false, comp: dim };
+  }
+  function pct(p) { var c = checks(p), n = 0; CHECKS.forEach(function (k) { if (c[k[0]]) n++; }); return Math.round(n / CHECKS.length * 100); }
+  function pendientes(p) { return HIST.filter(function (h) { return h.sku === p.sku && h.estado === 'Pendiente de aprobación'; }); }
+  function dm(v) { return v == null ? '—' : F.num(v, v >= 1 ? 2 : v >= 0.1 ? 3 : 4); }
+  function vtxt(p) { var v = vol(p); return v == null ? '—' : F.m3(v, v < 0.01 ? 5 : v < 1 ? 4 : 2); }
+  function restTags(p, max) { if (!p.restr.length) return '<span class="muted t-13">Sin restricción</span>'; var t = p.restr.slice(0, max || 2).map(function (c) { return '<span class="tag">' + RS[c] + '</span>'; }).join(''); return '<div class="rtags">' + t + (p.restr.length > (max || 2) ? '<span class="tag">+' + (p.restr.length - (max || 2)) + '</span>' : '') + '</div>'; }
+
+  var capT = {};
+  A.vehiculos.forEach(function (v) { var x = capT[v.tipo] || (capT[v.tipo] = { n: 0, largo: 0, peso: 0, vol: 0, mc: 0, hum: 0, lam: 0, lg: 0 }); x.n++; x.largo = Math.max(x.largo, v.largoM); x.peso = Math.max(x.peso, v.pesoMaxKg); x.vol = Math.max(x.vol, v.volumenMaxM3); x.mc += v.compatibilidad.montacargas ? 1 : 0; x.hum += v.compatibilidad.protegeHumedad ? 1 : 0; x.lam += v.compatibilidad.lamina ? 1 : 0; x.lg += v.compatibilidad.largaMas6m ? 1 : 0; });
+  var TIPOS = ['Camioneta', 'Turbo', 'Sencillo', 'Dobletroque', 'Tractomula'];
+  function compat(p) {
+    var big = Math.max(p.L || 0, p.An || 0, p.H || 0), noDim = !(p.L && p.An && p.H);
+    return TIPOS.map(function (t) {
+      var c = capT[t], no = [], cond = [];
+      if (noDim) return { tipo: t, est: 'Sin datos', razones: ['Faltan dimensiones para evaluar'], c: c };
+      if (big > c.largo) no.push('El largo de ' + dm(big) + ' m supera el máximo de ' + dm(c.largo) + ' m');
+      if (p.restr.indexOf('LARGA') > -1 && c.lg === 0) no.push('Sin vehículo de este tipo habilitado para carga larga');
+      if (p.fam === 'Lámina' && c.lam === 0) no.push('Sin plataforma apta para lámina');
+      if (p.restr.indexOf('MONTACARGAS') > -1 && c.mc < c.n) cond.push(c.mc === 0 ? 'Ninguno admite montacargas' : 'Solo ' + c.mc + ' de ' + c.n + ' admiten montacargas');
+      if (p.restr.indexOf('HUMEDAD') > -1 && c.hum < c.n) cond.push(c.hum === 0 ? 'Ninguno protege de la humedad' : 'Solo ' + c.hum + ' de ' + c.n + ' protegen de la humedad');
+      if (p.restr.indexOf('LARGA') > -1 && c.lg > 0 && c.lg < c.n) cond.push('Solo ' + c.lg + ' de ' + c.n + ' habilitados para carga larga');
+      if (p.restr.indexOf('DOS_OPERARIOS') > -1) cond.push('Requiere ayudante en el descargue');
+      return no.length ? { tipo: t, est: 'No', razones: no, c: c } : cond.length ? { tipo: t, est: 'Condicionada', razones: cond, c: c } : { tipo: t, est: 'Sí', razones: ['Cumple largo, capacidad y restricciones'], c: c };
+    });
+  }
+  function cChip(e) { return UI.chip(e, { tone: e === 'Sí' ? 'success' : e === 'No' ? 'danger' : e === 'Condicionada' ? 'warning' : 'neutral' }); }
+
+  /* ---------- KPIs, chips y tabla ---------- */
+  function counts() { return { todos: P.length, inc: P.filter(function (p) { return pct(p) < 100; }).length, pen: P.filter(function (p) { return pendientes(p).length; }).length, nue: P.filter(function (p) { return p.nuevo; }).length }; }
+  function lastSync() { return P.reduce(function (m, p) { return Math.max(m, +p.sync); }, 0); }
+  function renderKpis() {
+    var c = counts(), avg = Math.round(P.reduce(function (s, p) { return s + pct(p); }, 0) / P.length);
+    $('#kpiRow').innerHTML =
+      UI.kpi({ label: 'SKU activos', icon: 'box', value: P.length, note: c.nue ? c.nue + ' nuevos de la última importación' : 'Familias: ' + new Set(P.map(function (p) { return p.fam; })).size }) +
+      UI.kpi({ label: 'Completitud logística', icon: 'gauge', valueHtml: avg + '<small>%</small>', note: 'Promedio de 5 datos obligatorios' }) +
+      UI.kpi({ id: 'inc', label: 'Con datos incompletos', icon: 'alert-triangle', value: c.inc, note: 'No entran al planeador de cargue', onClick: true }) +
+      UI.kpi({ id: 'pen', label: 'Cambios por aprobar', icon: 'clipboard-check', value: c.pen, note: 'Control de cambios logísticos', onClick: true }) +
+      UI.kpi({ label: 'Última sincronización', icon: 'refresh', valueHtml: F.hora(lastSync()), note: 'SAP · ' + F.relativo(lastSync()) });
+  }
+  $('#kpiRow').addEventListener('click', function (e) { var k = e.target.closest('[data-kpi]'); if (!k) return; setChip(k.dataset.kpi === 'inc' ? 'inc' : 'pen'); $('#chipBar').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  function renderChips() {
+    var c = counts(), defs = [['todos', 'Todos'], ['inc', 'Datos incompletos'], ['pen', 'Pendientes de aprobación']].concat(c.nue ? [['nue', 'Nuevos de la importación']] : []);
+    $('#chipBar').innerHTML = defs.map(function (d) { return '<button type="button" class="filter-chip" data-c="' + d[0] + '" aria-pressed="' + (st.chip === d[0]) + '">' + d[1] + ' <span class="n">' + c[d[0]] + '</span></button>'; }).join('');
+  }
+  $('#chipBar').addEventListener('click', function (e) { var b = e.target.closest('[data-c]'); if (b) setChip(b.dataset.c); });
+  function rowsNow() { return P.filter(function (p) { return st.chip === 'todos' || (st.chip === 'inc' && pct(p) < 100) || (st.chip === 'pen' && pendientes(p).length) || (st.chip === 'nue' && p.nuevo); }); }
+  function setChip(c) { st.chip = c; renderChips(); T.setRows(rowsNow()); }
+  var T = UI.table($('#tbl'), {
+    rows: rowsNow(), pageSize: 10, rowKey: 'sku', caption: 'Maestro de productos', emptyText: 'Ningún SKU coincide con estos filtros.',
+    searchable: { placeholder: 'Buscar SKU o descripción' }, searchKeys: ['sku', 'desc'],
+    filters: [{ key: 'fam', label: 'Familia', all: 'Todas las familias', options: 'auto' },
+      { key: 'restr', label: 'Restricción', all: 'Todas las restricciones', options: RCODES.map(function (c) { return { value: c, label: RS[c] }; }), match: function (r, v) { return r.restr.indexOf(v) > -1; } }],
+    columns: [
+      { key: 'sku', label: 'SKU', mono: true },
+      { key: 'desc', label: 'Descripción', title: true, render: function (p) { return esc(p.desc) + '<div class="cell-sub">' + esc(p.fam) + (p.nuevo ? ' · <strong>Nuevo</strong>' : '') + '</div>'; } },
+      { key: 'emp', label: 'Unidad · empaque', hideMobile: true, render: function (p) { return esc(p.ub) + '<div class="cell-sub">' + esc(p.emp) + '</div>'; } },
+      { key: 'pesoLog', label: 'Peso', num: true, render: function (p) { return F.num(p.pesoLog, 2) + ' kg'; } },
+      { key: 'vol', label: 'Volumen', num: true, value: function (p) { return vol(p) == null ? -1 : vol(p); }, render: function (p) { return vtxt(p); } },
+      { key: 'restr', label: 'Restricción', sortable: false, hideMobile: true, render: function (p) { return restTags(p, 2); } },
+      { key: 'sync', label: 'Origen SAP', hideMobile: true, value: function (p) { return +p.sync; }, render: function (p) { return '<span class="sync-cell">' + I('lock') + 'SAP · ' + F.relativo(p.sync) + '</span>'; } },
+      { key: 'pct', label: 'Completitud', value: function (p) { return pct(p); }, render: function (p) { var v = pct(p), pn = pendientes(p).length; return UI.meter(v, 100, { level: v === 100 ? 'ok' : v >= 60 ? 'warn' : 'crit', label: 'Completitud logística' }) + (pn ? '<div style="margin-top:4px">' + UI.chip('Pendiente de aprobación', { tone: 'warning', small: true }) + '</div>' : ''); } }
+    ],
+    onRowClick: function (p) { openFicha(p.sku); },
+    actions: function (p) { return [{ label: 'Abrir ficha logística', icon: 'eye', onClick: function () { openFicha(p.sku); } }, { label: 'Ver compatibilidad', icon: 'truck', onClick: function () { openFicha(p.sku, 'comp'); } }, { label: 'Ver historial de cambios', icon: 'clock', onClick: function () { openFicha(p.sku, 'hist'); } }, { sep: true }, { label: 'Ver stock en bodegas', icon: 'warehouse', href: 'bodegas.html' }]; }
+  });
+  function refreshAll() { renderKpis(); renderChips(); T.setRows(rowsNow()); }
+
+  /* ---------- esquema proporcional (HU-055) ---------- */
+  function pieceSvg(L, An, H, uid) {
+    if (!(L > 0 && An > 0 && H > 0)) return '<div class="muted t-13" style="padding:18px 0;text-align:center">Sin dimensiones registradas: no se puede dibujar la pieza.</div>';
+    var k = 190 / Math.max(L, An, H), w = Math.max(L * k, 6), h = Math.max(H * k, 6), d = Math.max(An * k, 6), dx = d * .62, dy = d * .38, ox = 28, oy = dy + 22, thin = Math.min(L, An, H) * k < 6;
+    var W = ox + w + dx + 64, Hh = oy + h + 34;
+    var s = '<svg viewBox="0 0 ' + Math.round(W) + ' ' + Math.round(Hh) + '" width="' + Math.round(W) + '" role="img" aria-label="Esquema de la pieza: largo ' + dm(L) + ' m, ancho ' + dm(An) + ' m, alto ' + dm(H) + ' m"><defs><pattern id="hp' + uid + '" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="var(--surface-3)"/><line x1="0" y1="0" x2="0" y2="7" stroke="currentColor" stroke-width="2"/></pattern></defs>';
+    var x0 = ox, y0 = oy;
+    s += '<polygon points="' + x0 + ',' + y0 + ' ' + (x0 + dx) + ',' + (y0 - dy) + ' ' + (x0 + w + dx) + ',' + (y0 - dy) + ' ' + (x0 + w) + ',' + y0 + '" fill="url(#hp' + uid + ')" stroke="currentColor" stroke-width="1.25"/>';
+    s += '<polygon points="' + (x0 + w) + ',' + y0 + ' ' + (x0 + w + dx) + ',' + (y0 - dy) + ' ' + (x0 + w + dx) + ',' + (y0 - dy + h) + ' ' + (x0 + w) + ',' + (y0 + h) + '" fill="var(--surface-3)" stroke="currentColor" stroke-width="1.25"/>';
+    s += '<rect x="' + x0 + '" y="' + y0 + '" width="' + w + '" height="' + h + '" fill="var(--surface)" stroke="currentColor" stroke-width="1.25"/>';
+    s += '<text x="' + (x0 + w / 2) + '" y="' + (y0 + h + 18) + '" text-anchor="middle">L ' + dm(L) + ' m</text>';
+    s += '<text x="' + (x0 + w + dx + 8) + '" y="' + (y0 + h / 2 + 16) + '">H ' + dm(H) + ' m</text>';
+    s += '<text x="' + (x0 + w + dx + 8) + '" y="' + (y0 - dy - 2) + '">A ' + dm(An) + ' m</text></svg>';
+    return s + (thin ? '<div class="cap">Escala proporcional; las secciones muy delgadas se engrosan para poder verse.</div>' : '<div class="cap">Escala proporcional entre largo, ancho y alto.</div>');
+  }
+
+  /* ---------- ficha logística (HU-059) ---------- */
+  var F_ = null;
+  function openFicha(sku, tab) {
+    var p = byS[sku]; if (!p) return;
+    F_ = { sku: sku, tab: tab || 'ficha', edit: false, draft: null, errs: {} };
+    var api = UI.drawer({ title: p.desc, subtitleHtml: '<span class="mono">' + p.sku + '</span> · ' + esc(p.fam) + ' · <span id="fcChip"></span>', width: 760, body: '', footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Ver stock en bodegas', icon: 'arrow-right', kind: 'secondary', onClick: function () { location.href = 'bodegas.html'; } }], onClose: function () { F_ = null; } });
+    F_.api = api; bindFicha(api.body); drawFicha();
+  }
+  function drawFicha() {
+    if (!F_) return; var p = byS[F_.sku], y = F_.api.body.scrollTop, n = pendientes(p).length;
+    var tabs = [['ficha', 'Ficha logística'], ['comp', 'Compatibilidad'], ['stock', 'Stock por bodega'], ['hist', 'Historial' + (n ? ' (' + n + ')' : '')]];
+    var h = '<div class="tabs f-tabs" role="tablist" aria-label="Secciones de la ficha">' + tabs.map(function (t) { return '<button type="button" class="tab" role="tab" data-ft="' + t[0] + '" aria-selected="' + (F_.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>';
+    h += F_.tab === 'ficha' ? tabFicha(p) : F_.tab === 'comp' ? tabComp(p) : F_.tab === 'stock' ? tabStock(p) : tabHist(p);
+    F_.api.body.innerHTML = h; F_.api.body.scrollTop = y;
+    var c = $('#fcChip', F_.api.el); if (c) c.innerHTML = UI.chip(pct(p) === 100 ? 'Datos completos' : 'Datos incompletos', { tone: pct(p) === 100 ? 'success' : 'warning', small: true }) + (n ? ' ' + UI.chip('Pendiente de aprobación', { tone: 'warning', small: true }) : '');
+  }
+  function lockDt(t) { return '<span class="lk">' + esc(t) + '</span>'; }
+  function tabFicha(p) {
+    var c = checks(p), pc = pct(p), d = F_.edit ? F_.draft : null, miss = CHECKS.filter(function (k) { return !c[k[0]]; });
+    var h = '<div class="stack-lg">';
+    h += '<section class="f-sec"><div class="f-sec-head"><h3>Completitud de datos logísticos</h3><strong class="num">' + pc + ' %</strong></div>' + UI.meter(pc, 100, { size: 'lg', level: pc === 100 ? 'ok' : pc >= 60 ? 'warn' : 'crit', label: 'Completitud', showValue: false }) +
+      (pc === 100 ? '<p class="muted t-13">Los 5 datos obligatorios están completos: el SKU puede usarse en planeación y cargue.</p>' : '<div class="cmp-list">' + CHECKS.map(function (k) { var ok = c[k[0]], extra = k[0] === 'peso' && !ok && p.pesoLog > 0 ? ' · desvía ' + F.num(Math.abs(desvPeso(p)), 0) + ' % del peso de SAP' : ''; return '<div class="cmp-item' + (ok ? '' : ' miss') + '"><span class="ic">' + I(ok ? 'check' : 'alert-triangle') + '</span><span class="grow">' + k[1] + '<span class="muted">' + esc(extra) + '</span></span><span class="t-12 muted">' + (ok ? 'Completo' : 'Por completar') + '</span></div>'; }).join('') + '</div>') +
+      (miss.length ? UI.banner({ tone: 'warning', title: 'Este SKU no puede planearse hasta completar sus datos', text: 'Sin ' + miss.map(function (k) { return k[1].toLowerCase(); }).join(', ') + ', el motor de cargue no puede calcular la ocupación del vehículo.' }) : '') + '</section>';
+    h += '<section class="f-sec"><div class="f-sec-head"><h3>' + I('lock') + 'Datos de origen SAP</h3><span class="lock-pill" data-tip="Estos campos se modifican en SAP y se sincronizan; aquí son de solo lectura">' + I('lock') + 'Solo lectura</span></div>' +
+      '<dl class="kv"><dt>' + lockDt('SKU') + '</dt><dd class="mono">' + p.sku + '</dd><dt>' + lockDt('Descripción') + '</dt><dd>' + esc(p.desc) + '</dd><dt>' + lockDt('Familia') + '</dt><dd>' + esc(p.fam) + '</dd><dt>' + lockDt('Unidad base') + '</dt><dd>' + esc(p.ub) + '</dd><dt>' + lockDt('Peso neto en SAP') + '</dt><dd>' + F.num(p.peso, 2) + ' kg por ' + p.ub.toLowerCase() + '</dd><dt>' + lockDt('Estado') + '</dt><dd>' + UI.chip(p.estado) + '</dd><dt>' + lockDt('Última sincronización') + '</dt><dd>' + F.fechaHora(p.sync) + ' · ' + F.relativo(p.sync) + '</dd></dl></section>';
+    h += '<section class="f-sec"><div class="f-sec-head"><h3>Datos logísticos</h3>' + (F_.edit ? '' : '<button type="button" class="btn btn-secondary btn-sm" data-a="edit">' + I('edit') + 'Editar datos logísticos</button>') + '</div>';
+    if (pendientes(p).length && !F_.edit) h += UI.banner({ tone: 'info', text: 'Hay un cambio pendiente de aprobación para este SKU. Revísalo en la pestaña Historial.' });
+    h += F_.edit ? editForm(p, d) : viewLog(p);
+    h += '</section></div>';
+    return h;
+  }
+  function viewLog(p) {
+    var v = vol(p), dv = desvPeso(p), fac = p.fac;
+    return '<div class="grid c2 gap-3" style="align-items:start"><dl class="kv"><dt>Unidad de empaque</dt><dd>' + esc(p.emp) + '</dd><dt>Unidades por empaque</dt><dd class="num">' + F.num(fac) + '</dd><dt>Peso logístico por ' + p.ub.toLowerCase() + '</dt><dd class="num">' + F.num(p.pesoLog, 2) + ' kg' + (Math.abs(dv) > 0.05 ? ' <span class="chip ' + (Math.abs(dv) > 10 ? 'chip-warning' : 'chip-neutral') + ' chip-sm no-dot">' + (dv > 0 ? '+' : '−') + F.num(Math.abs(dv), 0) + ' % vs SAP</span>' : '') + '</dd><dt>Peso por empaque</dt><dd class="num">' + F.kg(p.pesoLog * fac) + '</dd><dt>Largo × ancho × alto</dt><dd class="num">' + (v == null ? '<span class="muted">Sin registrar</span>' : dm(p.L) + ' × ' + dm(p.An) + ' × ' + dm(p.H) + ' m') + '</dd><dt>Volumen por ' + p.ub.toLowerCase() + '</dt><dd class="num">' + vtxt(p) + '</dd><dt>Volumen por empaque</dt><dd class="num">' + (v == null ? '—' : F.m3(v * fac, 3)) + '</dd></dl><div class="piece">' + pieceSvg(p.L, p.An, p.H, 'v') + '</div></div>' +
+      '<div><div class="strong t-13" style="margin:6px 0 2px">Restricciones de manipulación</div>' + (p.restr.length ? p.restr.map(function (c) { return '<div class="rest-line">' + I('alert-triangle') + '<span>' + esc(A.restriccionesProducto[c]) + '</span></div>'; }).join('') : '<div class="muted t-13">Sin restricciones: se puede cargar con cualquier método.</div>') + (p.rev ? '' : '<div class="mt-2">' + UI.banner({ tone: 'warning', text: 'Las restricciones de este SKU aún no fueron revisadas por logística.' }) + '</div>') + '</div>';
+  }
+  function fld(id, label, val, unit, err, hint) { return '<div class="field"><label class="label" for="' + id + '">' + label + '</label><div class="u-in"><input class="input" id="' + id + '" data-f="' + id + '" inputmode="decimal" value="' + esc(val) + '"' + (err ? ' aria-invalid="true"' : '') + '><span class="u">' + unit + '</span></div>' + (err ? '<span class="error-text">' + I('alert-circle', 'icon-sm') + esc(err) + '</span>' : hint ? '<span class="hint">' + hint + '</span>' : '') + '</div>'; }
+  function editForm(p, d) {
+    var e = F_.errs, v = (parse(d.L) > 0 && parse(d.An) > 0 && parse(d.H) > 0) ? parse(d.L) * parse(d.An) * parse(d.H) : null;
+    return '<div class="edit-grid"><div class="field"><label class="label" for="dEt">Tipo de empaque</label><select class="select" id="dEt" data-f="dEt">' + EMPS.map(function (x) { return '<option' + (x === d.dEt ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></div>' +
+      fld('dFac', 'Unidades por empaque', d.dFac, 'un.', e.dFac) + fld('dPeso', 'Peso logístico por ' + p.ub.toLowerCase(), d.dPeso, 'kg', e.dPeso, 'Peso de SAP: ' + F.num(p.peso, 2) + ' kg') +
+      '<div class="field"><span class="label">Volumen calculado</span><div class="input" style="display:flex;align-items:center;background:var(--surface-3)" id="dVol" aria-live="polite">' + (v == null ? '—' : F.m3(v, v < 0.01 ? 5 : 4)) + '</div><span class="hint">Largo × ancho × alto</span></div></div>' +
+      '<div class="edit-grid c3">' + fld('dL', 'Largo', d.L, 'm', e.dL) + fld('dAn', 'Ancho', d.An, 'm', e.dAn) + fld('dH', 'Alto', d.H, 'm', e.dH) + '</div>' +
+      '<div class="piece" id="dSvg">' + pieceSvg(parse(d.L), parse(d.An), parse(d.H), 'e') + '</div>' +
+      '<fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label">Restricciones de manipulación</legend><div class="check-grid">' + RCODES.map(function (c) { return '<label class="check"><input type="checkbox" data-r="' + c + '"' + (d.restr.indexOf(c) > -1 ? ' checked' : '') + '> ' + esc(A.restriccionesProducto[c]) + '</label>'; }).join('') + '</div></fieldset>' +
+      '<div id="dWarn"></div><div class="row end" style="margin-top:4px"><button type="button" class="btn btn-ghost" data-a="cancel">Cancelar</button><button type="button" class="btn btn-primary" data-a="solicitar">Solicitar cambio</button></div>';
+  }
+  function parse(s) { if (typeof s === 'number') return s; var n = parseFloat(String(s == null ? '' : s).trim().replace(',', '.')); return isNaN(n) ? NaN : n; }
+  function toStr(n) { return n == null ? '' : String(n).replace('.', ','); }
+  function startEdit(p) { F_.edit = true; F_.errs = {}; var m = p.emp.match(/^(\S+)/); F_.draft = { dEt: EMPS.indexOf(m && m[1]) > -1 ? m[1] : 'Unidad', dFac: toStr(p.fac), dPeso: toStr(p.pesoLog), L: toStr(p.L), An: toStr(p.An), H: toStr(p.H), restr: p.restr.slice() }; }
+  function validate(p, d) {
+    var e = {}, f = parse(d.dFac), w = parse(d.dPeso), l = parse(d.L), a = parse(d.An), h = parse(d.H);
+    if (!(f >= 1) || f % 1 !== 0) e.dFac = 'Ingresa un entero de 1 o más.'; else if (f > 500) e.dFac = 'El máximo es 500 unidades por empaque.';
+    if (!(w > 0)) e.dPeso = 'El peso debe ser mayor a cero.'; else if (w > 5000) e.dPeso = 'Peso fuera de rango (máximo 5.000 kg).';
+    if (!(l > 0)) e.dL = 'Ingresa el largo en metros.'; else if (l > 14) e.dL = 'Excede el largo máximo de un vehículo (14 m).';
+    if (!(a > 0)) e.dAn = 'Ingresa el ancho en metros.'; else if (a > 3) e.dAn = 'Excede el ancho de la plataforma (3 m).';
+    if (!(h > 0)) e.dH = 'Ingresa el alto en metros.'; else if (h > 3) e.dH = 'Excede la altura legal (3 m).';
+    return e;
+  }
+  function empStr(d) { var f = parse(d.dFac); return (d.dEt === 'Unidad' || ((d.dEt === 'Rollo' || d.dEt === 'Caja') && f === 1)) && f === 1 ? d.dEt : d.dEt + ' x ' + f; }
+  function diffs(p, d) {
+    var out = [], patch = {}, w = parse(d.dPeso), f = parse(d.dFac), l = parse(d.L), a = parse(d.An), h = parse(d.H), em = empStr(d);
+    if (em !== p.emp) { out.push({ k: 'Unidad de empaque', de: p.emp, a: em }); patch.emp = em; patch.fac = f; }
+    else if (f !== p.fac) { out.push({ k: 'Unidades por empaque', de: String(p.fac), a: String(f) }); patch.fac = f; }
+    if (w !== p.pesoLog) { out.push({ k: 'Peso logístico', de: F.num(p.pesoLog, 2) + ' kg', a: F.num(w, 2) + ' kg' }); patch.pesoLog = w; }
+    [['L', 'Largo', l], ['An', 'Ancho', a], ['H', 'Alto', h]].forEach(function (x) { if (x[2] !== p[x[0]]) { out.push({ k: x[1], de: p[x[0]] == null ? 'Sin registrar' : dm(p[x[0]]) + ' m', a: dm(x[2]) + ' m' }); patch[x[0]] = x[2]; } });
+    var r0 = p.restr.slice().sort().join(), r1 = d.restr.slice().sort().join();
+    if (r0 !== r1 || !p.rev) { if (r0 !== r1) out.push({ k: 'Restricciones', de: p.restr.map(function (c) { return RS[c]; }).join(' · ') || 'Ninguna', a: d.restr.map(function (c) { return RS[c]; }).join(' · ') || 'Ninguna' }); patch.restr = d.restr.slice(); patch.rev = true; if (r0 === r1 && !p.rev) out.push({ k: 'Restricciones', de: 'Sin revisar', a: 'Revisadas' }); }
+    return { list: out, patch: patch };
+  }
+  function bindFicha(body) {
+    body.addEventListener('click', function (e) {
+      var t = e.target.closest('[data-ft]'), a = e.target.closest('[data-a]'); if (!F_) return; var p = byS[F_.sku];
+      if (t) { F_.tab = t.dataset.ft; drawFicha(); return; }
+      if (!a) return; var act = a.dataset.a;
+      if (act === 'edit') { startEdit(p); drawFicha(); }
+      else if (act === 'cancel') { F_.edit = false; F_.errs = {}; drawFicha(); }
+      else if (act === 'solicitar') { var er = validate(p, F_.draft); F_.errs = er; if (Object.keys(er).length) { drawFicha(); var f = $('[aria-invalid="true"]', body); if (f) f.focus(); return; } var df = diffs(p, F_.draft); if (!df.list.length) { UI.toast('No hay cambios por solicitar.', 'info'); return; } motivoModal(p, df); }
+      else if (act === 'aprobar') aprobar(+a.dataset.h);
+      else if (act === 'rechazar') rechazar(+a.dataset.h);
+    });
+    body.addEventListener('input', function (e) {
+      if (!F_ || !F_.edit) return; var id = e.target.dataset.f, d = F_.draft; if (!id) return;
+      var map = { dFac: 'dFac', dPeso: 'dPeso', dL: 'L', dAn: 'An', dH: 'H' }; if (!map[id]) return; d[map[id]] = e.target.value;
+      var l = parse(d.L), a = parse(d.An), h = parse(d.H), v = l > 0 && a > 0 && h > 0 ? l * a * h : null;
+      $('#dVol', body).textContent = v == null ? '—' : F.m3(v, v < 0.01 ? 5 : 4); $('#dSvg', body).innerHTML = pieceSvg(l, a, h, 'e');
+      var p = byS[F_.sku], w = parse(d.dPeso), dv = (w - p.peso) / p.peso * 100;
+      $('#dWarn', body).innerHTML = w > 0 && Math.abs(dv) > 10 ? UI.banner({ tone: 'warning', text: 'El peso logístico desvía ' + F.num(Math.abs(dv), 0) + ' % del peso de SAP. Se pedirá justificación y el cambio quedará pendiente de aprobación.' }) : '';
+    });
+    body.addEventListener('change', function (e) {
+      if (!F_ || !F_.edit) return; if (e.target.dataset.f === 'dEt') F_.draft.dEt = e.target.value;
+      if (e.target.dataset.r) { var c = e.target.dataset.r, r = F_.draft.restr, i = r.indexOf(c); if (e.target.checked && i < 0) r.push(c); if (!e.target.checked && i > -1) r.splice(i, 1); }
+    });
+  }
+  function motivoModal(p, df) {
+    var m = UI.modal({ title: 'Solicitar cambio de datos logísticos', subtitle: p.sku + ' · ' + p.desc, width: 520,
+      body: '<div class="stack"><div>' + df.list.map(function (x) { return '<div class="diff-line"><span>' + esc(x.k) + '</span><span><s>' + esc(x.de) + '</s> → <b>' + esc(x.a) + '</b></span></div>'; }).join('') + '</div><div class="field"><label class="label" for="mvT">Motivo del cambio</label><textarea class="textarea" id="mvT" placeholder="Ej. Pesaje en báscula del CEDI con 30 muestras"></textarea><span class="error-text" id="mvE" hidden>' + I('alert-circle', 'icon-sm') + 'Explica el motivo (mínimo 10 caracteres) para que el aprobador pueda decidir.</span></div>' + UI.banner({ tone: 'info', text: 'El cambio no se aplica de inmediato: queda «Pendiente de aprobación» y lo revisa otro usuario con permiso. Los campos de SAP no se modifican desde aquí.' }) + '</div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Enviar a aprobación', kind: 'primary', onClick: function () {
+        var t = $('#mvT', m.el).value.trim(); if (t.length < 10) { $('#mvE', m.el).hidden = false; $('#mvT', m.el).setAttribute('aria-invalid', 'true'); $('#mvT', m.el).focus(); return false; }
+        HIST.unshift({ id: ++hid, sku: p.sku, by: me.usuarioId, when: new Date(), motivo: t, estado: 'Pendiente de aprobación', cambios: df.list, patch: df.patch, res: null });
+        if (F_) { F_.edit = false; F_.tab = 'hist'; } UI.toast('Solicitud enviada. Queda pendiente de aprobación.', 'success'); drawFicha(); refreshAll();
+      } }] });
+  }
+  function aprobar(id) {
+    var h = HIST.filter(function (x) { return x.id === id; })[0], p = byS[h.sku];
+    if (h.by === me.usuarioId) { UI.toast('No puedes aprobar tus propios cambios.', 'error'); return; }
+    UI.confirm({ title: '¿Aprobar este cambio?', tone: 'primary', confirmLabel: 'Aprobar y aplicar', html: 'Se aplicará a la ficha de <strong>' + esc(p.desc) + '</strong> y quedará registrado con tu nombre.' + '<div class="mt-3">' + h.cambios.map(function (x) { return '<div class="diff-line"><span>' + esc(x.k) + '</span><span><s>' + esc(x.de) + '</s> → <b>' + esc(x.a) + '</b></span></div>'; }).join('') + '</div>' }).then(function (ok) {
+      if (!ok) return; Object.assign(p, h.patch); h.estado = 'Aprobado'; h.res = { by: me.usuarioId, when: new Date(), nota: 'Aprobado' }; UI.toast('Cambio aprobado y aplicado a la ficha.', 'success'); drawFicha(); refreshAll();
+    });
+  }
+  function rechazar(id) {
+    var h = HIST.filter(function (x) { return x.id === id; })[0];
+    var m = UI.modal({ title: 'Rechazar cambio', subtitle: byS[h.sku].desc, width: 460, body: '<div class="field"><label class="label" for="rjT">Motivo del rechazo</label><textarea class="textarea" id="rjT"></textarea><span class="error-text" id="rjE" hidden>' + I('alert-circle', 'icon-sm') + 'Indica por qué se rechaza para que quien lo pidió pueda corregirlo.</span></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Rechazar cambio', kind: 'danger', onClick: function () { var t = $('#rjT', m.el).value.trim(); if (t.length < 6) { $('#rjE', m.el).hidden = false; $('#rjT', m.el).setAttribute('aria-invalid', 'true'); return false; } h.estado = 'Rechazado'; h.res = { by: me.usuarioId, when: new Date(), nota: t }; UI.toast('Cambio rechazado. Se notificó al solicitante.', 'warning'); drawFicha(); refreshAll(); } }] });
+  }
+  function tabComp(p) {
+    var cs = compat(p), ok = cs.filter(function (c) { return c.est === 'Sí'; }).length;
+    return '<div class="stack-lg">' + (cs[0].est === 'Sin datos' ? UI.banner({ tone: 'warning', title: 'No se puede evaluar la compatibilidad', text: 'Registra largo, ancho y alto para saber qué vehículos pueden transportar este SKU.' }) : UI.banner({ tone: ok ? 'info' : 'danger', text: ok ? 'Se puede transportar sin condiciones en ' + ok + ' de 5 tipos de vehículo; los demás tienen condiciones o no son aptos.' : 'Ningún tipo de vehículo lo transporta sin condiciones.' })) +
+      '<div class="table-wrap"><table class="table is-dense"><thead><tr><th>Tipo de vehículo</th><th>Capacidad máx.</th><th>Resultado</th><th>Motivo</th></tr></thead><tbody>' + cs.map(function (c) { return '<tr><td data-label="Tipo"><strong>' + c.tipo + '</strong><div class="cell-sub">' + c.c.n + ' vehículos</div></td><td data-label="Capacidad" class="num">' + F.ton(c.c.peso, 1) + '<div class="cell-sub">largo ' + dm(c.c.largo) + ' m</div></td><td data-label="Resultado">' + cChip(c.est) + '</td><td data-label="Motivo" style="min-width:200px">' + c.razones.map(esc).join('<br>') + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+      '<p class="muted t-13">Derivado de la flota parametrizada: largo útil, carrocería y compatibilidades de cada vehículo. <a href="vehiculos.html">Ver matriz de vehículos</a>.</p></div>';
+  }
+  function tabStock(p) {
+    var rows = A.sedes.filter(function (s) { return p.stock[s.id]; });
+    if (!rows.length) return UI.empty({ icon: 'warehouse', title: 'Sin existencias registradas', text: 'Este SKU todavía no tiene stock en ninguna bodega.' });
+    var tf = 0, tr = 0; rows.forEach(function (s) { tf += p.stock[s.id].fisico; tr += p.stock[s.id].reservado; });
+    return '<div class="stack-lg"><div class="grid c3 gap-3"><div class="mini-stat"><div class="v">' + F.num(tf) + '</div><div class="l">Físico total</div></div><div class="mini-stat"><div class="v">' + F.num(tr) + '</div><div class="l">Reservado</div></div><div class="mini-stat"><div class="v">' + F.num(tf - tr) + '</div><div class="l">Disponible</div></div></div>' +
+      '<div class="table-wrap"><table class="table is-dense"><thead><tr><th>Bodega</th><th class="num">Físico</th><th class="num">Reservado</th><th class="num">Disponible</th><th>Frente al mínimo</th></tr></thead><tbody>' + rows.map(function (s) { var x = p.stock[s.id], bajo = x.disponible < x.minimo; return '<tr><td data-label="Bodega"><strong>' + esc(s.nombre) + '</strong>' + (x.enTransito ? '<div class="cell-sub">' + F.num(x.enTransito) + ' en tránsito</div>' : '') + '</td><td data-label="Físico" class="num">' + F.num(x.fisico) + '</td><td data-label="Reservado" class="num">' + F.num(x.reservado) + '</td><td data-label="Disponible" class="num strong">' + F.num(x.disponible) + '</td><td data-label="Mínimo" style="min-width:160px">' + UI.meter(x.disponible, Math.max(x.minimo * 2, x.disponible, 1), { level: bajo ? 'crit' : 'ok', text: (bajo ? 'Bajo mínimo ' : 'Mínimo ') + F.num(x.minimo), label: 'Disponible frente al mínimo' }) + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+      '<p class="muted t-13">Ver <a href="reservas.html">reservas</a> y <a href="inventario.html">inventario por ubicación</a>. Las cantidades vienen de SAP y se concilian cada 15 minutos.</p></div>';
+  }
+  function tabHist(p) {
+    var hs = HIST.filter(function (h) { return h.sku === p.sku; }), items = [];
+    hs.forEach(function (h) {
+      var u = A.idx.usuarios[h.by], own = h.by === me.usuarioId, pend = h.estado === 'Pendiente de aprobación';
+      var body = h.cambios.map(function (x) { return '<div class="diff-line"><span>' + esc(x.k) + '</span><span><s>' + esc(x.de) + '</s> → <b>' + esc(x.a) + '</b></span></div>'; }).join('') + '<div class="muted t-13" style="margin-top:6px">Motivo: ' + esc(h.motivo) + '</div>';
+      if (h.res) body += '<div class="muted t-13">' + esc(A.idx.usuarios[h.res.by].nombre) + ' · ' + F.fechaHora(h.res.when) + (h.res.nota && h.estado === 'Rechazado' ? ' · «' + esc(h.res.nota) + '»' : '') + '</div>';
+      if (pend) body += '<div class="hist-act">' + (own ? '<span class="muted t-13">Tu solicitud espera la aprobación de otro usuario con permiso.</span><button type="button" class="btn btn-secondary btn-sm" disabled data-tip="No puedes aprobar tus propios cambios">Aprobar</button>' : '<button type="button" class="btn btn-primary btn-sm" data-a="aprobar" data-h="' + h.id + '">Aprobar</button><button type="button" class="btn btn-danger btn-sm" data-a="rechazar" data-h="' + h.id + '">Rechazar</button>') + '</div>';
+      items.push({ ts: +h.when, state: pend ? 'current' : h.estado === 'Rechazado' ? 'error' : 'done', titleHtml: 'Cambio logístico ' + UI.chip(h.estado, { tone: pend ? 'warning' : h.estado === 'Aprobado' ? 'success' : 'danger', small: true }), meta: esc(u.nombre) + ' · ' + F.fechaHora(h.when), body: body });
+    });
+    items.push({ ts: +p.sync, state: 'done', title: p.nuevo ? 'Creado por importación desde SAP' : 'Sincronización desde SAP', meta: 'Sistema · ' + F.fechaHora(p.sync), body: 'Campos de origen actualizados: descripción, familia, unidad base y peso neto.' });
+    items.sort(function (a, b) { return b.ts - a.ts; });
+    return '<div class="stack"><p class="muted t-13">Todo cambio a datos logísticos pide un motivo y lo aprueba otro usuario. Los campos de SAP nunca se editan aquí.</p>' + UI.timeline(items) + '</div>';
+  }
+
+  /* ---------- importación (HU-052) ---------- */
+  var NUEVOS = [['1000239', 'Varilla corrugada 7/8" x 6 m', 'Varilla', 'Barra', 'Atado x 12', 12, 18.3], ['1001104', 'Malla electrosoldada XX-221 2.35 x 6 m', 'Malla', 'Unidad', 'Paquete x 10', 10, 48.6], ['1002203', 'Perfil C 80x40x1.5 mm x 6 m', 'Perfil', 'Unidad', 'Paquete x 20', 20, 9.2]];
+  function importModal() {
+    var im = { src: 'ambos', phase: 'cfg', steps: [], pct: 0, fail: false };
+    var m = UI.modal({ title: 'Importar SKU', subtitle: 'Actualiza el maestro desde SAP y el Data Lake', width: 560, body: '', footer: '' });
+    var foot = document.createElement('footer'); foot.className = 'ov-foot'; m.el.appendChild(foot);
+    function sources() { return im.src === 'sap' ? ['SAP'] : im.src === 'dl' ? ['Data Lake'] : ['SAP', 'Data Lake']; }
+    function stepsList() { var s = [['Conectando con SAP', 'SAP'], ['Leyendo materiales modificados', 'SAP'], ['Consumiendo atributos del Data Lake', 'Data Lake'], ['Validando unidades, pesos y duplicados', 'x'], ['Aplicando al maestro', 'x']]; return s.filter(function (x) { return x[1] === 'x' || sources().indexOf(x[1]) > -1; }); }
+    function draw() {
+      var b = '';
+      if (im.phase === 'cfg') {
+        b = '<div class="stack"><fieldset style="border:0;padding:0;margin:0" class="stack-sm"><legend class="label">Fuente</legend>' + [['ambos', 'SAP y Data Lake', 'Materiales de SAP y atributos normalizados del Data Lake'], ['sap', 'Solo SAP', 'Catálogo de materiales y unidades'], ['dl', 'Solo Data Lake', 'Atributos de producto normalizados']].map(function (o) { return '<label class="radio" style="align-items:flex-start"><input type="radio" name="isrc" value="' + o[0] + '"' + (im.src === o[0] ? ' checked' : '') + '><span><strong>' + o[1] + '</strong><br><span class="muted t-13">' + o[2] + '</span></span></label>'; }).join('') + '</fieldset>' + UI.banner({ tone: 'info', text: 'La importación crea los SKU nuevos y actualiza solo los campos de origen. Los datos logísticos que editaste no se sobrescriben.' }) + '</div>';
+        foot.innerHTML = '<button type="button" class="btn btn-ghost" data-n="x">Cancelar</button><span class="grow"></span><button type="button" class="btn btn-primary" data-n="go">Importar</button>';
+      } else if (im.phase === 'run' || im.phase === 'fail') {
+        b = '<div class="stack"><div class="imp-steps" role="list" aria-live="polite">' + im.steps.map(function (s) { return '<div class="imp-step is-' + s.st + '" role="listitem"><span class="ic">' + (s.st === 'done' ? I('check') : s.st === 'fail' ? I('x') : s.st === 'run' ? '<span class="spin" style="width:12px;height:12px"></span>' : '') + '</span><span>' + s.t + '</span><span class="t-12">' + (s.note || '') + '</span></div>'; }).join('') + '</div>' + UI.meter(im.pct, 100, { level: im.phase === 'fail' ? 'crit' : 'info', label: 'Progreso de la importación', text: Math.round(im.pct) + ' %' }) +
+          (im.phase === 'fail' ? UI.banner({ tone: 'danger', title: 'El Data Lake no respondió', text: 'Tiempo de espera agotado al consumir los atributos de producto. SAP ya quedó leído: puedes reintentar solo esta parte sin perder lo avanzado.' }) : '') + '</div>';
+        foot.innerHTML = im.phase === 'fail' ? '<button type="button" class="btn btn-ghost" data-n="x">Cerrar</button><span class="grow"></span><button type="button" class="btn btn-primary" data-n="retry">Reintentar</button>' : '<button type="button" class="btn btn-ghost" data-n="x" disabled>Importando…</button>';
+      } else {
+        var r = im.res;
+        b = '<div class="stack">' + (r.nuevos || r.act ? UI.banner({ tone: 'success', title: 'Importación terminada', text: 'Se procesaron ' + F.num(r.leidos) + ' materiales en ' + F.num(r.seg, 0) + ' segundos.' }) : UI.banner({ tone: 'info', title: 'El maestro ya está al día', text: 'No hay materiales nuevos ni modificados desde la última importación.' })) +
+          '<div class="res-grid"><div class="mini-stat"><div class="v">' + r.nuevos + '</div><div class="l">Nuevos</div></div><div class="mini-stat"><div class="v">' + r.act + '</div><div class="l">Actualizados</div></div><div class="mini-stat"><div class="v">' + r.igual + '</div><div class="l">Sin cambios</div></div><div class="mini-stat"><div class="v">' + r.rech.length + '</div><div class="l">Rechazados</div></div></div>' +
+          (r.nuevos ? '<div>' + UI.banner({ tone: 'warning', title: r.nuevos + ' SKU nuevos sin datos logísticos', text: 'Aparecen en «Datos incompletos». Completa empaque, dimensiones y restricciones antes de usarlos en planeación.' }) + '</div>' : '') +
+          (r.rech.length ? '<div><div class="strong t-13 mb-2" style="margin-bottom:6px">Rechazados</div>' + r.rech.map(function (x) { return '<div class="rest-line">' + I('x-circle') + '<span><span class="mono">' + x[0] + '</span> · ' + esc(x[1]) + '</span></div>'; }).join('') + '</div>' : '') + '</div>';
+        foot.innerHTML = '<span class="grow"></span>' + (r.nuevos ? '<button type="button" class="btn btn-secondary" data-n="inc">Ver SKU incompletos</button>' : '') + '<button type="button" class="btn btn-primary" data-n="x">Listo</button>';
+      }
+      m.body.innerHTML = b;
+    }
+    function run(resume) {
+      im.phase = 'run'; var list = stepsList(); if (!resume) { im.steps = list.map(function (s) { return { t: s[0], st: 'pend', src: s[1] }; }); im.pct = 0; }
+      var i = im.steps.findIndex(function (s) { return s.st !== 'done'; }); draw();
+      (function next() {
+        if (i >= im.steps.length) { finish(); return; }
+        var s = im.steps[i]; s.st = 'run'; draw();
+        setTimeout(function () {
+          if (!m.el.isConnected) return;
+          if (s.src === 'Data Lake' && !st.dlTried) { st.dlTried = true; s.st = 'fail'; s.note = 'Timeout'; im.phase = 'fail'; im.pct = Math.max(im.pct, 55); draw(); return; }
+          s.st = 'done'; s.note = s.src === 'x' ? '' : s.t.indexOf('Leyendo') === 0 ? F.num(st.imp ? 0 : 2275) + ' materiales' : ''; i++; im.pct = i / im.steps.length * 100; draw(); next();
+        }, 650);
+      })();
+    }
+    function finish() {
+      var primera = st.imp === 0, res = { leidos: primera ? 2275 : 2275, seg: 4 + Math.random() * 3, nuevos: primera ? NUEVOS.length : 0, act: primera ? 6 : 0, igual: P.length - (primera ? 6 : 0), rech: primera ? [['1009001', 'Material marcado para borrado en SAP (LVORM)'], ['1009014', 'Sin unidad de empaque (UMREZ) definida']] : [] };
+      if (primera) {
+        P.slice(0, 40).filter(function (p, k) { return k % 7 === 0; }).slice(0, 6).forEach(function (p) { p.sync = new Date(); });
+        NUEVOS.forEach(function (n) { P.push({ sku: n[0], desc: n[1], fam: n[2], ub: n[3], emp: n[4], fac: n[5], peso: n[6], pesoLog: n[6], L: null, An: null, H: null, restr: [], rev: false, sync: new Date(), stock: {}, nuevo: true, estado: 'Activo' }); });
+        P.sort(function (a, b) { return a.sku < b.sku ? -1 : 1; });
+      }
+      st.imp++; res.igual = P.length - res.nuevos - res.act; im.res = res; im.phase = 'done'; draw(); refreshAll();
+      if (primera) UI.toast(res.nuevos + ' SKU nuevos importados; ' + res.rech.length + ' rechazados por reglas de SAP.', 'success');
+    }
+    m.body.addEventListener('change', function (e) { if (e.target.name === 'isrc') im.src = e.target.value; });
+    foot.addEventListener('click', function (e) { var b = e.target.closest('[data-n]'); if (!b) return; var n = b.dataset.n; if (n === 'x') m.close(); else if (n === 'go') run(false); else if (n === 'retry') run(true); else if (n === 'inc') { m.close(); setChip('nue'); } });
+    draw();
+  }
+  $('#btnImport').addEventListener('click', importModal);
+
+  renderKpis(); renderChips();
+  var qs = UI.param('sku'); if (qs && byS[qs]) openFicha(qs);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Novedades y devoluciones · Armetales</title>
+<meta name="description" content="Bandeja de novedades de entrega de Armetales: entregas fallidas y parciales, devoluciones, retorno a bodega, reintentos y notas crédito.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de la bandeja de novedades (tokens y componentes viven en app.css) */
+  .kpi-row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .kpi .kpi-value { font-size: 28px; } .kpi { padding: 12px; } }
+  .insight { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 1000px) { .insight { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); } }
+  .donut-box { display: grid; gap: 16px; align-items: center; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 520px) { .donut-box { grid-template-columns: 170px minmax(0, 1fr); } }
+  .donut-box .chart { --h: 170px; }
+  .legend-list { display: grid; gap: 10px; }
+  .legend-list .li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px; }
+  .legend-list .li .sub { grid-column: 2 / -1; font-size: 12px; color: var(--text-2); margin-top: -6px; }
+  .legend-list .li b { font-variant-numeric: tabular-nums; }
+  .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .ret-row { display: flex; gap: 12px; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--border); }
+  .ret-row:last-child { border-bottom: 0; }
+  .ret-row .rr-body { flex: 1; min-width: 0; }
+  .ret-row .rr-t { font-weight: 600; font-size: 13.5px; line-height: 1.35; }
+  .ret-row .rr-m { font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
+  @media (max-width: 519px) { .ret-row { flex-wrap: wrap; } .ret-row .rr-body { flex-basis: calc(100% - 52px); } .ret-row .btn { margin-left: 44px; } }
+  .chips-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .nv-id { font-family: var(--font-mono); font-size: 12.5px; }
+  .tipo-ico { display: inline-flex; width: 24px; height: 24px; border-radius: 6px; align-items: center; justify-content: center; background: var(--surface-3); color: var(--text-2); flex: none; }
+  .tipo-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .mini-stat { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); min-width: 0; }
+  .mini-stat .v { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
+  .mini-stat .l { font-size: 11.5px; color: var(--text-2); }
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .resp { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .resp:last-child { border-bottom: 0; }
+  .resp .grow { min-width: 0; }
+  .lines-edit { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lines-edit th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--text-2); padding: 4px 6px; }
+  .lines-edit td { padding: 6px; border-top: 1px solid var(--border); vertical-align: middle; }
+  .lines-edit .input { height: 34px; width: 84px; text-align: right; font-variant-numeric: tabular-nums; }
+  .lines-edit .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .recur { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px; }
+  .recur .tag { height: 26px; }
+  .opt-row { display: grid; gap: 8px; }
+  .opt-card { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); cursor: pointer; }
+  .opt-card:has(input:checked) { border-color: var(--blue); background: var(--blue-bg); }
+  .opt-card:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+  .opt-card .t { font-weight: 600; font-size: 13.5px; }
+  .opt-card .s { font-size: 12.5px; color: var(--text-2); }
+  .cap-note { font-size: 12.5px; }
+</style>
+</head>
+<body data-page="novedades">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Operación</div>
+      <h1 class="page-title">Novedades y devoluciones</h1>
+      <p class="page-desc">Entregas fallidas o parciales, devoluciones y averías: de la causa al retorno a bodega, el reintento y la nota crédito.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-secondary" id="btnRetorno">Registrar retorno a bodega</button>
+      <button type="button" class="btn btn-primary" id="btnNueva">Registrar novedad</button>
+    </div>
+  </header>
+
+  <section aria-label="Indicadores de novedades"><div class="kpi-row" id="kpiRow"></div></section>
+
+  <section class="section insight" aria-label="Motivos y retornos pendientes">
+    <div class="card">
+      <div class="card-head"><div><h2 class="card-title">Novedades por motivo</h2><p class="card-sub" id="motSub"></p></div></div>
+      <div class="card-body donut-box"><div class="chart" id="donut" role="img" aria-label="Novedades por clase de motivo"></div><div class="legend-list" id="donutLegend"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2 class="card-title">Mercancía por recibir en bodega</h2><p class="card-sub" id="retSub"></p></div></div>
+      <div id="retList"></div>
+    </div>
+  </section>
+
+  <section class="section" aria-label="Listado de novedades">
+    <div class="tabs" role="tablist" id="mainTabs" aria-label="Vistas de novedades">
+      <button type="button" class="tab" role="tab" aria-controls="tp-bandeja" aria-selected="true">Bandeja <span class="count" id="cntBandeja"></span></button>
+      <button type="button" class="tab" role="tab" aria-controls="tp-historial">Historial</button>
+    </div>
+    <div class="tab-panel" id="tp-bandeja" role="tabpanel" style="margin-top:16px">
+      <div class="chips-bar"><div class="filter-bar" id="stateChips" role="group" aria-label="Filtrar por estado"></div></div>
+      <div id="tblBandeja"></div>
+    </div>
+    <div class="tab-panel" id="tp-historial" role="tabpanel" hidden style="margin-top:16px">
+      <div class="card mb-4" id="recurCard"></div>
+      <div class="chips-bar"><div class="segmented" role="group" aria-label="Periodo" id="periodSeg"><button type="button" data-p="7" aria-pressed="false">7 días</button><button type="button" data-p="30" aria-pressed="false">30 días</button><button type="button" data-p="0" aria-pressed="true">Todo el historial</button></div><button type="button" class="btn btn-secondary btn-sm" id="btnCsv"></button></div>
+      <div id="tblHistorial"></div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+/* Novedades y devoluciones · HU-221…228. Los cambios de estado viven en memoria. */
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$, me = A.usuarioActual;
+  $('#btnCsv').innerHTML = UI.icon('download') + 'Exportar CSV';
+
+  /* ---------- datos derivados ---------- */
+  var CLASES = ['Cliente', 'Producto', 'Logística', 'Facturación y pedido', 'Otros'], CCOL = ['#2A6BDB', '#C98A00', '#56616B', '#7A4B9A', '#0E8F9E'];
+  function clasificar(m) {
+    m = String(m || '').toLowerCase();
+    if (/modific|easy sales|factur/.test(m)) return 'Facturación y pedido';
+    if (/averi|calidad|oxid|referencia/.test(m)) return 'Producto';
+    if (/faltante|cargue|cargaron|veh[ií]culo|embrague|cierre vial|restricci/.test(m)) return 'Logística';
+    if (/ausente|aplazar|obra cerrada|sin recibo|sin autoriz|direcci|sobrante|reduce|rechaza|lluvia/.test(m)) return 'Cliente';
+    return 'Otros';
+  }
+  var nowMs = new Date(A.ahora).getTime();
+  var items = A.novedades.map(function (n) {
+    var c = Object.assign({}, n); c.clase = clasificar(n.motivo); c.log = []; c.fechaMs = new Date(n.fechaHora).getTime();
+    c.cliente = (A.idx.clientes[n.clienteId] || {}).razonSocial || n.clienteId; c.valor = n.notaCreditoCOP || 0; c.resolucion = n.estado === 'Cerrada' || n.estado === 'Resuelta' ? n.accion : '';
+    return c;
+  });
+  var seqNext = 14;
+  function byId(id) { return items.filter(function (n) { return n.novedadId === id; })[0]; }
+  function pedido(n) { return A.idx.pedidos[n.pedidoId]; }
+  function isOpen(n) { return n.estado === 'Abierta' || n.estado === 'En gestión'; }
+  function pendRet(n) { return n.retorno && n.retorno.estado !== 'Recibido en CEDI'; }
+  function who(id) { if (!id) return '—'; if (/^CND/.test(id)) { var c = A.idx.conductores[id]; return c ? c.nombre + ' (conductor)' : id; } var u = A.usuarios.filter(function (x) { return x.usuarioId === id; })[0]; return u ? u.nombre : id; }
+  function tipoIcon(t) { return /fallida/i.test(t) ? 'x-circle' : /parcial/i.test(t) && /Entrega/.test(t) ? 'layers' : /Devoluci/.test(t) ? 'undo' : /averiado|Faltante/.test(t) ? 'alert-triangle' : /vehículo/.test(t) ? 'truck' : /Restricción/.test(t) ? 'ban' : 'edit'; }
+  function tipoChip(t) { return '<span class="tipo-cell"><span class="tipo-ico">' + UI.icon(tipoIcon(t), 'icon-sm') + '</span><span>' + esc(t) + '</span></span>'; }
+  function claseTone(c) { return { 'Cliente': 'info', 'Producto': 'warning', 'Logística': 'neutral', 'Facturación y pedido': 'info', 'Otros': 'neutral' }[c]; }
+  function claseChip(c) { return '<span class="chip chip-' + claseTone(c) + ' chip-sm no-dot">' + esc(c) + '</span>'; }
+  var RESP_ROLES = { fallida: ['Coordinador logístico', 'Despachador', 'Asesor comercial'], parcial: ['Coordinador logístico', 'Jefe de bodega', 'Asesor comercial'], devolucion: ['Jefe de bodega', 'Analista de inventarios', 'Asesor comercial'], averia: ['Jefe de logística', 'Jefe de bodega', 'Analista de inventarios'], vehiculo: ['Jefe de logística', 'Despachador', 'Coordinador logístico'], pedido: ['Planificador logístico', 'Asesor comercial', 'Coordinador logístico'], acceso: ['Despachador', 'Coordinador logístico', 'Planificador logístico'] };
+  function familia(t) { return /fallida/i.test(t) ? 'fallida' : /Entrega parcial/.test(t) ? 'parcial' : /Devoluci/.test(t) ? 'devolucion' : /averiado|Faltante/.test(t) ? 'averia' : /vehículo/.test(t) ? 'vehiculo' : /modificado/.test(t) ? 'pedido' : 'acceso'; }
+  function notificados(n) { return RESP_ROLES[familia(n.tipo)].map(function (rol) { var u = A.usuarios.filter(function (x) { return x.rol === rol; })[0]; return { u: u, rol: rol }; }).filter(function (x) { return x.u; }); }
+  function ncDe(n) { return n.valor || 0; }
+
+  /* ítems afectados (HU-225): del pedido original */
+  function itemsOf(n) {
+    if (n.items) return n.items; var p = pedido(n); if (!p) return []; var tot = p.pesoKg || 1, val = p.valorCOP || 0;
+    if (n.sku && n.cantidadAfectada) {
+      var ln = p.lineas.filter(function (l) { return l.sku === n.sku; })[0], pr = A.idx.productos[n.sku], sol = ln ? ln.cantidad : n.cantidadAfectada, afect = Math.min(n.cantidadAfectada, sol);
+      return [{ sku: n.sku, desc: ln ? ln.descripcion : pr ? pr.descripcion : n.sku, unidad: ln ? ln.unidad : n.unidad || (pr && pr.unidadBase) || 'Unidad', sol: sol, afect: afect, ent: sol - afect, kg: ln ? ln.pesoKg * afect / sol : 0, valor: n.valor }];
+    }
+    var total = /fallida|Devolución total/i.test(n.tipo);
+    return p.lineas.map(function (l) { return { sku: l.sku, desc: l.descripcion, unidad: l.unidad, sol: l.cantidad, afect: total ? l.cantidad : 0, ent: total ? 0 : l.cantidad, kg: total ? l.pesoKg : 0, valor: Math.round(val * l.pesoKg / tot) }; });
+  }
+  function kgAfectado(n) { var s = itemsOf(n).reduce(function (a, i) { return a + (i.kg || 0); }, 0); return s || (pedido(n) ? pedido(n).pesoKg : 0); }
+
+  /* ---------- resumen ---------- */
+  var COP = F.cop, state = { chip: 'abiertas', period: 0 };
+  function renderKpis() {
+    var ab = items.filter(isOpen), sin = items.filter(function (n) { return n.estado === 'Abierta'; }).length, ret = items.filter(pendRet), rei = items.filter(function (n) { return n.reintento && n.estado !== 'Cerrada'; }), nc = items.reduce(function (a, n) { return a + ncDe(n); }, 0);
+    $('#kpiRow').innerHTML =
+      UI.kpi({ id: 'abiertas', label: 'Novedades abiertas', icon: 'alert-triangle', value: ab.length, note: sin + ' sin responsable asignado', onClick: true }) +
+      UI.kpi({ id: 'retorno', label: 'Retornos por recibir', icon: 'undo', value: ret.length, note: 'Mercancía fuera de bodega', onClick: true }) +
+      UI.kpi({ id: 'reintento', label: 'Reintentos programados', icon: 'calendar', value: rei.length, note: 'Entregas por reprogramar', onClick: true }) +
+      UI.kpi({ id: 'nc', label: 'Valor en notas crédito', icon: 'file-text', valueHtml: COP(nc), note: items.filter(function (n) { return n.valor > 0; }).length + ' notas en 7 días', onClick: true });
+    $('#cntBandeja').textContent = items.filter(function (n) { return n.estado !== 'Cerrada'; }).length;
+  }
+  $('#kpiRow').addEventListener('click', function (e) { var k = e.target.closest('[data-kpi]'); if (!k) return; var m = { abiertas: 'abiertas', retorno: 'retorno', reintento: 'reintento', nc: 'nc' }[k.dataset.kpi]; if (k.dataset.kpi === 'nc') { goTab('tp-historial'); return; } goTab('tp-bandeja'); state.chip = m; renderChips(); applyBandeja(); $('#tblBandeja').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+
+  function renderMotivos() {
+    var agg = CLASES.map(function (c) { var l = items.filter(function (n) { return n.clase === c; }); return { c: c, n: l.length, v: l.reduce(function (a, n) { return a + ncDe(n); }, 0) }; }).filter(function (x) { return x.n; });
+    $('#motSub').textContent = items.length + ' novedades · clasificadas por causa raíz';
+    UI.chart.donut($('#donut'), { labels: agg.map(function (x) { return x.c; }), data: agg.map(function (x) { return x.n; }), colors: agg.map(function (x) { return CCOL[CLASES.indexOf(x.c)]; }), center: { value: items.length, label: 'novedades' }, legend: false, unit: 'novedades' });
+    $('#donutLegend').innerHTML = agg.map(function (x) { return '<div class="li"><i class="sw" style="background:' + CCOL[CLASES.indexOf(x.c)] + '"></i><span>' + esc(x.c) + '</span><b>' + x.n + '</b><span class="sub">' + (x.v ? COP(x.v) + ' en notas crédito' : 'Sin nota crédito') + '</span></div>'; }).join('');
+  }
+  function renderRet() {
+    var l = items.filter(pendRet); $('#retSub').textContent = l.length ? l.length + ' ' + (l.length === 1 ? 'devolución espera' : 'devoluciones esperan') + ' recepción en ' + UI.sede().nombre : 'Todo lo devuelto ya está en bodega';
+    $('#retList').innerHTML = l.length ? l.map(function (n) {
+      return '<div class="ret-row"><span class="notif-ico ' + (n.retorno.estado === 'Pendiente de recogida' ? 'alerta' : 'info') + '">' + UI.icon('truck', 'icon-sm') + '</span><div class="rr-body"><div class="rr-t"><span class="nv-id">' + n.novedadId + '</span> · ' + esc(n.cliente) + '</div><div class="rr-m">' + esc(n.retorno.estado) + ' · ' + (itemsOf(n)[0] ? esc(itemsOf(n)[0].desc) : 'Pedido ' + n.pedidoId) + '</div></div><button type="button" class="btn btn-secondary btn-sm" data-ret="' + n.novedadId + '">Registrar recepción</button></div>';
+    }).join('') : UI.empty({ icon: 'check-circle', title: 'Sin retornos pendientes', text: 'Cuando una novedad envíe mercancía de regreso, aparecerá aquí hasta que bodega la reciba.' });
+  }
+  $('#retList').addEventListener('click', function (e) { var b = e.target.closest('[data-ret]'); if (b) retornoModal(b.dataset.ret); });
+
+  /* ---------- tablas ---------- */
+  function cols(hist) {
+    return [
+      { key: 'novedadId', label: 'Novedad', mono: true, title: true, render: function (r) { return '<span class="nv-id">' + r.novedadId + '</span>'; } },
+      { key: 'tipo', label: 'Tipo', render: function (r) { return tipoChip(r.tipo); } },
+      { key: 'cliente', label: 'Cliente', render: function (r) { return esc(r.cliente) + '<div class="cell-sub mono">' + r.pedidoId + '</div>'; } },
+      { key: 'clase', label: 'Motivo', render: function (r) { return claseChip(r.clase) + '<div class="cell-sub" style="max-width:240px;white-space:normal">' + esc(r.motivo) + '</div>'; } },
+      { key: 'fechaMs', label: 'Reportada', value: function (r) { return r.fechaMs; }, render: function (r) { return '<span class="nowrap">' + F.fechaHora(r.fechaHora) + '</span>'; } },
+      { key: 'valor', label: 'Nota crédito', num: true, render: function (r) { return r.valor ? COP(r.valor) : '<span class="muted">—</span>'; }, hideMobile: !hist },
+      { key: 'estado', label: 'Estado', render: function (r) { return UI.chip(r.estado) + (pendRet(r) ? '<div class="cell-sub">Retorno por recibir</div>' : ''); } }
+    ].concat(hist ? [{ key: 'responsable', label: 'Responsable', hideMobile: true }] : []);
+  }
+  function tableOpts(hist) {
+    return { rows: [], pageSize: hist ? 10 : 8, searchable: { placeholder: 'Buscar por cliente, pedido o novedad' }, searchKeys: ['cliente', 'pedidoId', 'novedadId', 'motivo'], rowKey: 'novedadId', caption: hist ? 'Historial de novedades' : 'Bandeja de novedades', sort: { key: 'fechaMs', dir: 'desc' },
+      emptyText: hist ? 'No hay novedades en ese periodo con esos filtros.' : 'No hay novedades con esos filtros. Prueba con otro estado o limpia la búsqueda.',
+      filters: [{ key: 'tipo', label: 'Tipo', all: 'Todos los tipos', options: 'auto' }, { key: 'clase', label: 'Motivo', all: 'Todos los motivos', options: CLASES }],
+      columns: cols(hist), onRowClick: function (r) { openDetail(r.novedadId); },
+      actions: function (r) { var a = [{ label: 'Ver detalle', icon: 'eye', onClick: function () { openDetail(r.novedadId); } }]; if (r.estado !== 'Cerrada') { a.push({ label: 'Programar reintento', icon: 'calendar', onClick: function () { reintentoModal(r.novedadId); } }); if (pendRet(r)) a.push({ label: 'Registrar retorno a bodega', icon: 'undo', onClick: function () { retornoModal(r.novedadId); } }); } a.push({ sep: true }, { label: 'Ver pedido ' + r.pedidoId, icon: 'package', href: 'pedidos.html?id=' + encodeURIComponent(r.pedidoId) }); return a; } };
+  }
+  var tB = UI.table($('#tblBandeja'), tableOpts(false)), tH = UI.table($('#tblHistorial'), tableOpts(true));
+  var CHIPS = [['abiertas', 'Abiertas', isOpen], ['sin', 'Sin responsable', function (n) { return n.estado === 'Abierta'; }], ['gestion', 'En gestión', function (n) { return n.estado === 'En gestión'; }], ['resuelta', 'Resueltas', function (n) { return n.estado === 'Resuelta'; }], ['retorno', 'Retorno por recibir', pendRet], ['reintento', 'Con reintento', function (n) { return n.reintento && n.estado !== 'Cerrada'; }], ['todas', 'Todas', function (n) { return n.estado !== 'Cerrada'; }]];
+  function renderChips() { $('#stateChips').innerHTML = CHIPS.map(function (c) { return '<button type="button" class="filter-chip" data-c="' + c[0] + '" aria-pressed="' + (state.chip === c[0]) + '">' + c[1] + ' <span class="n">' + items.filter(c[2]).length + '</span></button>'; }).join(''); }
+  $('#stateChips').addEventListener('click', function (e) { var b = e.target.closest('[data-c]'); if (!b) return; state.chip = b.dataset.c; renderChips(); applyBandeja(); });
+  function applyBandeja() { var f = CHIPS.filter(function (c) { return c[0] === state.chip; })[0][2]; tB.setRows(items.filter(f)); }
+  function applyHist() { var min = state.period ? nowMs - state.period * 86400000 : 0; tH.setRows(items.filter(function (n) { return n.fechaMs >= min; })); }
+  $('#periodSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; state.period = +b.dataset.p; $$('button', $('#periodSeg')).forEach(function (x) { x.setAttribute('aria-pressed', x === b); }); applyHist(); });
+  var tabs = UI.tabs($('#mainTabs')); function goTab(id) { tabs.select(id); }
+
+  function renderRecur() {
+    var by = {}; items.forEach(function (n) { (by[n.clienteId] = by[n.clienteId] || []).push(n); }); var rec = Object.keys(by).filter(function (k) { return by[k].length >= 2; }).sort(function (a, b) { return by[b].length - by[a].length; });
+    $('#recurCard').innerHTML = '<div class="card-head"><div><h2 class="card-title">Clientes con novedades repetidas</h2><p class="card-sub">Dos o más novedades en el historial: conviene revisar dirección, ventana y condiciones de recibo.</p></div></div>' +
+      (rec.length ? '<div class="recur">' + rec.map(function (k) { return '<a class="tag" href="clientes.html?id=' + encodeURIComponent(k) + '">' + esc(by[k][0].cliente) + ' · ' + by[k].length + '</a>'; }).join('') + '</div>' : UI.empty({ icon: 'check-circle', title: 'Sin reincidencias', text: 'Ningún cliente acumula más de una novedad en este periodo.' }));
+  }
+  $('#btnCsv').addEventListener('click', function () {
+    var rows = tH.getView ? tH.getView() : items, head = ['novedad', 'tipo', 'estado', 'pedido', 'cliente', 'clase_motivo', 'motivo', 'reportada', 'nota_credito_cop', 'responsable'];
+    function q(v) { v = v == null ? '' : String(v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+    var csv = '﻿' + head.join(',') + '\n' + (rows.rows || rows).map(function (n) { return [n.novedadId, n.tipo, n.estado, n.pedidoId, n.cliente, n.clase, n.motivo, n.fechaHora, n.valor, n.responsable].map(q).join(','); }).join('\n');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = 'novedades-armetales.csv'; document.body.appendChild(a); a.click(); a.remove(); UI.toast('Se descargó el historial de novedades en CSV.', 'success');
+  });
+
+  function refreshAll() { renderKpis(); renderMotivos(); renderRet(); renderChips(); applyBandeja(); applyHist(); renderRecur(); }
+
+  /* ---------- detalle (HU-223, 225, 227) ---------- */
+  var drawer = null, curId = null;
+  function timeline(n) {
+    var t0 = n.fechaMs, tl = [{ state: 'done', title: 'Novedad reportada', meta: F.fechaHora(n.fechaHora) + ' · ' + who(n.reportadoPor) }, { state: 'done', title: 'Responsables notificados', meta: F.fechaHora(t0 + 60000) + ' · ' + notificados(n).length + ' personas, en la app y por correo' }];
+    if (n.estado !== 'Abierta') tl.push({ state: n.estado === 'En gestión' ? 'current' : 'done', title: 'En gestión', meta: n.responsable + (n.estado === 'En gestión' ? ' · en curso' : '') });
+    if (n.retorno) tl.push({ state: n.retorno.estado === 'Recibido en CEDI' ? 'done' : 'current', title: n.retorno.estado === 'Recibido en CEDI' ? 'Mercancía recibida en ' + (n.retorno.ubicacion || 'bodega') : n.retorno.estado, meta: n.retorno.estado === 'Recibido en CEDI' ? (n.retorno.fecha ? F.fechaHora(n.retorno.fecha) + ' · ' : '') + (n.retorno.condicion || 'Estado verificado') : 'Bodega destino: ' + ((A.sedes.filter(function (s) { return s.id === n.retorno.bodegaId; })[0] || {}).nombre || n.retorno.bodegaId) });
+    if (n.reintento) tl.push({ state: n.reintento.estado === 'Programado' ? 'current' : 'done', title: 'Reintento programado', meta: (/^\d{4}-/.test(n.reintento.programado) ? F.fecha(n.reintento.programado) : n.reintento.programado) + (n.reintento.viaje ? ' · ' + n.reintento.viaje : '') });
+    n.log.forEach(function (l) { tl.push({ state: 'done', title: l.t, meta: F.fechaHora(l.at) + ' · ' + l.by }); });
+    if (n.estado === 'Resuelta' || n.estado === 'Cerrada') tl.push({ state: 'done', title: n.estado === 'Cerrada' ? 'Novedad cerrada' : 'Marcada como resuelta', meta: n.accion || '' });
+    return tl;
+  }
+  function detailBody(n) {
+    var p = pedido(n), items_ = itemsOf(n), par = A.paradas.filter(function (x) { return x.paradaId === n.paradaId; })[0], ev = A.evidencias.filter(function (e) { return e.pedidoId === n.pedidoId && (!n.paradaId || e.paradaId === n.paradaId); }), cl = A.idx.clientes[n.clienteId], noti = notificados(n);
+    var banner = n.estado === 'Cerrada' ? UI.banner({ tone: 'success', title: 'Novedad cerrada', text: n.accion || 'Resuelta y sin pendientes.' }) :
+      pendRet(n) ? UI.banner({ tone: 'warning', title: 'Mercancía pendiente de recepción', text: 'Estado del retorno: ' + n.retorno.estado + '. No se puede cerrar hasta que bodega la reciba.' }) :
+      n.estado === 'Abierta' ? UI.banner({ tone: 'danger', title: 'Sin responsable asignado', text: 'Toma la gestión para iniciar el seguimiento y notificar al cliente.' }) :
+      (/fallida/i.test(n.tipo) && !n.reintento) ? UI.banner({ tone: 'warning', title: 'Entrega fallida sin reintento', text: 'Programa un nuevo viaje o registra la cancelación para poder cerrarla.' }) : UI.banner({ tone: 'info', text: 'La novedad está en gestión por ' + n.responsable + '.' });
+    var h = '<div class="stack-lg">' + banner;
+    h += '<div class="acts">' + (n.estado !== 'Cerrada' ? '<button type="button" class="btn btn-secondary btn-sm" data-a="reintento">' + UI.icon('calendar') + (n.reintento ? 'Reprogramar reintento' : 'Programar reintento') + '</button>' : '') + (n.estado !== 'Cerrada' && (n.retorno ? pendRet(n) : /Devoluci|parcial|averiado|Faltante/i.test(n.tipo)) ? '<button type="button" class="btn btn-secondary btn-sm" data-a="retorno">' + UI.icon('undo') + 'Registrar retorno a bodega</button>' : '') + '<button type="button" class="btn btn-ghost btn-sm" data-a="notificar">' + UI.icon('send') + 'Reenviar notificación</button>' + (n.estado !== 'Cerrada' ? '<button type="button" class="btn btn-ghost btn-sm" data-a="cerrar">' + UI.icon('check') + 'Cerrar novedad</button>' : '') + '</div>';
+    h += '<section>' + UI.kv([['Tipo', tipoChip(n.tipo)], ['Estado', UI.chip(n.estado)], ['Pedido original', '<a class="mono" href="pedidos.html?id=' + encodeURIComponent(n.pedidoId) + '">' + n.pedidoId + '</a>'], ['Cliente', '<a href="clientes.html?id=' + encodeURIComponent(n.clienteId) + '">' + esc(n.cliente) + '</a>'], ['Despacho', n.despachoId ? '<a class="mono" href="despachos.html?id=' + n.despachoId + '">' + n.despachoId + '</a>' : '—'], ['Parada', par ? '<a href="seguimiento.html?despacho=' + n.despachoId + '&parada=' + par.paradaId + '">Parada ' + par.secuencia + ' · ' + esc(par.municipio) + '</a>' : 'Sin parada (novedad de ruta)'], ['Reportada por', esc(who(n.reportadoPor))], ['Responsable', n.estado === 'Abierta' ? '<span class="muted">Sin asignar</span>' : esc(n.responsable)], ['Reportada', F.fechaHora(n.fechaHora)]]) + '</section>';
+    if (p) h += '<section><h3 class="mb-2">Pedido original</h3><div class="grid c2 gap-2"><div class="mini-stat"><div class="l">Estado del pedido</div><div class="v">' + UI.chip(p.estado, { small: true }) + '</div></div><div class="mini-stat"><div class="l">Valor del pedido</div><div class="v">' + COP(p.valorCOP) + '</div></div><div class="mini-stat"><div class="l">Entrega solicitada</div><div class="v">' + F.fecha(p.entregaSolicitada) + '</div></div><div class="mini-stat"><div class="l">Asesor · líneas</div><div class="v">' + esc(p.asesor) + ' · ' + p.lineas.length + '</div></div></div></section>';
+    h += '<section><div class="row between mb-2"><h3>Motivo clasificado</h3><button type="button" class="btn btn-ghost btn-sm" data-a="clasificar" aria-haspopup="menu">Reclasificar</button></div><div class="row gap-2" style="flex-wrap:wrap">' + claseChip(n.clase) + '<span>' + esc(n.motivo) + '</span></div>' + (cl && n.clase === 'Cliente' ? '<p class="muted t-13 mt-2">Ventana habitual del cliente: ' + cl.ventanaInicio + ' – ' + cl.ventanaFin + '. ' + (cl.restricciones && cl.restricciones[0] ? esc(cl.restricciones[0]) + '.' : '') + '</p>' : '') + '</section>';
+    h += '<section><h3 class="mb-2">Ítems afectados</h3>' + (items_.length ? '<div class="table-wrap"><table class="table is-dense"><thead><tr><th>Producto</th><th class="num">Solicitado</th><th class="num">Entregado</th><th class="num">Afectado</th></tr></thead><tbody>' + items_.map(function (i) { return '<tr><td>' + esc(i.desc) + '<div class="cell-sub mono">' + i.sku + '</div></td><td class="num">' + F.num(i.sol, 0) + '</td><td class="num">' + F.num(i.ent, 0) + '</td><td class="num">' + (i.afect ? '<strong>' + F.num(i.afect, 0) + '</strong> ' + esc((i.unidad || '').toLowerCase()) : '—') + '</td></tr>'; }).join('') + '</tbody></table></div>' : UI.empty({ icon: 'inbox', title: 'Sin ítems asociados', text: 'Esta novedad es de la ruta y no afecta líneas de un pedido.' })) + (n.valor ? '<div class="row between mt-2"><span class="muted">Nota crédito asociada</span><strong class="num">' + COP(n.valor) + '</strong></div>' : '') + '</section>';
+    h += '<section><h3 class="mb-2">Evidencias</h3>' + (ev.length ? '<div class="row gap-2" style="flex-wrap:wrap">' + ev.map(function (e) { return '<a class="tag" href="evidencias.html?despacho=' + e.despachoId + '">' + UI.icon('camera', 'icon-sm') + '&nbsp;' + esc(e.tipo) + ' · ' + F.hora(e.fechaHora) + '</a>'; }).join('') + '</div>' : '<p class="muted t-13">No hay evidencias cargadas para esta novedad. Pídelas al conductor desde <a href="evidencias.html">Evidencias</a>.</p>') + '</section>';
+    h += '<section><h3 class="mb-2">Responsables notificados</h3>' + noti.map(function (x) { return '<div class="resp">' + UI.avatar(x.u.nombre, { size: 'sm' }) + '<div class="grow"><div class="strong t-13">' + esc(x.u.nombre) + '</div><div class="muted t-12">' + esc(x.rol) + '</div></div><span class="chip chip-success chip-sm">Notificado</span></div>'; }).join('') + '</section>';
+    h += '<section><h3 class="mb-3">Línea de tiempo</h3>' + UI.timeline(timeline(n)) + '</section></div>';
+    return h;
+  }
+  function footerHtml(n) {
+    var primary = n.estado === 'Abierta' ? ['tomar', 'Tomar gestión'] : n.estado === 'En gestión' ? ['resolver', 'Marcar como resuelta'] : n.estado === 'Resuelta' ? ['cerrar', 'Cerrar novedad'] : null;
+    return '<button type="button" class="btn btn-ghost" data-a="x">Cerrar panel</button>' + (primary ? '<button type="button" class="btn btn-primary" data-a="' + primary[0] + '">' + primary[1] + '</button>' : '');
+  }
+  function openDetail(id) {
+    var n = byId(id); if (!n) return; curId = id; var foot = document.createElement('div'); foot.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;width:100%;flex-wrap:wrap'; foot.innerHTML = footerHtml(n);
+    drawer = UI.drawer({ title: n.novedadId, subtitleHtml: esc(n.cliente) + ' · ' + UI.chip(n.estado, { small: true }), width: 620, body: detailBody(n), footer: foot, onClose: function () { drawer = null; curId = null; } });
+    function act(e) { var b = e.target.closest('[data-a]'); if (!b) return; doAct(b.dataset.a, b); }
+    drawer.body.addEventListener('click', act); foot.addEventListener('click', act); drawer._foot = foot;
+  }
+  function repaint() { refreshAll(); if (drawer && curId) { var n = byId(curId); drawer.setBody(detailBody(n)); drawer.setTitle(n.novedadId); drawer._foot.innerHTML = footerHtml(n); var sub = $('.ov-sub', drawer.el); if (sub) sub.innerHTML = esc(n.cliente) + ' · ' + UI.chip(n.estado, { small: true }); } }
+  function addLog(n, t) { n.log.push({ t: t, at: Date.now(), by: me.nombre }); }
+  function doAct(a, b) {
+    var n = byId(curId); if (!n) return;
+    if (a === 'x') drawer.close();
+    else if (a === 'tomar') { n.estado = 'En gestión'; n.responsable = me.nombre; addLog(n, 'Gestión asumida por ' + me.nombre); UI.toast(n.novedadId + ' pasó a En gestión. Quedaste como responsable.', 'success'); repaint(); }
+    else if (a === 'resolver') { if (pendRet(n)) { UI.toast('Aún hay mercancía por recibir: registra el retorno a bodega antes de marcarla resuelta.', 'warning'); return; } n.estado = 'Resuelta'; n.accion = n.accion || 'Resuelta por ' + me.nombre; addLog(n, 'Marcada como resuelta'); UI.toast(n.novedadId + ' quedó resuelta. Ciérrala cuando el cliente confirme.', 'success'); repaint(); }
+    else if (a === 'cerrar') cerrarModal(n.novedadId);
+    else if (a === 'retorno') retornoModal(n.novedadId);
+    else if (a === 'reintento') reintentoModal(n.novedadId);
+    else if (a === 'notificar') { addLog(n, 'Notificación reenviada a ' + notificados(n).length + ' responsables'); UI.toast('Se reenvió la notificación a ' + notificados(n).map(function (x) { return x.u.nombre.split(' ')[0]; }).join(', ') + '.', 'success'); repaint(); }
+    else if (a === 'clasificar') UI.menu(b, [{ heading: 'Clase del motivo' }].concat(CLASES.map(function (c) { return { label: c, checked: n.clase === c, onClick: function () { if (c === n.clase) return; var antes = n.clase; n.clase = c; addLog(n, 'Reclasificada de «' + antes + '» a «' + c + '»'); UI.toast('Motivo reclasificado como «' + c + '».', 'success'); repaint(); } }; })), { align: 'end' });
+  }
+
+  /* ---------- formulario común ---------- */
+  function fe(root, id, msg) { var e = $('#' + id + 'E', root), c = $('#' + id, root); if (e) { e.hidden = !msg; e.innerHTML = msg ? UI.icon('alert-circle', 'icon-sm') + esc(msg) : ''; } if (c) c.setAttribute('aria-invalid', msg ? 'true' : 'false'); return !!msg; }
+  function firstBad(root) { var x = $('[aria-invalid="true"]', root); if (x) x.focus(); }
+
+  /* ---------- registrar novedad (HU-221, 222) ---------- */
+  function nuevaModal() {
+    var peds = A.pedidos.filter(function (p) { return p.despachoId && /En ruta|Entregado|Entrega parcial|Fallido|Planificado/.test(p.estado); }).slice(0, 60);
+    var TIPOS = ['Entrega fallida', 'Entrega parcial', 'Devolución parcial', 'Devolución total', 'Producto averiado en cargue'];
+    var m = UI.modal({ title: 'Registrar novedad', subtitle: 'Entrega fallida, parcial, devolución o avería de un pedido despachado.', width: 620,
+      body: '<form class="form-grid" novalidate onsubmit="return false"><div class="form-grid c2">' +
+        '<div class="field"><label class="label" for="nvT">Tipo de novedad</label><select class="select" id="nvT">' + TIPOS.map(function (t) { return '<option>' + t + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label class="label" for="nvP">Pedido</label><select class="select" id="nvP"><option value="">Selecciona un pedido</option>' + peds.map(function (p) { return '<option value="' + p.pedidoId + '">' + p.pedidoId + ' · ' + esc(p.cliente) + '</option>'; }).join('') + '</select><span class="error-text" id="nvPE" hidden></span></div></div>' +
+        '<div class="field"><label class="label" for="nvM">Motivo</label><select class="select" id="nvM"></select><span class="hint" id="nvMH"></span><span class="error-text" id="nvME" hidden></span></div>' +
+        '<div class="field" id="nvLG" hidden><span class="label">Cantidades entregadas por línea</span><div class="table-wrap"><table class="lines-edit"><thead><tr><th>Producto</th><th class="num">Solicitado</th><th class="num">Entregado</th><th class="num">Difiere</th></tr></thead><tbody id="nvLines"></tbody></table></div><span class="error-text" id="nvLE" hidden></span></div>' +
+        '<label class="check" id="nvRG"><input type="checkbox" id="nvR" checked> La mercancía regresa a bodega</label>' +
+        '<div class="field"><label class="label" for="nvO">Observaciones <span class="opt">(opcional)</span></label><textarea class="textarea" id="nvO" placeholder="Qué pasó en el sitio y con quién se habló."></textarea></div></form>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Registrar novedad', kind: 'primary', onClick: function () { return save(); } }] });
+    var R = m.el, T = $('#nvT', R), P = $('#nvP', R), M = $('#nvM', R);
+    function lista() { var f = familia(T.value); return f === 'fallida' ? A.motivos.fallida : f === 'devolucion' ? A.motivos.devolucion : A.motivos.parcial; }
+    function sync() { var f = T.value, partial = f === 'Entrega parcial' || f === 'Devolución parcial' || f === 'Producto averiado en cargue'; M.innerHTML = '<option value="">Selecciona un motivo</option>' + lista().map(function (x) { return '<option>' + esc(x) + '</option>'; }).join(''); $('#nvMH', R).textContent = 'Se clasifica automáticamente para los reportes de notas crédito.'; $('#nvLG', R).hidden = !partial || !P.value; $('#nvRG', R).hidden = f === 'Entrega fallida'; $('#nvR', R).checked = f !== 'Entrega fallida'; lines(); }
+    function lines() { var p = A.idx.pedidos[P.value], tb = $('#nvLines', R); if (!p) { tb.innerHTML = ''; return; } var f = T.value; $('#nvLG', R).hidden = !(f === 'Entrega parcial' || f === 'Devolución parcial' || f === 'Producto averiado en cargue'); tb.innerHTML = p.lineas.map(function (l, i) { return '<tr><td>' + esc(l.descripcion) + '</td><td class="num">' + F.num(l.cantidad, 0) + '</td><td class="num"><input class="input" type="number" min="0" max="' + l.cantidad + '" value="' + l.cantidad + '" data-i="' + i + '" aria-label="Cantidad entregada de ' + esc(l.descripcion) + '"></td><td class="num" data-d="' + i + '">0</td></tr>'; }).join(''); }
+    T.addEventListener('change', sync); P.addEventListener('change', lines); R.addEventListener('input', function (e) { var i = e.target.dataset && e.target.dataset.i; if (i == null) return; var l = A.idx.pedidos[P.value].lineas[+i], v = +e.target.value; var d = $('[data-d="' + i + '"]', R); d.textContent = isNaN(v) ? '—' : F.num(l.cantidad - v, 0); d.style.color = l.cantidad - v > 0 ? 'var(--red-fg)' : ''; }); sync();
+    function save() {
+      var bad = false, f = T.value, p = A.idx.pedidos[P.value], partial = f === 'Entrega parcial' || f === 'Devolución parcial' || f === 'Producto averiado en cargue', dup = p && items.filter(function (n) { return n.pedidoId === p.pedidoId && n.tipo === f && isOpen(n); })[0];
+      bad = fe(R, 'nvP', !p ? 'Selecciona el pedido afectado.' : dup ? 'Ya existe una novedad abierta de este tipo para el pedido (' + dup.novedadId + '). Edítala en lugar de duplicarla.' : '') || bad;
+      bad = fe(R, 'nvM', !M.value ? 'Indica el motivo para clasificar la novedad.' : '') || bad;
+      var ins = $$('[data-i]', R), msg = ''; if (partial && p) { var cambios = 0; ins.forEach(function (i) { var l = p.lineas[+i.dataset.i], v = i.value === '' ? NaN : +i.value; if (isNaN(v) || v < 0) msg = 'Hay cantidades vacías o negativas.'; else if (v > l.cantidad) msg = 'No puedes entregar más de lo solicitado (' + esc(l.descripcion) + ').'; else if (v < l.cantidad) cambios++; }); if (!msg && !cambios) msg = f === 'Producto averiado en cargue' ? 'Indica al menos una línea afectada.' : 'Una entrega parcial debe tener al menos una línea con cantidad menor a la solicitada.'; }
+      bad = fe(R, 'nvL', msg) || bad;
+      if (bad) { firstBad(R); return false; }
+      var its = p.lineas.map(function (l, i) { var ent = partial ? +ins[i].value : (f === 'Devolución total' ? 0 : f === 'Entrega fallida' ? 0 : l.cantidad), af = l.cantidad - ent; return { sku: l.sku, desc: l.descripcion, unidad: l.unidad, sol: l.cantidad, ent: ent, afect: af, kg: l.pesoKg * af / l.cantidad, valor: Math.round(p.valorCOP * l.pesoKg / p.pesoKg) * af / l.cantidad }; }).filter(function (x) { return partial ? x.afect > 0 : true; });
+      var nc = f === 'Entrega fallida' ? 0 : Math.round(its.reduce(function (a, x) { return a + x.valor; }, 0) / 1000) * 1000, par = A.paradas.filter(function (x) { return x.pedidoId === p.pedidoId; })[0];
+      var n = { novedadId: 'NOV-2611-0' + (seqNext < 10 ? '0' : '') + (seqNext++), tipo: f, pedidoId: p.pedidoId, paradaId: par ? par.paradaId : null, despachoId: p.despachoId, clienteId: p.clienteId, motivo: M.value, sku: its[0] && partial ? its[0].sku : null, cantidadAfectada: its[0] && partial ? its[0].afect : null, unidad: its[0] ? its[0].unidad : null, estado: 'Abierta', responsable: me.nombre, accion: f === 'Entrega fallida' ? 'Reprogramar entrega y contactar al cliente' : 'Recibir mercancía en CEDI y emitir nota crédito', fechaHora: new Date().toISOString(), reportadoPor: me.usuarioId, retorno: $('#nvR', R).checked && f !== 'Entrega fallida' ? { estado: 'Pendiente de recogida', bodegaId: 'CEDI-BOG' } : null, reintento: null, notaCreditoCOP: nc, observaciones: $('#nvO', R).value.trim(), clase: clasificar(M.value), log: [], fechaMs: Date.now(), cliente: (A.idx.clientes[p.clienteId] || {}).razonSocial || p.cliente, valor: nc, resolucion: '', items: its };
+      items.unshift(n); refreshAll(); state.chip = 'abiertas'; renderChips(); applyBandeja();
+      UI.toast('Se notificó a ' + notificados(n).map(function (x) { return x.rol.toLowerCase(); }).join(', ') + '.', 'success', { title: n.novedadId + ' registrada' }); setTimeout(function () { openDetail(n.novedadId); }, 240); return true;
+    }
+  }
+
+  /* ---------- retorno a bodega (HU-224) ---------- */
+  function retornoModal(id) {
+    var pend = items.filter(pendRet);
+    if (!pend.length) { UI.modal({ title: 'Registrar retorno a bodega', width: 480, body: UI.empty({ icon: 'check-circle', title: 'No hay mercancía por recibir', text: 'Todas las devoluciones registradas ya fueron recibidas en bodega. Si llega mercancía nueva, primero registra la novedad.' }), footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Registrar novedad', kind: 'primary', onClick: function () { setTimeout(nuevaModal, 220); } }] }); return; }
+    var sel = id && byId(id) && pendRet(byId(id)) ? id : pend[0].novedadId, bod = A.sedes.filter(function (s) { return s.id === 'CEDI-BOG' || s.id === 'BOD-FUN'; });
+    var m = UI.modal({ title: 'Registrar retorno a bodega', subtitle: 'Confirma qué llegó, en qué estado y dónde quedó almacenado.', width: 580,
+      body: '<form class="form-grid" novalidate onsubmit="return false"><div class="field"><label class="label" for="rtN">Novedad</label><select class="select" id="rtN">' + pend.map(function (n) { return '<option value="' + n.novedadId + '"' + (n.novedadId === sel ? ' selected' : '') + '>' + n.novedadId + ' · ' + esc(n.cliente) + '</option>'; }).join('') + '</select><span class="hint" id="rtNH"></span></div>' +
+        '<div class="form-grid c2"><div class="field"><label class="label" for="rtB">Bodega de recepción</label><select class="select" id="rtB">' + bod.map(function (s) { return '<option value="' + s.id + '">' + esc(s.nombre) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label class="label" for="rtU">Ubicación de recepción</label><select class="select" id="rtU"></select><span class="error-text" id="rtUE" hidden></span></div></div>' +
+        '<fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label">Estado de la mercancía</legend><div class="opt-row">' +
+        '<label class="opt-card"><input type="radio" name="rtC" value="Buen estado" checked><span><span class="t">Buen estado</span><br><span class="s">Se reintegra al stock disponible.</span></span></label>' +
+        '<label class="opt-card"><input type="radio" name="rtC" value="Averiada"><span><span class="t">Averiada</span><br><span class="s">Pasa a cuarentena y genera baja o reclamo.</span></span></label>' +
+        '<label class="opt-card"><input type="radio" name="rtC" value="Requiere inspección de calidad"><span><span class="t">Requiere inspección de calidad</span><br><span class="s">Queda bloqueada hasta que calidad la revise.</span></span></label></div></fieldset>' +
+        '<div class="field"><label class="label" for="rtQ">Cantidad recibida</label><input class="input" id="rtQ" type="number" min="0" inputmode="numeric" style="max-width:180px"><span class="hint" id="rtQH"></span><span class="error-text" id="rtQE" hidden></span></div></form>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Registrar recepción', kind: 'primary', onClick: function () { return save(); } }] });
+    var R = m.el, N = $('#rtN', R), B = $('#rtB', R), U = $('#rtU', R), Q = $('#rtQ', R);
+    function afect(n) { return itemsOf(n).reduce(function (a, i) { return a + i.afect; }, 0) || n.cantidadAfectada || 0; }
+    function syncN() { var n = byId(N.value); $('#rtNH', R).textContent = n.tipo + ' · ' + n.retorno.estado; Q.value = afect(n); $('#rtQH', R).textContent = 'Se esperan ' + F.num(afect(n), 0) + ' ' + ((itemsOf(n)[0] && itemsOf(n)[0].unidad) || 'unidades').toLowerCase() + '.'; }
+    function syncB() { var libres = A.ubicaciones.filter(function (u) { return u.bodegaId === B.value && u.estado === 'Disponible'; }).slice(0, 12); U.innerHTML = '<option value="">Selecciona la ubicación</option><option value="Muelle de devoluciones M-02">Muelle de devoluciones M-02 (zona de paso)</option>' + libres.map(function (u) { return '<option value="' + u.ubicacionId + '">' + u.ubicacionId + ' · ' + esc(u.zonaNombre) + '</option>'; }).join(''); }
+    N.addEventListener('change', syncN); B.addEventListener('change', syncB); syncN(); syncB();
+    function save() {
+      var n = byId(N.value), esp = afect(n), q = Q.value === '' ? NaN : +Q.value, bad = false;
+      bad = fe(R, 'rtU', !U.value ? 'Elige dónde se deja la mercancía mientras se verifica.' : '') || bad;
+      bad = fe(R, 'rtQ', isNaN(q) || q < 0 ? 'Indica la cantidad recibida.' : q > esp ? 'No puedes recibir más de lo devuelto (' + F.num(esp, 0) + ').' : '') || bad;
+      if (bad) { firstBad(R); return false; }
+      var cond = ($$('[name=rtC]', R).filter(function (x) { return x.checked; })[0] || {}).value;
+      n.retorno = { estado: 'Recibido en CEDI', bodegaId: B.value, ubicacion: U.value, condicion: cond, cantidad: q, fecha: Date.now() }; if (n.estado === 'Abierta') { n.estado = 'En gestión'; n.responsable = me.nombre; }
+      addLog(n, 'Retorno recibido en ' + U.value + ' · ' + cond + ' · ' + F.num(q, 0) + ' de ' + F.num(esp, 0));
+      UI.toast(q < esp ? 'Recepción registrada con diferencia: faltan ' + F.num(esp - q, 0) + ' unidades. Queda en conciliación.' : cond === 'Buen estado' ? 'Mercancía recibida y reintegrada al stock disponible de ' + (bod.filter(function (s) { return s.id === B.value; })[0].nombre) + '.' : 'Mercancía recibida y apartada: ' + cond.toLowerCase() + '.', q < esp ? 'warning' : 'success', { title: n.novedadId }); repaint(); return true;
+    }
+  }
+
+  /* ---------- reintento (HU-226) ---------- */
+  function reintentoModal(id) {
+    var n = byId(id), p = pedido(n), kg = kgAfectado(n), rid = p ? p.rutaId : null, today = A.ymd(0), max = A.ymd(7);
+    var cand = A.despachos.filter(function (d) { return d.estado === 'Cargando'; }).map(function (d) { var ve = A.idx.vehiculos[d.vehiculoId]; return { id: d.despachoId, ruta: d.rutaId, placa: d.vehiculoId, tipo: ve.tipo, libre: ve.pesoMaxKg - d.pesoKg, label: d.despachoId, estado: 'Cargando hoy' }; })
+      .concat(A.plan.viajes.map(function (v) { var ve = A.idx.vehiculos[v.vehiculoId]; return { id: v.viajeId, ruta: v.rutaId, placa: v.vehiculoId, tipo: ve.tipo, libre: ve.pesoMaxKg - v.pesoKg, label: v.viajeId + ' del plan', estado: 'Propuesto' }; }));
+    cand.sort(function (a, b) { return (b.ruta === rid) - (a.ruta === rid) || b.libre - a.libre; });
+    var m = UI.modal({ title: n.reintento ? 'Reprogramar reintento' : 'Programar reintento de entrega', subtitleHtml: esc(n.cliente) + ' · <span class="mono">' + n.pedidoId + '</span>', width: 600,
+      body: '<form class="form-grid" novalidate onsubmit="return false">' + UI.banner({ tone: 'info', text: 'Carga a reentregar: ' + F.kg(kg) + (A.idx.clientes[n.clienteId] ? ' · el cliente recibe de ' + A.idx.clientes[n.clienteId].ventanaInicio + ' a ' + A.idx.clientes[n.clienteId].ventanaFin : '') + '.' }) +
+        '<div class="field"><label class="label" for="riF">Fecha del reintento</label><input class="input" id="riF" type="date" min="' + A.ymd(1) + '" max="' + max + '" value="' + A.ymd(1) + '" style="max-width:220px"><span class="error-text" id="riFE" hidden></span></div>' +
+        '<fieldset class="field" style="border:0;padding:0;margin:0"><legend class="label">Viaje sugerido</legend><div class="opt-row">' + cand.slice(0, 5).map(function (c, i) { var ok = c.libre >= kg, same = c.ruta === rid; return '<label class="opt-card"><input type="radio" name="riV" value="' + c.id + '"' + (i === 0 && ok ? ' checked' : '') + '><span><span class="t">' + esc(c.label) + ' · ' + c.placa + (same ? ' · <span class="chip chip-success chip-sm no-dot">Misma ruta</span>' : '') + '</span><br><span class="s">' + esc((A.idx.rutas[c.ruta] || {}).nombre || c.ruta) + ' · ' + esc(c.tipo) + ' · ' + c.estado + '</span><br><span class="s cap-note" style="color:' + (ok ? 'var(--green-fg)' : 'var(--red-fg)') + '">' + (ok ? 'Cabe: quedan ' + F.kg(c.libre - kg) + ' libres' : 'No cabe: faltan ' + F.kg(kg - c.libre)) + '</span></span></label>'; }).join('') + '</div><span class="error-text" id="riVE" hidden></span></fieldset>' +
+        '<div class="field"><label class="label" for="riN">Nota para el conductor <span class="opt">(opcional)</span></label><textarea class="textarea" id="riN" placeholder="Confirmar con el residente antes de salir."></textarea></div></form>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: n.reintento ? 'Guardar nueva fecha' : 'Programar reintento', kind: 'primary', onClick: function () { return save(); } }] });
+    var R = m.el; $$('[name=riV]', R).forEach(function (r) { r.addEventListener('change', function () { fe(R, 'riV', ''); }); });
+    function save() {
+      var f = $('#riF', R).value, v = ($$('[name=riV]', R).filter(function (x) { return x.checked; })[0] || {}).value, c = cand.filter(function (x) { return x.id === v; })[0], bad = false;
+      bad = fe(R, 'riF', !f ? 'Indica la fecha.' : f <= today ? 'El reintento debe ser a partir de mañana.' : f > max ? 'Máximo 7 días después de la novedad.' : '') || bad;
+      bad = fe(R, 'riV', !c ? 'Elige el viaje en el que irá el reintento.' : c.libre < kg ? 'El viaje no tiene capacidad: faltan ' + F.kg(kg - c.libre) + '. Elige otro.' : '') || bad;
+      if (bad) { var x = $('[aria-invalid="true"]', R); if (x && x.focus) x.focus(); return false; }
+      n.reintento = { programado: f, estado: 'Programado', viaje: c.label + ' · ' + c.placa }; if (n.estado === 'Abierta') { n.estado = 'En gestión'; n.responsable = me.nombre; } addLog(n, 'Reintento programado para ' + F.fecha(f) + ' en ' + c.label);
+      UI.toast('Reintento del ' + F.fecha(f) + ' en ' + c.label + '. El cliente y el despachador recibieron la notificación.', 'success', { title: 'Reintento programado' }); repaint(); return true;
+    }
+  }
+
+  /* ---------- cerrar novedad ---------- */
+  function cerrarModal(id) {
+    var n = byId(id), fall = /fallida/i.test(n.tipo);
+    var m = UI.modal({ title: 'Cerrar novedad', subtitleHtml: '<span class="mono">' + n.novedadId + '</span> · ' + esc(n.cliente), width: 520,
+      body: '<form class="form-grid" novalidate onsubmit="return false"><div class="field"><label class="label" for="ceR">Resolución</label><select class="select" id="ceR"><option value="">Selecciona cómo se resolvió</option><option>Reintento de entrega realizado</option><option>Mercancía reintegrada a bodega</option><option>Nota crédito emitida al cliente</option><option>Cancelación del pedido acordada con el cliente</option><option>Resuelta sin acción adicional</option></select><span class="error-text" id="ceRE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="ceC">Comentario de cierre</label><textarea class="textarea" id="ceC" placeholder="Qué se acordó y quién lo confirmó."></textarea><span class="error-text" id="ceCE" hidden></span></div></form>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Cerrar novedad', kind: 'primary', onClick: function () { return save(); } }] });
+    var R = m.el;
+    function save() {
+      var r = $('#ceR', R).value, c = $('#ceC', R).value.trim(), bad = false;
+      bad = fe(R, 'ceR', !r ? 'Selecciona la resolución.' : pendRet(n) ? 'No se puede cerrar: la mercancía devuelta aún no se recibió en bodega (' + n.retorno.estado.toLowerCase() + ').' : (fall && !n.reintento && r === 'Reintento de entrega realizado') ? 'No hay reintento programado en esta novedad. Prográmalo primero.' : (r === 'Nota crédito emitida al cliente' && !n.valor) ? 'Esta novedad no tiene valor de nota crédito asociado.' : '') || bad;
+      bad = fe(R, 'ceC', c.length < 10 ? 'Escribe al menos una frase con lo acordado (mínimo 10 caracteres).' : '') || bad;
+      if (bad) { firstBad(R); return false; }
+      n.estado = 'Cerrada'; n.accion = r; n.resolucion = r; addLog(n, 'Cerrada: ' + r); UI.toast(n.novedadId + ' cerrada. Pasó al historial.', 'success'); repaint(); return true;
+    }
+  }
+
+  $('#btnNueva').addEventListener('click', nuevaModal);
+  $('#btnRetorno').addEventListener('click', function () { retornoModal(); });
+
+  /* ---------- arranque ---------- */
+  $('#kpiRow').innerHTML = [1, 2, 3, 4].map(function () { return '<div class="card kpi"><span class="skeleton sk-line" style="width:50%"></span><span class="skeleton" style="height:34px;width:60%"></span><span class="skeleton sk-line" style="width:70%"></span></div>'; }).join('');
+  tB.setLoading(true);
+  setTimeout(function () {
+    refreshAll(); tB.setLoading(false);
+    var q = UI.param('id'); if (q && byId(q)) { if (byId(q).estado === 'Cerrada') goTab('tp-historial'); openDetail(q); }
+    else if (UI.param('pedido')) { var pn = items.filter(function (n) { return n.pedidoId === UI.param('pedido'); })[0]; if (pn) openDetail(pn.novedadId); }
+  }, 350);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reservas · Armetales</title>
+<meta name="description" content="Gestión de reservas de Armetales: disponibilidad por SKU y bodega, reservas por pedido, ajustes, liberación, trazabilidad y conciliación con inventario.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  select.select.input-sm { padding-right: 32px; }
+
+  /* Layout específico de reservas (tokens y componentes viven en app.css) */
+  .kpi-row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 20px; }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .kpi .kpi-value { font-size: 28px; } .kpi { padding: 12px; } .kpi-row > :last-child:nth-child(odd) { grid-column: span 2; } }
+  .sbar { display: flex; height: 14px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface-3); overflow: hidden; min-width: 140px; width: 100%; }
+  .sbar .rs { --hc: var(--blue); background-color: color-mix(in srgb, var(--blue) 12%, transparent); border-right: 2px solid var(--blue); flex: none; }
+  .sbar .av { background: color-mix(in srgb, var(--green) 26%, transparent); flex: none; }
+  .sbar.is-over .rs { --hc: var(--red); background-color: color-mix(in srgb, var(--red) 12%, transparent); border-color: var(--red); }
+  .sbar-wrap { min-width: 150px; }
+  .table-toolbar .select { padding-right: 32px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--text-2); align-items: center; margin: 0 0 12px; }
+  .legend .lg { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .sw { width: 22px; height: 12px; border: 1px solid var(--border); border-radius: 3px; display: inline-block; }
+  .legend .sw.rs { --hc: var(--blue); background-color: color-mix(in srgb, var(--blue) 12%, transparent); }
+  .legend .sw.av { background: color-mix(in srgb, var(--green) 26%, transparent); }
+  .tab-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .disp-cell { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .disp-cell.is-low { color: var(--amber-fg, var(--amber)); } .disp-cell.is-zero { color: var(--red-fg, var(--red)); }
+  .diff-pos { color: var(--amber-fg, var(--amber)); font-weight: 600; } .diff-neg { color: var(--red-fg, var(--red)); font-weight: 600; }
+  .dr-sec > h3 { font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .mini-stat { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .mini-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 24px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .mini-stat .l { font-size: 12px; color: var(--text-2); }
+  .avail-box { border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); padding: 12px; display: grid; gap: 8px; }
+  .avail-box .row { justify-content: space-between; font-size: 13px; }
+  .link-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .radio-cards { display: grid; gap: 8px; border: 0; padding: 0; margin: 0; }
+  .radio-card { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); cursor: pointer; }
+  .radio-card:has(input:checked) { border-color: var(--ink); background: var(--surface-2); }
+  :root[data-theme="dark"] .radio-card:has(input:checked) { border-color: #E9EDF0; }
+  .radio-card:focus-within { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .demo-opt { font-size: 12.5px; color: var(--text-2); }
+  .inline-link { background: none; border: 0; padding: 0; color: var(--blue-fg); font: inherit; font-weight: 500; cursor: pointer; text-decoration: underline; }
+</style>
+</head>
+<body data-page="reservas">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Operación</div>
+      <h1 class="page-title">Gestión de reservas</h1>
+      <p class="page-desc">Disponible = físico − reservas. Reserva unidades para cada pedido, ajústalas cuando cambie la cantidad, libéralas al cancelar y concilia con el inventario.</p>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-secondary" href="pedidos.html">Ir a pedidos</a>
+      <button type="button" class="btn btn-primary" id="reserveBtn"></button>
+    </div>
+  </header>
+
+  <section aria-label="Indicadores de reservas"><div class="kpi-row" id="kpis"></div></section>
+
+  <div class="tabs" role="tablist" id="tabs" aria-label="Vistas de reservas">
+    <button class="tab" role="tab" id="t-disp" aria-controls="p-disp" aria-selected="true">Disponibilidad por SKU</button>
+    <button class="tab" role="tab" id="t-res" aria-controls="p-res" aria-selected="false">Reservas <span class="count" id="cRes"></span></button>
+    <button class="tab" role="tab" id="t-con" aria-controls="p-con" aria-selected="false">Conciliación <span class="count" id="cCon"></span></button>
+  </div>
+
+  <div class="tab-panel" id="p-disp" role="tabpanel" aria-labelledby="t-disp">
+    <div class="legend" aria-hidden="true"><span class="lg"><i class="sw rs hatch"></i> Reservado</span><span class="lg"><i class="sw av"></i> Disponible</span><span class="lg">Largo de la barra = stock físico</span></div>
+    <div id="tblDisp"></div>
+  </div>
+
+  <div class="tab-panel" id="p-res" role="tabpanel" aria-labelledby="t-res" hidden>
+    <div class="filter-bar mb-3" id="resChips" role="group" aria-label="Filtrar reservas por estado"></div>
+    <div id="tblRes"></div>
+  </div>
+
+  <div class="tab-panel" id="p-con" role="tabpanel" aria-labelledby="t-con" hidden>
+    <div class="tab-head">
+      <p class="muted t-13" style="max-width:62ch">Compara las unidades reservadas en la plataforma con las que reporta el inventario de SAP para el CEDI Bogotá. Elige qué sistema manda y alinea las diferencias.</p>
+      <div class="row gap-3"><label class="switch"><input type="checkbox" id="showAll"> Mostrar coincidentes</label><button type="button" class="btn btn-primary btn-sm" id="concAll"></button></div>
+    </div>
+    <div id="tblCon"></div>
+  </div>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, YO = A.usuarioActual, CEDI = 'CEDI-BOG';
+  var ABIERTOS = ['Recibido', 'Stock validado', 'Bloqueado por stock', 'En firme', 'En preparación', 'Listo para despacho', 'Planificado'];
+  var NOW = new Date(A.ahora).getTime();
+  var BODS = {}; A.sedes.forEach(function (s) { BODS[s.id] = s.nombre; });
+  var bodega = CEDI, adj = {}, conflictUsed = false, tDisp, tRes, tCon, tabsApi;
+  $('#reserveBtn').innerHTML = UI.icon('plus') + 'Reservar unidades';
+  $('#concAll').innerHTML = UI.icon('check-circle') + 'Conciliar diferencias';
+
+  /* ---------- utilidades ---------- */
+  function uname(id) { if (!id || id === 'Sistema') return 'Sistema'; var u = A.idx.usuarios && A.idx.usuarios[id]; return u ? u.nombre : id; }
+  function uPl(u, n) { u = String(u).toLowerCase(); return n === 1 ? u : (/[aeiou]$/.test(u) ? u + 's' : u + 'es'); }
+  function plural(n, s, p) { return n === 1 ? s : p; }
+  function ped(id) { return A.idx.pedidos[id]; }
+  function prod(sku) { return A.idx.productos[sku]; }
+  function errText(m) { return '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + esc(m) + '</span>'; }
+  function setErr(f, input, msg) { var o = f.querySelector('.error-text'); if (o) o.remove(); if (msg) { input.setAttribute('aria-invalid', 'true'); f.insertAdjacentHTML('beforeend', errText(msg)); } else input.removeAttribute('aria-invalid'); }
+  function setFoot(api, btns) {
+    api.footer.innerHTML = btns.map(function (b, i) { return '<button type="button" class="btn ' + ({ primary: 'btn-primary', secondary: 'btn-secondary', ghost: 'btn-ghost', danger: 'btn-danger is-solid' }[b.kind || 'secondary']) + '"' + (b.disabled ? ' disabled' : '') + (b.tip ? ' data-tip="' + esc(b.tip) + '"' : '') + ' data-i="' + i + '">' + (b.icon ? UI.icon(b.icon) : '') + esc(b.label) + '</button>'; }).join('');
+    UI.$$('button', api.footer).forEach(function (el) { el.addEventListener('click', function () { var b = btns[+el.dataset.i]; if (b.onClick) b.onClick(api); }); });
+  }
+  function nextRsv() { var mx = 0; A.reservas.forEach(function (r) { var n = parseInt(r.reservaId.slice(-4), 10); if (n > mx) mx = n; }); return 'RSV-2611-' + String(mx + 1).padStart(4, '0'); }
+  function ev(r, title, meta, state) { (r._ev = r._ev || []).push({ title: title, meta: F.fechaHora(new Date()) + ' · ' + YO.nombre + (meta ? ' · ' + meta : ''), state: state || 'done' }); }
+
+  /* Vencidas de demostración: dos reservas pendientes con fecha de vencimiento ya cumplida */
+  A.reservas.filter(function (r) { return r.estado === 'Pendiente' && r.vence; }).slice(-2).forEach(function (r) { r.vence = new Date(NOW - 3 * 36e5).toISOString(); });
+  function estUI(r) {
+    if (r.estado === 'Sin stock') return (r.faltante || 0) > 0 && r.faltante < r.cantidad ? 'Parcial' : 'Sin stock';
+    if ((r.estado === 'Pendiente' || r.estado === 'Activa') && r.vence && new Date(r.vence).getTime() < NOW) return 'Vencida';
+    return r.estado;
+  }
+  function reservada(r) { return r.cantidad - (r.faltante || 0); }
+  function viva(r) { var e = estUI(r); return e === 'Activa' || e === 'Pendiente' || e === 'Parcial'; }
+
+  /* ---------- stock (HU-070/071) ---------- */
+  function stk(p, bod) {
+    if (bod === 'all') { var o = { fis: 0, res: 0, min: 0 }; Object.keys(p.stock).forEach(function (b) { var x = stk(p, b); o.fis += x.fis; o.res += x.res; o.min += x.min; }); o.disp = o.fis - o.res; return o; }
+    var s = p.stock[bod]; if (!s) return { fis: 0, res: 0, disp: 0, min: 0 }; var res = s.reservado + (adj[p.skuSAP + '|' + bod] || 0);
+    return { fis: s.fisico, res: res, disp: s.fisico - res, min: s.minimo || 0 };
+  }
+  function bumpRes(sku, bod, n) { var k = sku + '|' + bod; adj[k] = (adj[k] || 0) + n; }
+  function sbar(x) {
+    var fis = Math.max(1, x.fis), rs = Math.min(100, Math.max(0, x.res / fis * 100)), av = Math.max(0, Math.min(100 - rs, x.disp / fis * 100));
+    return '<div class="sbar-wrap"><div class="sbar' + (x.disp < 0 ? ' is-over' : '') + '" role="img" aria-label="Reservado ' + F.num(x.res, 0) + ' y disponible ' + F.num(Math.max(0, x.disp), 0) + ' de ' + F.num(x.fis, 0) + ' físicos"><i class="rs hatch" style="width:' + rs.toFixed(1) + '%"></i><i class="av" style="width:' + av.toFixed(1) + '%"></i></div></div>';
+  }
+  function stockRows() { return A.productos.map(function (p) { var x = stk(p, bodega); return { skuSAP: p.skuSAP, descripcion: p.descripcion, familia: p.familia, unidad: p.unidadBase, fis: x.fis, res: x.res, disp: x.disp, min: x.min, p: p }; }); }
+
+  /* ---------- conciliación (HU-078): SAP simulado ---------- */
+  var sap = {}, sapCause = {};
+  (function () {
+    var offs = { 3: [-8, 'Reserva creada en la plataforma aún sin confirmar en SAP'], 9: [12, 'Reserva liberada en la plataforma; SAP todavía la mantiene'], 14: [-3, 'Consumo de despacho pendiente de contabilizar en SAP'], 21: [20, 'Reserva manual creada directamente en SAP sin pedido'], 27: [-5, 'Reserva creada en la plataforma aún sin confirmar en SAP'], 35: [6, 'Reserva liberada en la plataforma; SAP todavía la mantiene'] };
+    A.productos.forEach(function (p, i) { var x = stk(p, CEDI), o = offs[i]; sap[p.skuSAP] = Math.max(0, x.res + (o ? o[0] : 0)); if (o) sapCause[p.skuSAP] = o[1]; });
+  })();
+  function conRows(all) {
+    var rows = A.productos.map(function (p) { var pl = stk(p, CEDI).res, s = sap[p.skuSAP]; return { sku: p.skuSAP, descripcion: p.descripcion, unidad: p.unidadBase, plat: pl, sap: s, diff: pl - s, causa: pl === s ? 'Coincide' : (sapCause[p.skuSAP] || 'Cambio reciente en la plataforma pendiente de enviar a SAP') }; });
+    return all ? rows : rows.filter(function (r) { return r.diff !== 0; });
+  }
+
+  /* ---------- KPIs ---------- */
+  function renderKpis() {
+    var vivas = A.reservas.filter(function (r) { return estUI(r) === 'Activa'; }), uds = A.productos.reduce(function (s, p) { return s + stk(p, CEDI).res; }, 0);
+    var bajo = A.productos.filter(function (p) { var x = stk(p, CEDI); return x.disp < x.min; }).length, venc = A.reservas.filter(function (r) { return estUI(r) === 'Vencida'; }).length, dif = conRows().length;
+    $('#kpis').innerHTML = UI.kpi({ label: 'Reservas activas', icon: 'layers', value: vivas.length, note: A.reservas.filter(function (r) { return estUI(r) === 'Pendiente'; }).length + ' pendientes de firme' }) +
+      UI.kpi({ label: 'Unidades reservadas', icon: 'package', value: F.num(uds, 0), note: 'En ' + BODS[CEDI] }) +
+      UI.kpi({ label: 'SKU bajo mínimo', icon: 'alert-triangle', value: bajo, note: 'Por debajo del mínimo' }) +
+      UI.kpi({ label: 'Reservas vencidas', icon: 'clock', value: venc, note: venc ? 'Libéralas o renuévalas' : 'Sin vencimientos' }) +
+      UI.kpi({ label: 'Diferencias por conciliar', icon: 'git-branch', value: dif, note: 'Plataforma vs. SAP' });
+    $('#cCon').textContent = dif; $('#cCon').hidden = !dif; $('#cRes').textContent = A.reservas.length;
+  }
+
+  /* ---------- tabla: disponibilidad ---------- */
+  var bodOpts = Object.keys(A.productos[0].stock).map(function (b) { return '<option value="' + b + '">' + esc(BODS[b] || b) + '</option>'; }).join('');
+  tDisp = UI.table($('#tblDisp'), {
+    rows: stockRows(), pageSize: 12, rowKey: 'skuSAP', caption: 'Disponibilidad por SKU', sort: { key: 'disp', dir: 'asc' },
+    searchable: { placeholder: 'Buscar SKU o descripción' },
+    toolbar: '<select class="select input-sm" id="bodSel" aria-label="Bodega" style="width:auto;min-width:160px">' + bodOpts + '<option value="all">Todas (consolidado)</option></select>',
+    filters: [{ key: 'familia', label: 'Familia', all: 'Todas las familias', options: 'auto' },
+      { key: 'nivel', label: 'Nivel', all: 'Cualquier nivel', options: [{ value: 'bajo', label: 'Bajo mínimo' }, { value: 'sin', label: 'Sin disponible' }], match: function (r, v) { return v === 'bajo' ? r.disp < r.min : r.disp <= 0; } }],
+    emptyText: 'Ningún SKU coincide con la búsqueda.',
+    columns: [
+      { key: 'skuSAP', label: 'SKU', mono: true },
+      { key: 'descripcion', label: 'Producto', title: true, render: function (r) { return '<span class="cell-main">' + esc(r.descripcion) + '</span><div class="cell-sub">' + esc(r.familia) + ' · ' + esc(r.unidad) + '</div>'; } },
+      { key: 'fis', label: 'Físico', num: true, render: function (r) { return F.num(r.fis, 0); } },
+      { key: 'res', label: 'Reservado', num: true, render: function (r) { return F.num(r.res, 0); } },
+      { key: 'disp', label: 'Disponible', num: true, render: function (r) { var c = r.disp <= 0 ? ' is-zero' : r.disp < r.min ? ' is-low' : ''; return '<span class="disp-cell' + c + '">' + F.num(r.disp, 0) + '</span>' + (r.disp <= 0 ? '<div class="cell-sub">Sin disponible</div>' : r.disp < r.min ? '<div class="cell-sub">Mínimo ' + F.num(r.min, 0) + '</div>' : ''); } },
+      { key: 'dist', label: 'Distribución', sortable: false, render: function (r) { return sbar(r); } }
+    ],
+    onRowClick: function (r) { skuDrawer(r.p); },
+    actions: function (r) { return [{ label: 'Ver detalle por bodega', icon: 'eye', onClick: function () { skuDrawer(r.p); } }, { label: 'Reservar unidades', icon: 'plus', onClick: function () { reserveModal({ sku: r.skuSAP }); } }, { label: 'Ver reservas del SKU', icon: 'layers', onClick: function () { goRes(r.skuSAP); } }]; }
+  });
+  $('#bodSel').value = bodega; $('#bodSel').addEventListener('change', function (e) { bodega = e.target.value; tDisp.setRows(stockRows()); });
+  function refreshDisp() { tDisp.setRows(stockRows()); }
+
+  /* ---------- tabla: reservas ---------- */
+  var RES_ESTADOS = ['Activa', 'Parcial', 'Pendiente', 'Consumida', 'Liberada', 'Vencida', 'Sin stock'], resSel = '';
+  var tc = { Vencida: 'warning' };
+  function chipR(r) { var e = estUI(r); return UI.chip(e, tc[e] ? { tone: tc[e] } : {}); }
+  tRes = UI.table($('#tblRes'), {
+    rows: A.reservas, pageSize: 10, rowKey: 'reservaId', caption: 'Reservas', sort: { key: 'fechaCreacion', dir: 'desc' },
+    searchable: { placeholder: 'Buscar por reserva, pedido, SKU o cliente' }, searchKeys: ['pedidoId', 'sku'],
+    filters: [{ key: 'estado', label: 'Estado', all: 'Todos los estados', options: RES_ESTADOS, match: function (r, v) { return estUI(r) === v; } }, { key: 'bodegaId', label: 'Bodega', all: 'Todas las bodegas', options: Object.keys(BODS).filter(function (b) { return A.productos[0].stock[b]; }).map(function (b) { return { value: b, label: BODS[b] }; }) }],
+    emptyText: 'No hay reservas con esos filtros. Prueba con otro pedido o SKU.',
+    columns: [
+      { key: 'reservaId', label: 'Reserva', mono: true },
+      { key: 'pedidoId', label: 'Pedido', title: true, value: function (r) { return r.pedidoId + ' ' + (ped(r.pedidoId) ? ped(r.pedidoId).cliente : ''); }, render: function (r) { var p = ped(r.pedidoId); return '<a class="mono link-btn" href="pedidos.html?id=' + encodeURIComponent(r.pedidoId) + '">' + r.pedidoId + '</a><div class="cell-sub">' + esc(p ? p.cliente : '') + '</div>'; } },
+      { key: 'sku', label: 'SKU', value: function (r) { var p = prod(r.sku); return r.sku + ' ' + (p ? p.descripcion : ''); }, render: function (r) { var p = prod(r.sku); return '<span class="mono">' + r.sku + '</span><div class="cell-sub">' + esc(p ? p.descripcion : '') + '</div>'; } },
+      { key: 'bodegaId', label: 'Bodega', hideMobile: true, render: function (r) { return esc(BODS[r.bodegaId] || r.bodegaId); } },
+      { key: 'cantidad', label: 'Cantidad', num: true, render: function (r) { return (r.faltante ? F.num(reservada(r), 0) + ' <span class="muted">de ' + F.num(r.cantidad, 0) + '</span>' : F.num(r.cantidad, 0)) + '<div class="cell-sub">' + esc(String(r.unidad).toLowerCase()) + (/[aeiou]$/i.test(r.unidad) ? 's' : 'es') + '</div>'; } },
+      { key: 'estado', label: 'Estado', value: function (r) { return estUI(r); }, render: function (r) { return chipR(r); } },
+      { key: 'fechaCreacion', label: 'Creada', render: function (r) { return '<span class="nowrap">' + F.fecha(r.fechaCreacion) + ' · ' + F.hora(r.fechaCreacion) + '</span>'; } },
+      { key: 'vence', label: 'Vence', hideMobile: true, render: function (r) { return r.vence && viva(r) ? '<span class="nowrap">' + F.fecha(r.vence) + '</span>' : '<span class="subtle">—</span>'; } }
+    ],
+    onRowClick: function (r) { resDrawer(r); },
+    actions: function (r) { var v = viva(r); return [{ label: 'Ver trazabilidad', icon: 'eye', onClick: function () { resDrawer(r); } }, { label: 'Ajustar cantidad', icon: 'edit', disabled: !v, onClick: function () { adjustModal(r); } }, { label: 'Liberar reserva', icon: 'undo', disabled: !v, onClick: function () { releaseModal(r); } }, { sep: true }, { label: 'Ver pedido', icon: 'arrow-up-right', href: 'pedidos.html?id=' + encodeURIComponent(r.pedidoId) }]; }
+  });
+  function drawChips() {
+    var cnt = {}; A.reservas.forEach(function (r) { var e = estUI(r); cnt[e] = (cnt[e] || 0) + 1; });
+    $('#resChips').innerHTML = '<button type="button" class="filter-chip" data-v="" aria-pressed="' + (resSel === '') + '">Todas <span class="n">' + A.reservas.length + '</span></button>' + RES_ESTADOS.filter(function (e) { return cnt[e]; }).map(function (e) { return '<button type="button" class="filter-chip" data-v="' + e + '" aria-pressed="' + (resSel === e) + '">' + e + ' <span class="n">' + cnt[e] + '</span></button>'; }).join('');
+  }
+  $('#resChips').addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (!b) return; resSel = b.dataset.v; tRes.setFilter('estado', resSel); drawChips(); });
+  var rs = $('select[data-key="estado"]', $('#tblRes')); if (rs) rs.addEventListener('change', function () { resSel = rs.value; drawChips(); });
+  function goRes(q) { tabsApi.select('p-res'); tRes.search(q); var inp = $('#tblRes input[type=search]'); if (inp) inp.value = q; }
+
+  /* ---------- tabla: conciliación ---------- */
+  var conSel = [];
+  function conTable() {
+    var host = $('#tblCon'), all = $('#showAll').checked, rows = conRows(all);
+    $('#concAll').disabled = !conRows().length;
+    if (!rows.length) { host.innerHTML = '<div class="card">' + UI.empty({ icon: 'check-circle', title: 'Todo conciliado', text: 'Las reservas de la plataforma coinciden con las de SAP para ' + BODS[CEDI] + '.' }) + '</div>'; tCon = null; return; }
+    tCon = UI.table(host, {
+      rows: rows, pageSize: 10, rowKey: 'sku', caption: 'Conciliación de reservas con inventario', dense: false, sort: { key: 'diff', dir: 'desc' }, searchable: { placeholder: 'Buscar SKU o descripción' }, emptyText: 'Sin resultados.',
+      columns: [
+        { key: 'sku', label: 'SKU', mono: true },
+        { key: 'descripcion', label: 'Producto', title: true, render: function (r) { return '<span class="cell-main">' + esc(r.descripcion) + '</span><div class="cell-sub">' + esc(r.causa) + '</div>'; } },
+        { key: 'plat', label: 'Plataforma', num: true, render: function (r) { return F.num(r.plat, 0); } },
+        { key: 'sap', label: 'SAP', num: true, render: function (r) { return F.num(r.sap, 0); } },
+        { key: 'diff', label: 'Diferencia', num: true, render: function (r) { return r.diff === 0 ? '<span class="chip chip-success chip-sm no-dot">Coincide</span>' : '<span class="' + (r.diff > 0 ? 'diff-pos' : 'diff-neg') + '">' + (r.diff > 0 ? '+' : '') + F.num(r.diff, 0) + ' ' + esc(String(r.unidad).toLowerCase()) + (Math.abs(r.diff) === 1 ? '' : 's') + '</span>'; } },
+        { key: 'x', label: 'Acción', sortable: false, render: function (r) { return r.diff === 0 ? '<span class="subtle">—</span>' : '<button type="button" class="btn btn-secondary btn-sm" data-conc="' + r.sku + '">Conciliar</button>'; } }
+      ]
+    });
+  }
+  $('#tblCon').addEventListener('click', function (e) { var b = e.target.closest('[data-conc]'); if (b) concModal([b.dataset.conc]); });
+  $('#showAll').addEventListener('change', conTable);
+  $('#concAll').addEventListener('click', function () { concModal(conRows().map(function (r) { return r.sku; })); });
+  function concModal(skus) {
+    var rows = conRows(true).filter(function (r) { return skus.indexOf(r.sku) > -1; }), tot = rows.reduce(function (s, r) { return s + Math.abs(r.diff); }, 0);
+    UI.modal({ title: 'Conciliar reservas', subtitle: rows.length + ' ' + plural(rows.length, 'SKU', 'SKU') + ' · ' + F.num(tot, 0) + ' unidades en diferencia', width: 520,
+      body: '<div class="stack"><fieldset class="radio-cards"><legend class="label mb-2">¿Qué sistema manda?</legend>' +
+        '<label class="radio-card"><input type="radio" class="radio" name="src" value="plat" checked><span><strong>La plataforma es la fuente</strong><br><span class="muted t-13">Se envía a SAP la cantidad reservada aquí. Es lo habitual cuando el cambio nació en el pedido.</span></span></label>' +
+        '<label class="radio-card"><input type="radio" class="radio" name="src" value="sap"><span><strong>SAP es la fuente</strong><br><span class="muted t-13">Se ajustan las reservas de la plataforma a lo que reporta SAP. Úsalo si la reserva se hizo directamente allá.</span></span></label></fieldset>' +
+        '<div class="table-wrap"><table class="table is-dense"><thead><tr><th scope="col">SKU</th><th scope="col" class="num">Plataforma</th><th scope="col" class="num">SAP</th></tr></thead><tbody>' + rows.slice(0, 6).map(function (r) { return '<tr><td><span class="mono">' + r.sku + '</span></td><td class="num">' + r.plat + '</td><td class="num">' + r.sap + '</td></tr>'; }).join('') + '</tbody></table></div>' + (rows.length > 6 ? '<p class="muted t-13">y ' + (rows.length - 6) + ' más…</p>' : '') +
+        '<div class="field" id="nf"><label class="label" for="nota">Nota de conciliación <span class="opt">(opcional)</span></label><input id="nota" class="input" placeholder="Ej.: conteo del 11 de noviembre"></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Conciliar', kind: 'primary', icon: 'check', onClick: function (m) {
+        var src = m.body.querySelector('input[name=src]:checked').value;
+        rows.forEach(function (r) { if (src === 'plat') sap[r.sku] = r.plat; else { bumpRes(r.sku, CEDI, r.sap - r.plat); sap[r.sku] = r.sap; } delete sapCause[r.sku]; });
+        conTable(); renderKpis(); refreshDisp(); drawChips(); UI.toast(rows.length + ' ' + plural(rows.length, 'diferencia conciliada', 'diferencias conciliadas') + (src === 'plat' ? ': SAP quedó igual a la plataforma.' : ': la plataforma quedó igual a SAP.'), 'success', { title: 'Conciliación registrada' });
+      } }] });
+  }
+
+  /* ---------- drawer: SKU ---------- */
+  function skuDrawer(p) {
+    var bods = Object.keys(p.stock), rs = A.reservas.filter(function (r) { return r.sku === p.skuSAP && viva(r); });
+    var cons = stk(p, 'all');
+    var d = UI.drawer({ title: p.skuSAP, subtitle: p.descripcion, width: 600,
+      body: '<div class="stack-lg"><div class="grid c3 gap-3"><div class="mini-stat"><div class="v">' + F.num(cons.fis, 0) + '</div><div class="l">Físico total</div></div><div class="mini-stat"><div class="v">' + F.num(cons.res, 0) + '</div><div class="l">Reservado</div></div><div class="mini-stat"><div class="v">' + F.num(cons.disp, 0) + '</div><div class="l">Disponible</div></div></div>' +
+        '<section class="dr-sec"><h3>Por bodega</h3><div class="stack-sm">' + bods.map(function (b) { var x = stk(p, b); return '<div><div class="row between t-13"><strong>' + esc(BODS[b] || b) + '</strong><span class="muted">Físico ' + F.num(x.fis, 0) + ' − reservado ' + F.num(x.res, 0) + ' = <strong class="disp-cell' + (x.disp <= 0 ? ' is-zero' : x.disp < x.min ? ' is-low' : '') + '">' + F.num(x.disp, 0) + '</strong></span></div>' + sbar(x) + '</div>'; }).join('') + '</div></section>' +
+        '<section class="dr-sec"><h3>Reservas vigentes <span class="tag">' + rs.length + '</span></h3>' + (rs.length ? '<div class="table-wrap"><table class="table is-dense"><thead><tr><th scope="col">Reserva</th><th scope="col">Pedido</th><th scope="col" class="num">Cant.</th><th scope="col">Estado</th></tr></thead><tbody>' + rs.slice(0, 8).map(function (r) { return '<tr><td><span class="mono">' + r.reservaId + '</span></td><td><a class="mono link-btn" href="pedidos.html?id=' + r.pedidoId + '">' + r.pedidoId + '</a></td><td class="num">' + F.num(reservada(r), 0) + '</td><td>' + chipR(r) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="muted t-13">No hay reservas vigentes para este SKU.</p>') + '</section></div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Ver reservas del SKU', kind: 'secondary', onClick: function () { goRes(p.skuSAP); } }, { label: 'Reservar unidades', kind: 'primary', icon: 'plus', onClick: function () { setTimeout(function () { reserveModal({ sku: p.skuSAP }); }, 50); } }] });
+  }
+
+  /* ---------- drawer: reserva con trazabilidad (HU-077) ---------- */
+  var curR = null, resD = null;
+  function traza(r) {
+    var p = ped(r.pedidoId), e = estUI(r), it = [], firme = p && p.historial.filter(function (h) { return h.estado === 'En firme'; })[0];
+    it.push({ title: 'Reserva creada · ' + r.origen.toLowerCase(), meta: F.fechaHora(r.fechaCreacion) + ' · ' + uname(r.usuarioId), state: 'done' });
+    if (r.estado === 'Sin stock') it.push({ title: e === 'Parcial' ? 'Cobertura parcial: faltan ' + r.faltante + ' ' + uPl(r.unidad, r.faltante) : 'Sin existencias para reservar', meta: 'Se reintenta cuando haya reposición', state: 'error' });
+    if (firme && (r.estado === 'Activa' || r.estado === 'Consumida')) it.push({ title: 'Activada al marcar el pedido en firme', meta: F.fechaHora(firme.fechaHora) + ' · ' + uname(firme.usuarioId), state: 'done' });
+    (r._ev || []).forEach(function (x) { it.push(x); });
+    if (r.estado === 'Consumida') it.push({ title: 'Consumida en despacho' + (p && p.despachoId ? ' ' + p.despachoId : ''), meta: 'Pedido ' + (p ? p.estado.toLowerCase() : ''), state: 'done' });
+    if (r.estado === 'Liberada' && !(r._ev || []).length) it.push({ title: 'Reserva liberada', meta: 'Por entrega fallida o cancelación del pedido', state: 'done' });
+    if (e === 'Vencida') it.push({ title: 'Reserva vencida', meta: 'Venció el ' + F.fechaHora(r.vence) + ' sin que el pedido pasara a firme', state: 'error' });
+    if (e === 'Pendiente') it.push({ title: 'Pendiente de activación', meta: 'Se activa cuando el pedido pase a firme · vence ' + F.fecha(r.vence), state: 'current' });
+    if (e === 'Activa' && !(r._ev || []).length) it[it.length - 1].state = 'current';
+    return UI.timeline(it);
+  }
+  function resBody(r) {
+    var p = ped(r.pedido || r.pedidoId), pr = prod(r.sku), e = estUI(r), v = viva(r);
+    var h = '<div class="stack-lg"><div class="row gap-2">' + chipR(r) + '<span class="tag">' + esc(r.origen) + '</span></div>';
+    if (e === 'Vencida') h += UI.banner({ tone: 'warning', title: 'Reserva vencida', text: 'Venció sin que el pedido pasara a firme. Las unidades siguen apartadas hasta que la liberes o la ajustes.' });
+    if (e === 'Parcial' || e === 'Sin stock') h += UI.banner({ tone: e === 'Parcial' ? 'warning' : 'danger', title: e === 'Parcial' ? 'Reservada parcialmente' : 'Sin existencias', text: 'Se reservaron ' + reservada(r) + ' de ' + r.cantidad + ' ' + String(r.unidad).toLowerCase() + (r.cantidad === 1 ? '' : 's') + '. Faltan ' + r.faltante + '. El pedido sigue bloqueado hasta completar la reserva.' });
+    h += '<section class="dr-sec"><h3>Detalle</h3>' + UI.kv([['Pedido', '<a class="link-btn mono" href="pedidos.html?id=' + r.pedidoId + '">' + r.pedidoId + '</a>' + (p ? ' · ' + esc(p.cliente) : '')], ['Producto', '<span class="mono">' + r.sku + '</span> · ' + esc(pr ? pr.descripcion : '')], ['Bodega', esc(BODS[r.bodegaId] || r.bodegaId)], ['Cantidad reservada', F.num(reservada(r), 0) + ' de ' + F.num(r.cantidad, 0) + ' ' + esc(String(r.unidad).toLowerCase()) + (r.cantidad === 1 ? '' : 's')], ['Consumida', F.num(r.consumido || 0, 0)], ['Creada', F.fechaHora(r.fechaCreacion) + ' · ' + esc(uname(r.usuarioId))], ['Vence', r.vence ? F.fechaHora(r.vence) : '<span class="subtle">—</span>']]) + '</section>';
+    h += '<section class="dr-sec"><h3>Cobertura</h3>' + UI.meter(reservada(r), r.cantidad, { label: 'Cobertura de la reserva', level: r.faltante ? (reservada(r) ? 'warn' : 'crit') : 'ok', text: reservada(r) + ' / ' + r.cantidad }) + '</section>';
+    h += '<section class="dr-sec"><h3>Trazabilidad</h3>' + traza(r) + '<p class="t-13 muted mt-2">El registro completo de cambios está en <a class="link-btn" href="auditoria.html">auditoría</a>.</p></section></div>';
+    return h;
+  }
+  function renderRes() {
+    if (!resD) return; resD.setBody(resBody(curR)); var v = viva(curR);
+    setFoot(resD, [{ label: 'Cerrar', kind: 'ghost', onClick: function (a) { a.close(); } },
+      { label: 'Ver pedido', kind: 'secondary', onClick: function () { location.href = 'pedidos.html?id=' + encodeURIComponent(curR.pedidoId); } },
+      { label: 'Ajustar cantidad', kind: 'secondary', icon: 'edit', disabled: !v, tip: v ? '' : 'Solo se ajustan reservas vigentes', onClick: function () { adjustModal(curR); } },
+      { label: 'Liberar reserva', kind: 'primary', icon: 'undo', disabled: !v, tip: v ? '' : (estUI(curR) === 'Consumida' ? 'Ya se consumió en un despacho' : 'La reserva ya no está vigente'), onClick: function () { releaseModal(curR); } }]);
+  }
+  function resDrawer(r) { curR = r; resD = UI.drawer({ title: r.reservaId, subtitle: 'Pedido ' + r.pedidoId, width: 560, body: '', footer: '<span></span>', onClose: function () { resD = null; curR = null; try { history.replaceState(null, '', location.pathname); } catch (e) {} } }); renderRes(); try { history.replaceState(null, '', '?id=' + encodeURIComponent(r.reservaId)); } catch (e) {} }
+  function afterChange() { renderKpis(); refreshDisp(); drawChips(); tRes.refresh(); conTable(); if (resD) renderRes(); }
+
+  /* ---------- liberar (HU-075) ---------- */
+  function releaseModal(r) {
+    var n = reservada(r);
+    UI.modal({ title: 'Liberar reserva', subtitle: r.reservaId + ' · pedido ' + r.pedidoId, width: 480,
+      body: '<div class="stack">' + UI.banner({ tone: 'warning', text: 'Se devolverán ' + F.num(n, 0) + ' ' + String(r.unidad).toLowerCase() + (n === 1 ? '' : 's') + ' al disponible de ' + (BODS[r.bodegaId] || r.bodegaId) + '. Otro pedido podrá reservarlas de inmediato.' }) +
+        '<div class="field"><label class="label" for="mot">Motivo</label><select id="mot" class="select"><option value="">Selecciona un motivo</option><option>Cancelación del pedido</option><option>Entrega fallida</option><option>Cambio de bodega de salida</option><option>Error de captura</option><option>Vencimiento de la reserva</option></select></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Liberar reserva', kind: 'danger', icon: 'undo', onClick: function (m) {
+        var s = m.body.querySelector('#mot'), f = s.closest('.field'); if (!s.value) { setErr(f, s, 'Indica el motivo para dejar trazabilidad.'); s.focus(); return false; }
+        bumpRes(r.sku, r.bodegaId, -n); r.estado = 'Liberada'; r.faltante = 0; r.vence = null; ev(r, 'Reserva liberada', s.value); afterChange();
+        UI.toast(F.num(n, 0) + ' unidades de ' + r.sku + ' volvieron al disponible.', 'success', { title: r.reservaId + ' liberada' });
+      } }] });
+  }
+
+  /* ---------- ajustar cantidad (HU-076) ---------- */
+  function adjustModal(r) {
+    var p = prod(r.sku), n0 = reservada(r), x = stk(p, r.bodegaId), maxUp = n0 + Math.max(0, x.disp), cons = r.consumido || 0;
+    UI.modal({ title: 'Ajustar cantidad reservada', subtitle: r.reservaId + ' · ' + r.sku, width: 480,
+      body: '<div class="stack"><div class="avail-box"><div class="row"><span class="muted">Reservado ahora</span><strong>' + F.num(n0, 0) + '</strong></div><div class="row"><span class="muted">Disponible adicional en ' + esc(BODS[r.bodegaId] || r.bodegaId) + '</span><strong>' + F.num(Math.max(0, x.disp), 0) + '</strong></div></div>' +
+        '<div class="field" id="qf"><label class="label" for="qty">Nueva cantidad (' + esc(String(r.unidad).toLowerCase()) + 's)</label><input id="qty" class="input" type="number" inputmode="numeric" min="1" step="1" value="' + n0 + '"><span class="hint" id="qh">Sin cambios.</span></div>' +
+        '<div class="field"><label class="label" for="why">Motivo <span class="opt">(opcional)</span></label><input id="why" class="input" placeholder="Ej.: el cliente aumentó la cantidad del pedido"></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Guardar ajuste', kind: 'primary', onClick: function (m) {
+        var q = m.body.querySelector('#qty'), f = m.body.querySelector('#qf'), v = Number(q.value), msg = '';
+        if (!q.value || !Number.isInteger(v) || v < 1) msg = 'Ingresa una cantidad entera mayor que cero.';
+        else if (v < cons) msg = 'No puede ser menor a lo ya consumido (' + cons + ').';
+        else if (v > maxUp) msg = 'Solo hay ' + F.num(Math.max(0, x.disp), 0) + ' disponibles adicionales: el máximo para esta reserva es ' + F.num(maxUp, 0) + '.';
+        else if (v === n0) msg = 'La cantidad es la misma que la actual.';
+        setErr(f, q, msg); if (msg) { q.focus(); return false; }
+        var delta = v - n0; bumpRes(r.sku, r.bodegaId, delta); r.cantidad = v + (r.faltante || 0); ev(r, 'Cantidad ajustada de ' + n0 + ' a ' + v, m.body.querySelector('#why').value.trim());
+        afterChange(); UI.toast('Reserva ajustada a ' + v + ' unidades (' + (delta > 0 ? '+' : '') + delta + '). El pedido ' + r.pedidoId + ' se actualizó.', 'success', { title: r.reservaId });
+      } }] });
+    var q = document.querySelector('.modal #qty'), h = document.querySelector('.modal #qh');
+    q.addEventListener('input', function () { var v = Number(q.value), d = v - n0; h.textContent = !q.value ? '' : d === 0 ? 'Sin cambios.' : d > 0 ? 'Se tomarán ' + d + ' unidades más del disponible.' : 'Se devolverán ' + (-d) + ' unidades al disponible.'; });
+  }
+
+  /* ---------- reservar unidades (HU-072/073/074) ---------- */
+  function reserveModal(pre) {
+    pre = pre || {};
+    var list = A.pedidos.filter(function (p) { return ABIERTOS.indexOf(p.estado) > -1 && (!pre.sku || p.lineas.some(function (l) { return l.sku === pre.sku; })); });
+    if (!list.length) { UI.toast('No hay pedidos abiertos con ese SKU para reservar.', 'info'); return; }
+    var selP = pre.pedido && list.filter(function (p) { return p.pedidoId === pre.pedido; })[0] || list[0];
+    var m = UI.modal({ title: 'Reservar unidades', subtitle: 'Aparta stock para un pedido', width: 540,
+      body: '<form class="stack" novalidate id="rf"><div class="field"><label class="label" for="rp">Pedido</label><select id="rp" class="select">' + list.map(function (p) { return '<option value="' + p.pedidoId + '"' + (p === selP ? ' selected' : '') + '>' + p.pedidoId + ' · ' + esc(p.cliente) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label class="label" for="rs">SKU de la línea</label><select id="rs" class="select"></select></div>' +
+        '<div class="form-grid c2"><div class="field"><label class="label" for="rb">Bodega</label><select id="rb" class="select">' + bodOpts + '</select></div><div class="field" id="qf"><label class="label" for="rq">Cantidad a reservar</label><input id="rq" class="input" type="number" inputmode="numeric" min="1" step="1"></div></div>' +
+        '<div class="avail-box" id="ab" aria-live="polite"></div><div id="cf"></div>' +
+        '<label class="check demo-opt"><input type="checkbox" id="demo"' + (conflictUsed ? '' : ' checked') + '> Demo: simular que otro usuario reserva el mismo SKU al mismo tiempo</label></form>',
+      footer: '<span></span>' });
+    var $m = function (s) { return m.body.querySelector(s); }, P, L, lastErr = '';
+    function ya() { return A.reservas.filter(function (r) { return r.pedidoId === P.pedidoId && r.sku === L.sku && viva(r); }).reduce(function (s, r) { return s + reservada(r); }, 0); }
+    function fillSku() {
+      P = ped($m('#rp').value); var cur = pre.sku && P.lineas.some(function (l) { return l.sku === pre.sku; }) ? pre.sku : P.lineas[0].sku;
+      $m('#rs').innerHTML = P.lineas.map(function (l) { return '<option value="' + l.sku + '"' + (l.sku === cur ? ' selected' : '') + '>' + l.sku + ' · ' + esc(l.descripcion) + ' (pide ' + l.cantidad + ')</option>'; }).join(''); pre.sku = null; fillQty();
+    }
+    function fillQty() { L = P.lineas.filter(function (l) { return l.sku === $m('#rs').value; })[0]; var pend = Math.max(0, L.cantidad - ya()); $m('#rq').value = pend || ''; info(); }
+    function check() {
+      var q = Number($m('#rq').value), x = stk(prod(L.sku), $m('#rb').value), pend = L.cantidad - ya(), msg = '';
+      if (!$m('#rq').value || !Number.isInteger(q) || q < 1) msg = 'Ingresa una cantidad entera mayor que cero.';
+      else if (pend <= 0) msg = 'Este SKU ya está reservado por completo para el pedido.';
+      else if (q > x.disp) msg = 'Supera el disponible: hay ' + F.num(Math.max(0, x.disp), 0) + ' en ' + BODS[$m('#rb').value] + '.';
+      else if (q > pend) msg = 'El pedido solo necesita ' + pend + ' más de este SKU.';
+      return msg;
+    }
+    function info() {
+      var x = stk(prod(L.sku), $m('#rb').value), y = ya(), q = Number($m('#rq').value) || 0, msg = check();
+      $m('#ab').innerHTML = '<div class="row"><span class="muted">Disponible en ' + esc(BODS[$m('#rb').value]) + '</span><strong class="disp-cell' + (x.disp <= 0 ? ' is-zero' : '') + '">' + F.num(Math.max(0, x.disp), 0) + '</strong></div><div class="row"><span class="muted">Pide el pedido · ya reservado</span><strong>' + L.cantidad + ' · ' + y + '</strong></div>' + UI.meter(Math.min(q, Math.max(0, x.disp)), Math.max(1, q), { level: msg ? 'crit' : 'ok', text: Math.min(q, Math.max(0, x.disp)) + ' / ' + q, label: 'Cobertura de la cantidad solicitada' });
+      setErr($m('#qf'), $m('#rq'), msg); lastErr = msg;
+    }
+    ['#rp'].forEach(function (s) { $m(s).addEventListener('change', fillSku); });
+    $m('#rs').addEventListener('change', fillQty); $m('#rb').addEventListener('change', info); $m('#rq').addEventListener('input', info);
+    $m('#rf').addEventListener('submit', function (e) { e.preventDefault(); });
+    fillSku();
+    function confirm() {
+      var msg = check(); if (msg) { info(); $m('#rq').focus(); UI.toast(msg, 'error', { title: 'No se puede reservar' }); return; }
+      var q = Number($m('#rq').value), bod = $m('#rb').value, x = stk(prod(L.sku), bod);
+      /* HU-074: otro usuario reserva la misma línea justo antes de confirmar (aviso recuperable) */
+      if ($m('#demo').checked) {
+        $m('#demo').checked = false; conflictUsed = true;
+        var pend0 = L.cantidad - ya(), take = pend0 > 1 ? Math.ceil(pend0 * .6) : 1, other = { reservaId: nextRsv(), pedidoId: P.pedidoId, sku: L.sku, bodegaId: bod, cantidad: take, unidad: L.unidad, estado: ['Recibido', 'Stock validado', 'Bloqueado por stock'].indexOf(P.estado) > -1 ? 'Pendiente' : 'Activa', fechaCreacion: new Date().toISOString(), usuarioId: 'USR-003', origen: 'Manual', faltante: 0, consumido: 0, vence: new Date(NOW + 3 * 864e5).toISOString() };
+        A.reservas.unshift(other); bumpRes(L.sku, bod, take); var rest = L.cantidad - ya();
+        $m('#cf').innerHTML = UI.banner({ tone: 'warning', title: 'Otra persona reservó esta línea al mismo tiempo', html: 'Camila Andrea Torres reservó <strong>' + take + '</strong> ' + uPl(L.unidad, take) + ' de este SKU para ' + P.pedidoId + ' hace unos segundos. Tu reserva no se guardó para evitar duplicarla. ' + (rest > 0 ? '<button type="button" class="inline-link" id="useMax">Reservar las ' + rest + ' que faltan</button>' : 'La línea quedó completamente reservada.') });
+        var um = $m('#useMax'); if (um) um.addEventListener('click', function () { $m('#rq').value = rest; $m('#cf').innerHTML = ''; info(); });
+        info(); afterChange(); return;
+      }
+      $m('#cf').innerHTML = '';
+      var est = ['Recibido', 'Stock validado', 'Bloqueado por stock'].indexOf(P.estado) > -1 ? 'Pendiente' : 'Activa', full = q >= L.cantidad - ya();
+      var r = { reservaId: nextRsv(), pedidoId: P.pedidoId, sku: L.sku, bodegaId: bod, cantidad: q, unidad: L.unidad, estado: est, fechaCreacion: new Date().toISOString(), usuarioId: YO.usuarioId, origen: 'Manual', faltante: 0, consumido: 0, vence: new Date(NOW + 3 * 864e5).toISOString() };
+      A.reservas.unshift(r); bumpRes(L.sku, bod, q); ev(r, 'Reserva registrada desde la pantalla de reservas', ''); afterChange(); m.close();
+      UI.toast(q + ' ' + String(L.unidad).toLowerCase() + (q === 1 ? '' : 's') + ' de ' + L.sku + ' reservadas para ' + P.pedidoId + (full ? '.' : ' (aún faltan unidades en el pedido).'), 'success', { title: r.reservaId });
+      tabsApi.select('p-res'); tRes.goTo(1);
+    }
+    setFoot(m, [{ label: 'Cancelar', kind: 'ghost', onClick: function (a) { a.close(); } }, { label: 'Confirmar reserva', kind: 'primary', icon: 'check', onClick: confirm }]);
+  }
+  $('#reserveBtn').addEventListener('click', function () { reserveModal(); });
+
+  /* ---------- arranque ---------- */
+  tabsApi = UI.tabs($('#tabs'));
+  renderKpis(); drawChips(); conTable();
+  var qp = UI.param('pedido'), qs = UI.param('sku'), qi = UI.param('id');
+  if (qi) { var rr = A.reservas.filter(function (x) { return x.reservaId === qi; })[0]; tabsApi.select('p-res'); if (rr) resDrawer(rr); else UI.toast('No encontramos la reserva ' + qi + '.', 'warning'); }
+  else if (qp) { goRes(qp); }
+  else if (qs) { tDisp.search(qs); var si = $('#tblDisp input[type=search]'); if (si) si.value = qs; var pp = prod(qs); if (pp) skuDrawer(pp); }
+});
+</script>
+</body>
+</html>

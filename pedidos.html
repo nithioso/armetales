@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pedidos · Armetales</title>
+<meta name="description" content="Gestión de pedidos de Armetales: importación desde Easy Sales, validación de stock, prioridad, pedido en firme y notificación a logística.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  select.select.input-sm { padding-right: 32px; }
+
+  /* Layout específico de pedidos (tokens y componentes viven en app.css) */
+  .state-tiles { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); }
+  .st-tile { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-card, 10px); background: var(--surface); color: var(--text); cursor: pointer; font: inherit; transition: border-color .12s, background .12s, box-shadow .12s; min-width: 0; }
+  .st-tile:hover { border-color: var(--border-strong); background: var(--surface-2); }
+  .st-tile[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); background: var(--surface); }
+  :root[data-theme="dark"] .st-tile[aria-pressed="true"] { border-color: #E9EDF0; box-shadow: inset 0 0 0 1px #E9EDF0; }
+  .st-tile .n { font-family: var(--font-display); font-weight: 600; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .st-tile .l { font-size: 12.5px; color: var(--text-2); display: flex; align-items: center; gap: 6px; line-height: 1.25; }
+  .st-tile.is-danger .n { color: var(--red-fg, var(--red)); }
+  @media (max-width: 639px) {
+    .state-tiles { display: flex; overflow-x: auto; scrollbar-width: thin; padding-bottom: 4px; margin-inline: -16px; padding-inline: 16px; }
+    .st-tile { flex: none; min-width: 128px; }
+  }
+  .dr-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .dr-sec > h3 { font-size: 13px; text-transform: none; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .line-table td, .line-table th { vertical-align: middle; }
+  .line-table .meter { min-width: 150px; }
+  .rule-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .rule-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; }
+  .rule-list .ri { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; margin-top: 1px; }
+  .rule-list .ri .icon { width: 12px; height: 12px; }
+  .rule-list .ok .ri { background: var(--green-bg); color: var(--green-fg, var(--green)); }
+  .rule-list .bad .ri { background: var(--red-bg); color: var(--red-fg, var(--red)); }
+  .rule-list .sub { display: block; font-size: 12.5px; color: var(--text-2); }
+  .imp-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .imp-steps li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--text-3); }
+  .imp-steps li.is-done { color: var(--text); } .imp-steps li.is-current { color: var(--text); font-weight: 600; }
+  .imp-steps .si { width: 20px; height: 20px; flex: none; border-radius: 50%; border: 1.5px solid var(--border-strong); display: grid; place-items: center; }
+  .imp-steps .is-done .si { background: var(--green); border-color: var(--green); color: #fff; } .imp-steps .si .icon { width: 12px; height: 12px; }
+  .sum-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .sum-grid .mini { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .sum-grid .mini .v { font-family: var(--font-display); font-weight: 600; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .sum-grid .mini .l { font-size: 12px; color: var(--text-2); }
+  .imp-list { display: grid; gap: 0; border: 1px solid var(--border); border-radius: var(--r-ctl); overflow: hidden; }
+  .imp-list > div { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; } .imp-list > div:last-child { border-bottom: 0; }
+  .radio-cards { display: grid; gap: 8px; }
+  .radio-card { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); cursor: pointer; }
+  .radio-card:has(input:checked) { border-color: var(--ink); background: var(--surface-2); }
+  :root[data-theme="dark"] .radio-card:has(input:checked) { border-color: #E9EDF0; }
+  .radio-card:focus-within { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .link-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .msg-preview { border: 1px dashed var(--border-strong); border-radius: var(--r-ctl); padding: 10px 12px; background: var(--surface-2); font-size: 13px; white-space: pre-line; }
+</style>
+</head>
+<body data-page="pedidos">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Operación</div>
+      <h1 class="page-title">Gestión de pedidos</h1>
+      <p class="page-desc">Pedidos recibidos desde Easy Sales: valida el stock, define la prioridad, márcalos en firme y avisa a logística cuando estén listos para despacho.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-primary" id="importBtn"></button>
+    </div>
+  </header>
+
+  <section aria-label="Resumen por estado">
+    <div class="state-tiles" id="tiles" role="group" aria-label="Filtrar por estado del pedido"></div>
+  </section>
+
+  <section class="section" aria-label="Listado de pedidos">
+    <div id="tbl"></div>
+  </section>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$;
+  var ABIERTOS = ['Recibido', 'Stock validado', 'Bloqueado por stock', 'En firme', 'En preparación', 'Listo para despacho', 'Planificado'];
+  var ESTADOS = A.estados.pedido;
+  var YO = A.usuarioActual;
+  var t, drawer = null, cur = null, importRuns = 0, importedIds = [];
+  A.pedidos.forEach(function (p) { if (p.bloqueo && !p.bloqueo.unidad) { var l = p.lineas.filter(function (x) { return x.sku === p.bloqueo.sku; })[0]; p.bloqueo.unidad = l ? l.unidad : 'Unidad'; } });
+  $('#importBtn').innerHTML =UI.icon('download') + 'Importar desde Easy Sales';
+
+  /* ---------- utilidades ---------- */
+  function uname(id) { if (!id || id === 'Sistema') return 'Sistema'; var u = A.idx.usuarios && A.idx.usuarios[id]; return u ? u.nombre : id; }
+  function plural(n, s, p) { return n === 1 ? s : p; }
+  function prod(sku) { return A.idx.productos[sku]; }
+  function unitLow(l, n) { var u = String(l.unidad || '').toLowerCase(); return n === 1 ? u : (/[aeiou]$/.test(u) ? u + 's' : u + 'es'); }
+  function addHist(p, estado, nota) { p.historial.push({ estado: estado, fechaHora: new Date().toISOString(), usuarioId: YO.usuarioId, nota: nota || null }); }
+  function setEstado(p, estado, nota) { p.estado = estado; addHist(p, estado, nota); }
+  function nextRsv() { var mx = 0; A.reservas.forEach(function (r) { var n = parseInt(r.reservaId.slice(-4), 10); if (n > mx) mx = n; }); return 'RSV-2611-' + String(mx + 1).padStart(4, '0'); }
+  function errText(msg) { return '<span class="error-text">' + UI.icon('alert-circle', 'icon-sm') + esc(msg) + '</span>'; }
+  function setErr(fieldEl, input, msg) {
+    var old = fieldEl.querySelector('.error-text'); if (old) old.remove();
+    if (msg) { input.setAttribute('aria-invalid', 'true'); fieldEl.insertAdjacentHTML('beforeend', errText(msg)); } else input.removeAttribute('aria-invalid');
+  }
+  function setFoot(api, btns) {
+    api.footer.innerHTML = btns.map(function (b, i) { return '<button type="button" class="btn ' + ({ primary: 'btn-primary', secondary: 'btn-secondary', ghost: 'btn-ghost', danger: 'btn-danger is-solid' }[b.kind || 'secondary']) + '"' + (b.disabled ? ' disabled' : '') + (b.tip ? ' data-tip="' + esc(b.tip) + '"' : '') + ' data-i="' + i + '">' + (b.icon ? UI.icon(b.icon) : '') + esc(b.label) + '</button>'; }).join('');
+    UI.$$('button', api.footer).forEach(function (el) { el.addEventListener('click', function () { var b = btns[+el.dataset.i]; if (b.onClick) b.onClick(api); }); });
+  }
+
+  /* ---------- stock por línea (HU-064/065) ---------- */
+  function lineStock(p, l) {
+    if (p.bloqueo && p.bloqueo.sku === l.sku) return { disp: p.bloqueo.disponible, reservado: false };
+    if (p.estado !== 'Recibido') return { disp: l.cantidad, reservado: true };
+    var pr = prod(l.sku), st = pr && pr.stock[p.bodegaId]; return { disp: st ? Math.max(0, st.disponible) : 0, reservado: false };
+  }
+  function checkStock(p) {
+    var short = null, res = p.lineas.map(function (l) {
+      var s = lineStock(p, l), ok = s.disp >= l.cantidad; if (!ok && !short) short = { sku: l.sku, descripcion: l.descripcion, solicitado: l.cantidad, disponible: s.disp, faltante: l.cantidad - s.disp, unidad: l.unidad };
+      return { l: l, s: s, ok: ok };
+    });
+    return { lines: res, short: short };
+  }
+  function validarStock(p, silent) {
+    var r = checkStock(p), bodega = p.bodegaId;
+    p.lineas.forEach(function (l, i) { var ok = r.lines[i].ok; A.reservas.unshift({ reservaId: nextRsv(), pedidoId: p.pedidoId, sku: l.sku, bodegaId: bodega, cantidad: l.cantidad, unidad: l.unidad, estado: ok ? 'Pendiente' : 'Sin stock', fechaCreacion: new Date().toISOString(), usuarioId: YO.usuarioId, origen: 'Automática', faltante: ok ? 0 : r.lines[i].l.cantidad - r.lines[i].s.disp, consumido: 0, vence: new Date(Date.now() + 3 * 864e5).toISOString() }); });
+    if (r.short) { p.bloqueo = r.short; setEstado(p, 'Bloqueado por stock', 'Faltan ' + r.short.faltante + ' ' + unitLow(r.short, r.short.faltante) + ' de ' + r.short.descripcion); }
+    else { delete p.bloqueo; setEstado(p, 'Stock validado', 'Stock completo en ' + (A.idx.sedes ? '' : '') + bodega); }
+    return r;
+  }
+
+  /* ---------- resumen por estado (HU-061) ---------- */
+  var tilesDef = [{ v: '', l: 'Todos los pedidos' }, { v: 'pend', l: 'Pendientes de despacho' }].concat(ESTADOS.map(function (e) { return { v: e, l: e }; }));
+  function countFor(v) { return !v ? A.pedidos.length : v === 'pend' ? A.pedidos.filter(function (p) { return ABIERTOS.indexOf(p.estado) > -1; }).length : A.pedidos.filter(function (p) { return p.estado === v; }).length; }
+  var tileSel = '';
+  function drawTiles() {
+    $('#tiles').innerHTML = tilesDef.map(function (d) { var n = countFor(d.v); return '<button type="button" class="st-tile' + (d.v === 'Bloqueado por stock' && n ? ' is-danger' : '') + '" data-v="' + esc(d.v) + '" aria-pressed="' + (tileSel === d.v) + '"><span class="n">' + n + '</span><span class="l">' + (d.v && d.v !== 'pend' ? '<i class="dot ' + ({ info: 'info', danger: 'bad', warning: 'warn', success: 'ok', neutral: '' }[UI.tone(d.v)] || '') + '"></i>' : '') + esc(d.l) + '</span></button>'; }).join('');
+  }
+  $('#tiles').addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (!b) return; tileSel = b.dataset.v; t.setFilter('estado', tileSel); drawTiles(); });
+
+  /* ---------- tabla ---------- */
+  t = UI.table($('#tbl'), {
+    rows: A.pedidos, pageSize: 10, rowKey: 'pedidoId', caption: 'Pedidos',
+    searchable: { placeholder: 'Buscar por cliente o número de pedido' }, searchKeys: ['pedidoId', 'ordenCompra', 'municipio'],
+    emptyText: 'Ningún pedido coincide con los filtros. Prueba con otro cliente o limpia los filtros.',
+    filters: [
+      { key: 'estado', label: 'Estado', all: 'Todos los estados', options: [{ value: 'pend', label: 'Pendientes de despacho' }].concat(ESTADOS), match: function (r, v) { return v === 'pend' ? ABIERTOS.indexOf(r.estado) > -1 : r.estado === v; } },
+      { key: 'prioridad', label: 'Prioridad', all: 'Toda prioridad', options: A.estados.prioridad },
+      { key: 'rutaId', label: 'Ruta', all: 'Todas las rutas', options: A.rutas.map(function (r) { return { value: r.rutaId, label: r.nombre }; }) }
+    ],
+    columns: [
+      { key: 'pedidoId', label: 'Pedido', mono: true },
+      { key: 'cliente', label: 'Cliente', title: true, render: function (r) { return '<span class="cell-main">' + esc(r.cliente) + '</span><div class="cell-sub">' + r.lineas.length + ' ' + plural(r.lineas.length, 'ítem', 'ítems') + ' · ' + esc(r.ordenCompra || 'sin OC') + '</div>'; } },
+      { key: 'municipio', label: 'Municipio', hideMobile: true, render: function (r) { return esc(r.municipio.replace('Bogotá · ', 'Bogotá, ')); } },
+      { key: 'entregaSolicitada', label: 'Entrega solicitada', render: function (r) { var hoy = r.entregaSolicitada <= A.ymd(0) && ABIERTOS.indexOf(r.estado) > -1; return '<span class="nowrap">' + F.fecha(r.entregaSolicitada) + '</span>' + (hoy ? ' <span class="chip chip-sm chip-warning no-dot">Hoy</span>' : ''); } },
+      { key: 'pesoKg', label: 'Peso', num: true, render: function (r) { return F.kg(r.pesoKg); } },
+      { key: 'estado', label: 'Estado', render: function (r) { return UI.chip(r.estado); } },
+      { key: 'prioridad', label: 'Prioridad', render: function (r) { return UI.chip(r.prioridad, { small: true }); } },
+      { key: 'asesor', label: 'Asesor', hideMobile: true, render: function (r) { var p = r.asesor.split(' '); return '<span class="nowrap">' + esc(p[0] + ' ' + p[p.length - 1]) + '</span>'; } }
+    ],
+    onRowClick: function (r) { openDetail(r); },
+    actions: function (r) {
+      var abierto = ABIERTOS.indexOf(r.estado) > -1;
+      return [{ label: 'Ver detalle', icon: 'eye', onClick: function () { openDetail(r); } },
+        { label: 'Validar stock', icon: 'check-circle', disabled: r.estado !== 'Recibido', onClick: function () { runValidar(r); } },
+        { label: 'Cambiar prioridad', icon: 'flag', disabled: !abierto, onClick: function () { prioModal(r); } },
+        { sep: true },
+        { label: 'Ver reservas', icon: 'layers', href: 'reservas.html?pedido=' + encodeURIComponent(r.pedidoId) },
+        { label: 'Ver cliente', icon: 'user', href: 'clientes.html?id=' + encodeURIComponent(r.clienteId) }];
+    }
+  });
+  var estSel = $('select[data-key="estado"]', $('#tbl')); if (estSel) estSel.addEventListener('change', function () { tileSel = estSel.value; drawTiles(); });
+  function refreshAll() { t.refresh(); drawTiles(); if (drawer && cur) renderDetail(); }
+  drawTiles();
+
+  /* ---------- drawer de detalle (HU-063) ---------- */
+  var FLOW = ['Recibido', 'Stock validado', 'En firme', 'En preparación', 'Listo para despacho', 'Planificado', 'En ruta', 'Entregado'];
+  function timelineOf(p) {
+    var items = p.historial.map(function (h, i) {
+      var last = i === p.historial.length - 1, bad = h.estado === 'Bloqueado por stock' || h.estado === 'Fallido';
+      return { state: last ? (bad ? 'error' : 'current') : 'done', titleHtml: esc(h.nota && !/^(Faltan|Stock completo)/.test(h.nota) ? h.nota : h.estado), meta: F.fechaHora(h.fechaHora) + ' · ' + uname(h.usuarioId) + (h.nota && /^(Faltan|Stock completo)/.test(h.nota) ? ' · ' + h.nota : '') };
+    });
+    var idx = FLOW.indexOf(p.estado); if (p.estado === 'Bloqueado por stock') idx = 0;
+    if (idx > -1) FLOW.slice(idx + 1).forEach(function (s) { items.push({ title: s, meta: 'Pendiente', state: 'pending' }); });
+    return UI.timeline(items);
+  }
+  function rulesFor(p) {
+    var c = A.idx.clientes[p.clienteId] || {}, hoy = A.ymd(0);
+    return [
+      { ok: p.estado === 'Stock validado', t: 'Stock validado en ' + p.bodegaId, s: p.estado === 'Stock validado' ? 'Todas las líneas están cubiertas por reserva.' : 'Primero valida el stock del pedido.' },
+      { ok: c.calidadDireccion && c.calidadDireccion !== 'Por validar', t: 'Dirección de entrega con georreferencia', s: c.calidadDireccion === 'Por validar' ? 'La dirección del cliente está por validar: no se puede planear sin coordenadas.' : 'Dirección ' + String(c.calidadDireccion || '').toLowerCase() + '.', href: 'clientes.html?id=' + p.clienteId },
+      { ok: p.entregaSolicitada >= hoy, t: 'Fecha de entrega solicitada vigente', s: 'Entrega solicitada para el ' + F.fecha(p.entregaSolicitada) + '.' },
+      { ok: !!p.ordenCompra, t: 'Orden de compra registrada', s: p.ordenCompra || 'Falta la orden de compra del cliente.' },
+      { ok: (c.cupoCreditoCOP || 0) >= p.valorCOP, t: 'Cupo de crédito suficiente', s: 'Pedido ' + F.cop(p.valorCOP) + ' frente a cupo de ' + F.cop(c.cupoCreditoCOP || 0) + '.' }
+    ];
+  }
+  function lineTable(p) {
+    var chk = checkStock(p), pre = p.estado === 'Recibido';
+    return '<div class="table-wrap"><table class="table is-dense line-table"><caption class="sr-only">Ítems del pedido y validación de stock</caption><thead><tr><th scope="col">Ítem</th><th scope="col" class="num">Cant.</th><th scope="col">' + (pre ? 'Stock disponible' : 'Cobertura') + '</th></tr></thead><tbody>' +
+      chk.lines.map(function (x) {
+        var l = x.l, s = x.s, lv = x.ok ? 'ok' : s.disp > 0 ? 'warn' : 'crit', txt = s.reservado ? 'Reservado' : s.disp + ' / ' + l.cantidad;
+        return '<tr><td><span class="mono t-12">' + l.sku + '</span><div class="cell-main">' + esc(l.descripcion) + '</div><div class="cell-sub">' + F.kg(l.pesoKg) + ' · ' + F.m3(l.volumenM3, 2) + '</div></td><td class="num">' + F.num(l.cantidad, 0) + '<div class="cell-sub">' + esc(unitLow(l, l.cantidad)) + '</div></td><td>' + UI.meter(Math.min(s.disp, l.cantidad), l.cantidad, { level: lv, text: txt, label: 'Cobertura de ' + l.descripcion }) + (x.ok ? '' : '<div class="error-text mt-1">' + (s.disp > 0 ? 'Faltan ' + (l.cantidad - s.disp) + ' ' + unitLow(l, l.cantidad - s.disp) : 'Sin existencias disponibles') + '</div>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  function bodyOf(p) {
+    var c = A.idx.clientes[p.clienteId] || {}, abierto = ABIERTOS.indexOf(p.estado) > -1, rs = A.reservas.filter(function (r) { return r.pedidoId === p.pedidoId; });
+    var h = '<div class="stack-lg"><div class="dr-head">' + UI.chip(p.estado) + UI.chip(p.prioridad, { label: 'Prioridad ' + p.prioridad.toLowerCase() }) + '<span class="tag">' + esc(p.origen) + '</span>' + (p.modificado ? '<span class="chip chip-info chip-sm no-dot">Modificado en origen</span>' : '') + '<span class="num strong ml-auto">' + F.cop(p.valorCOP) + '</span></div>';
+    if (p.bloqueo) {
+      h += UI.banner({ tone: 'danger', title: 'Bloqueado por stock', html: 'Faltan <strong>' + p.bloqueo.faltante + ' ' + unitLow(p.bloqueo, p.bloqueo.faltante) + '</strong> de <strong>' + esc(p.bloqueo.descripcion) + '</strong>: hay ' + p.bloqueo.disponible + ' disponibles y el pedido pide ' + p.bloqueo.solicitado + '. No puede pasar a firme ni planearse hasta que se reponga o se ajuste la cantidad.<div class="link-row mt-2"><a class="btn btn-secondary btn-sm" href="reservas.html?sku=' + p.bloqueo.sku + '">Ver disponibilidad del SKU</a><button type="button" class="btn btn-secondary btn-sm" data-act="repo">Solicitar reposición</button></div>' });
+    }
+    if (p.estado === 'Stock validado') { var cc = c.calidadDireccion; if (cc === 'Por validar') h += UI.banner({ tone: 'warning', title: 'La dirección del cliente está por validar', html: 'No podrás marcarlo en firme hasta georreferenciar la dirección. <a class="link-btn" href="clientes.html?id=' + p.clienteId + '">Ir al cliente</a>' }); }
+    h += '<section class="dr-sec"><h3>Datos del pedido</h3>' + UI.kv([
+      ['Cliente', '<a class="link-btn" href="clientes.html?id=' + p.clienteId + '">' + esc(p.cliente) + '</a>'],
+      ['Entrega en', esc(p.municipio) + ' · <a class="link-btn" href="rutas.html">' + esc((A.idx.rutas[p.rutaId] || {}).nombre || p.rutaId) + '</a>'],
+      ['Entrega solicitada', F.fecha(p.entregaSolicitada)], ['Recibido', F.fechaHora(p.fecha)],
+      ['Orden de compra', '<span class="mono">' + esc(p.ordenCompra || '') + '</span>'], ['Asesor comercial', esc(p.asesor)],
+      ['Carga', F.kg(p.pesoKg) + ' · ' + F.m3(p.volumenM3, 2)], ['Bodega de salida', esc(p.bodegaId)],
+      ['Despacho', p.despachoId ? '<a class="link-btn mono" href="despachos.html?id=' + p.despachoId + '">' + p.despachoId + '</a>' : '<span class="subtle">Sin despacho asignado</span>']]) + (p.observaciones ? '<p class="muted t-13 mt-2">' + esc(p.observaciones) + '</p>' : '') + '</section>';
+    h += '<section class="dr-sec"><h3>Ítems y validación de stock' + (p.estado === 'Recibido' ? ' <span class="chip chip-neutral chip-sm no-dot">Sin validar</span>' : '') + '</h3>' + lineTable(p) + '</section>';
+    h += '<section class="dr-sec"><h3>Reservas del pedido <a class="btn btn-ghost btn-sm ml-auto" href="reservas.html?pedido=' + p.pedidoId + '">Ver en reservas ' + UI.icon('arrow-up-right', 'icon-sm') + '</a></h3>' +
+      (rs.length ? '<div class="table-wrap"><table class="table is-dense"><thead><tr><th scope="col">Reserva</th><th scope="col">SKU</th><th scope="col" class="num">Cant.</th><th scope="col">Estado</th></tr></thead><tbody>' + rs.map(function (r) { return '<tr><td><span class="mono">' + r.reservaId + '</span></td><td><span class="mono">' + r.sku + '</span></td><td class="num">' + r.cantidad + '</td><td>' + UI.chip(r.estado, { small: true }) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="muted t-13">Aún no hay reservas: se crean al validar el stock del pedido.</p>') + '</section>';
+    h += '<section class="dr-sec"><h3>Línea de tiempo</h3>' + timelineOf(p) + '</section>';
+    var links = [];
+    if (p.estado === 'Planificado' || p.estado === 'Listo para despacho') links.push('<a class="btn btn-secondary btn-sm" href="planeacion.html">Ir a planeación</a>');
+    if (p.despachoId) links.push('<a class="btn btn-secondary btn-sm" href="despachos.html?id=' + p.despachoId + '">Ver despacho</a>');
+    if (p.estado === 'En ruta') links.push('<a class="btn btn-secondary btn-sm" href="seguimiento.html">Seguir en ruta</a>');
+    if (/Entreg|Fallido/.test(p.estado)) links.push('<a class="btn btn-secondary btn-sm" href="evidencias.html">Ver evidencias</a>');
+    if (links.length) h += '<section class="dr-sec"><h3>Siguiente en el flujo</h3><div class="link-row">' + links.join('') + '</div></section>';
+    return h + '</div>';
+  }
+  function footerOf(p) {
+    var abierto = ABIERTOS.indexOf(p.estado) > -1, b = [{ label: 'Cerrar', kind: 'ghost', onClick: function (api) { api.close(); } }];
+    if (abierto) b.push({ label: 'Cambiar prioridad', kind: 'secondary', icon: 'flag', onClick: function () { prioModal(p); } });
+    if (p.estado === 'Recibido') b.push({ label: 'Marcar en firme', kind: 'secondary', disabled: true, tip: 'Requiere stock validado' }, { label: 'Validar stock', kind: 'primary', icon: 'check-circle', onClick: function () { runValidar(p); } });
+    else if (p.estado === 'Bloqueado por stock') b.push({ label: 'Marcar en firme', kind: 'secondary', disabled: true, tip: 'No disponible: pedido bloqueado por stock' }, { label: 'Revalidar stock', kind: 'primary', icon: 'refresh', onClick: function () { runRevalidar(p); } });
+    else if (p.estado === 'Stock validado') b.push({ label: 'Marcar en firme', kind: 'primary', icon: 'check', onClick: function () { firmeModal(p); } });
+    else if (p.estado === 'Listo para despacho') b.push({ label: 'Notificar a logística', kind: 'primary', icon: 'send', onClick: function () { notifModal(p); } });
+    else if (p.estado === 'En firme' || p.estado === 'En preparación') b.push({ label: 'Notificar a logística', kind: 'secondary', icon: 'send', disabled: true, tip: 'Disponible cuando el pedido esté listo para despacho' });
+    return b;
+  }
+  function renderDetail() {
+    if (!drawer) return; drawer.setBody(bodyOf(cur)); setFoot(drawer, footerOf(cur));
+    var rb = drawer.body.querySelector('[data-act="repo"]'); if (rb) rb.addEventListener('click', function () { UI.confirm({ title: '¿Solicitar reposición?', tone: 'primary', confirmLabel: 'Solicitar', html: 'Se enviará una solicitud de compra a abastecimiento por <strong>' + cur.bloqueo.faltante + ' ' + unitLow(cur.bloqueo, cur.bloqueo.faltante) + '</strong> de ' + esc(cur.bloqueo.descripcion) + '. Cuando llegue la mercancía el pedido se revalidará.' }).then(function (ok) { if (ok) { addHist(cur, 'Bloqueado por stock', 'Reposición solicitada a abastecimiento'); renderDetail(); UI.toast('Solicitud de reposición enviada a abastecimiento.', 'success'); } }); });
+  }
+  function openDetail(p) {
+    cur = p;
+    drawer = UI.drawer({ title: p.pedidoId, subtitle: p.cliente, width: 640, body: '', footer: '<span></span>', onClose: function () { drawer = null; cur = null; try { history.replaceState(null, '', location.pathname); } catch (e) {} } });
+    renderDetail(); try { history.replaceState(null, '', '?id=' + encodeURIComponent(p.pedidoId)); } catch (e) {}
+  }
+
+  /* ---------- acciones ---------- */
+  function runValidar(p) {
+    var btn = drawer && drawer.footer.querySelector('.btn-primary'); if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Validando…'; }
+    setTimeout(function () {
+      var r = validarStock(p); refreshAll();
+      if (r.short) UI.toast('Pedido bloqueado: faltan ' + r.short.faltante + ' ' + unitLow(r.short, r.short.faltante) + ' de ' + r.short.descripcion + '.', 'error', { title: p.pedidoId });
+      else UI.toast('Stock validado y reservado para ' + p.lineas.length + ' líneas.', 'success', { title: p.pedidoId });
+    }, 700);
+  }
+  function runRevalidar(p) {
+    var btn = drawer && drawer.footer.querySelector('.btn-primary'); if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Consultando stock…'; }
+    setTimeout(function () {
+      addHist(p, 'Bloqueado por stock', 'Revalidación: sin cambios en el stock'); refreshAll();
+      UI.toast('Sigue bloqueado: faltan ' + p.bloqueo.faltante + ' ' + unitLow(p.bloqueo, p.bloqueo.faltante) + ' de ' + p.bloqueo.descripcion + '. Solicita reposición o ajusta la cantidad con el asesor.', 'warning', { title: p.pedidoId });
+    }, 800);
+  }
+
+  /* Cambiar prioridad (HU-066) */
+  function prioModal(p) {
+    var opts = [['Alta', 'Entrega crítica: se planea primero y puede reordenar rutas.'], ['Media', 'Prioridad habitual del cliente.'], ['Baja', 'Puede esperar al siguiente viaje de su zona.']];
+    UI.modal({ title: 'Cambiar prioridad', subtitle: p.pedidoId + ' · ' + p.cliente, width: 480,
+      body: '<form class="stack" novalidate><fieldset class="radio-cards" style="border:0;padding:0;margin:0"><legend class="label mb-2">Prioridad comercial</legend>' + opts.map(function (o) { return '<label class="radio-card"><input type="radio" class="radio" name="pr" value="' + o[0] + '"' + (o[0] === p.prioridad ? ' checked' : '') + '><span><strong>' + o[0] + '</strong><br><span class="muted t-13">' + o[1] + '</span></span></label>'; }).join('') + '</fieldset>' +
+        '<div class="field" id="mf"><label class="label" for="mot">Motivo del cambio <span class="opt" id="optTag">(opcional)</span></label><textarea id="mot" class="textarea" placeholder="Ej.: obra con vaciado programado el viernes"></textarea></div></form>',
+      footer: [{ label: 'Cancelar' }, { label: 'Guardar prioridad', kind: 'primary', onClick: function (m) {
+        var v = m.body.querySelector('input[name=pr]:checked').value, mot = m.body.querySelector('#mot'), f = m.body.querySelector('#mf');
+        if (v === p.prioridad) { UI.toast('La prioridad ya es ' + v.toLowerCase() + '.', 'info'); return false; }
+        if (v === 'Alta' && mot.value.trim().length < 8) { setErr(f, mot, 'Para subir a prioridad alta indica el motivo (mínimo 8 caracteres).'); mot.focus(); return false; }
+        var antes = p.prioridad; p.prioridad = v; addHist(p, p.estado, 'Prioridad ' + antes.toLowerCase() + ' → ' + v.toLowerCase() + (mot.value.trim() ? ' · ' + mot.value.trim() : '')); refreshAll();
+        UI.toast('Prioridad de ' + p.pedidoId + ' cambiada a ' + v.toLowerCase() + '.', 'success');
+      } }] });
+  }
+
+  /* Marcar en firme (HU-067) */
+  function firmeModal(p) {
+    var rules = rulesFor(p), allOk = rules.every(function (r) { return r.ok; });
+    UI.modal({ title: 'Marcar pedido en firme', subtitle: p.pedidoId + ' · ' + p.cliente, width: 520,
+      body: '<div class="stack"><p class="muted t-13">Un pedido en firme deja de ser modificable por el asesor y sus reservas pasan a activas. Debe cumplir todas estas reglas:</p><ul class="rule-list">' +
+        rules.map(function (r) { return '<li class="' + (r.ok ? 'ok' : 'bad') + '"><span class="ri">' + UI.icon(r.ok ? 'check' : 'x') + '</span><span><strong>' + esc(r.t) + '</strong><span class="sub">' + esc(r.s) + (!r.ok && r.href ? ' <a class="link-btn" href="' + r.href + '">Resolver</a>' : '') + '</span></span></li>'; }).join('') + '</ul>' +
+        (allOk ? UI.banner({ tone: 'success', text: 'Cumple todas las reglas. Se activarán ' + p.lineas.length + ' reservas.' }) : UI.banner({ tone: 'danger', title: 'No se puede marcar en firme', text: 'Resuelve las reglas marcadas en rojo y vuelve a intentarlo.' })) + '</div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Marcar en firme', kind: 'primary', icon: 'check', onClick: function () {
+        if (!allOk) { UI.toast('Aún no cumple las reglas para pasar a firme.', 'error', { title: p.pedidoId }); return false; }
+        A.reservas.forEach(function (r) { if (r.pedidoId === p.pedidoId && r.estado === 'Pendiente') r.estado = 'Activa'; });
+        setEstado(p, 'En firme', 'Reservas activadas'); refreshAll(); UI.toast('Pedido en firme. Las reservas quedaron activas.', 'success', { title: p.pedidoId });
+      } }] });
+    if (!allOk) { var mb = document.querySelectorAll('.modal .ov-foot .btn-primary'); mb = mb[mb.length - 1]; if (mb) { mb.setAttribute('aria-disabled', 'true'); mb.style.opacity = '.55'; } }
+  }
+
+  /* Notificar a logística (HU-068) */
+  function notifModal(p) {
+    var dest = [['Planificador logístico', true], ['Despachador', true], ['Jefe de bodega', false], ['Coordinador logístico', false]];
+    var msg = function () { return 'Pedido ' + p.pedidoId + ' listo para despacho.\nCliente: ' + p.cliente + ' (' + p.municipio + ')\nCarga: ' + F.kg(p.pesoKg) + ' · ' + F.m3(p.volumenM3, 2) + ' · entrega ' + F.fecha(p.entregaSolicitada) + '.'; };
+    UI.modal({ title: 'Notificar a logística', subtitle: p.pedidoId + ' · ' + p.cliente, width: 500,
+      body: '<div class="stack"><div class="field" id="df"><span class="label" id="dl">Destinatarios</span><div class="stack-sm" role="group" aria-labelledby="dl">' + dest.map(function (d, i) { return '<label class="check"><input type="checkbox" name="d" value="' + esc(d[0]) + '"' + (d[1] ? ' checked' : '') + '> ' + d[0] + '</label>'; }).join('') + '</div></div>' +
+        '<div class="field"><span class="label">Canal</span><div class="row gap-4"><label class="check"><input type="checkbox" checked disabled> En la app</label><label class="check"><input type="checkbox" id="chMail" checked> Correo</label></div></div>' +
+        '<div class="field"><span class="label">Vista previa del mensaje</span><div class="msg-preview">' + esc(msg()) + '</div></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Enviar notificación', kind: 'primary', icon: 'send', onClick: function (m) {
+        var sel = UI.$$('input[name=d]:checked', m.body).map(function (x) { return x.value; }), f = m.body.querySelector('#df');
+        if (!sel.length) { setErr(f, f.querySelector('input'), 'Selecciona al menos un destinatario.'); return false; }
+        addHist(p, p.estado, 'Notificado a ' + sel.join(', ')); refreshAll(); UI.toast('Logística notificada (' + sel.length + ' ' + plural(sel.length, 'destinatario', 'destinatarios') + '). El pedido aparece en planeación.', 'success', { title: p.pedidoId });
+      } }] });
+  }
+
+  /* ---------- importar desde Easy Sales (HU-060 / HU-069) ---------- */
+  function rand(n) { return Math.floor(Math.random() * n); }
+  function genPedido() {
+    var cli = A.clientes.filter(function (c) { return c.estado === 'Activo'; }); cli = cli[rand(cli.length)];
+    var pool = A.productos.filter(function (x) { return x.estado === 'Activo' && x.stock['CEDI-BOG'] && x.stock['CEDI-BOG'].disponible > 60; }), used = {}, ls = [];
+    for (var i = 0, n = 1 + rand(3); i < n; i++) { var pr = pool[rand(pool.length)]; if (used[pr.skuSAP]) continue; used[pr.skuSAP] = 1; var q = pr.pesoKg > 100 ? 1 + rand(3) : 6 + rand(30); ls.push({ sku: pr.skuSAP, descripcion: pr.descripcion, cantidad: q, unidad: pr.unidadBase, pesoKg: Math.round(q * pr.pesoKg * 10) / 10, volumenM3: Math.round(q * pr.volumenM3 * 1000) / 1000 }); }
+    var mx = 0; A.pedidos.forEach(function (p) { var k = parseInt(p.pedidoId.slice(3), 10); if (k > mx) mx = k; });
+    var kg = ls.reduce(function (s, l) { return s + l.pesoKg; }, 0), m3 = ls.reduce(function (s, l) { return s + l.volumenM3; }, 0), ase = A.pedidos[rand(A.pedidos.length)].asesor, id = 'ES-' + (mx + 1 + rand(3));
+    return { pedidoId: id, pedidoIdOrigen: id, origen: 'Easy Sales', clienteId: cli.clienteIdSAP, cliente: cli.razonSocial, rutaId: cli.rutaId, municipio: cli.municipio === 'Bogotá' ? 'Bogotá · ' + cli.localidad : cli.municipio, fecha: new Date().toISOString(), entregaSolicitada: A.ymd(2 + rand(2)), lineas: ls, estado: 'Recibido', prioridad: ['Baja', 'Media', 'Media'][rand(3)], asesor: ase, ordenCompra: 'OC-' + (10000 + rand(89999)), bodegaId: 'CEDI-BOG', pesoKg: Math.round(kg * 10) / 10, volumenM3: Math.round(m3 * 100) / 100, valorCOP: Math.round(kg * (2100 + rand(900)) / 1000) * 1000, despachoId: null, observaciones: '', modificado: false, historial: [{ estado: 'Recibido', fechaHora: new Date().toISOString(), usuarioId: 'Sistema' }] };
+  }
+  $('#importBtn').addEventListener('click', function () {
+    var ultima = A.conexiones.filter(function (c) { return c.sistema === 'Easy Sales'; })[0];
+    var m = UI.modal({ title: 'Importar pedidos desde Easy Sales', width: 540, dismissible: true,
+      body: '<div class="stack" id="impBody"></div>', footer: '<span></span>' });
+    var body = m.body.querySelector('#impBody');
+    function start() {
+      body.innerHTML = UI.banner({ tone: 'info', text: 'Easy Sales envía los pedidos en línea y la plataforma concilia cada 10 minutos. Esta importación manual trae lo pendiente desde la última sincronización (' + F.hora(ultima.ultimaSync) + ').' }) +
+        UI.kv([['Origen', 'Easy Sales · API de pedidos ' + esc(ultima.version)], ['Desde', F.fechaHora(ultima.ultimaSync)], ['Pedidos en cola', ultima.colaPendiente + ' reportado por Easy Sales'], ['Regla de duplicados', 'Un pedido ya recibido con la misma versión se descarta']]);
+      setFoot(m, [{ label: 'Cancelar', kind: 'ghost', onClick: function () { m.close(); } }, { label: 'Iniciar importación', kind: 'primary', icon: 'download', onClick: run }]);
+    }
+    function run() {
+      var steps = ['Conectando con Easy Sales', 'Descargando pedidos nuevos', 'Validando clientes y SKU contra el maestro', 'Detectando pedidos duplicados', 'Creando pedidos en la plataforma'], i = 0;
+      setFoot(m, [{ label: 'Importando…', kind: 'primary', disabled: true }]);
+      function draw() { body.innerHTML = '<ul class="imp-steps" aria-live="polite">' + steps.map(function (s, k) { return '<li class="' + (k < i ? 'is-done' : k === i ? 'is-current' : '') + '"><span class="si">' + (k < i ? UI.icon('check') : k === i ? '<span class="spin"></span>' : '') + '</span>' + s + '</li>'; }).join('') + '</ul>' + UI.meter(i, steps.length, { level: 'info', text: Math.round(i / steps.length * 100) + ' %', label: 'Progreso de importación' }); }
+      draw(); var iv = setInterval(function () { i++; if (i >= steps.length) { clearInterval(iv); finish(); } else draw(); }, 650);
+    }
+    function finish() {
+      importRuns++; var nuevos = importRuns === 1 ? [genPedido(), genPedido(), genPedido(), genPedido()] : [];
+      var ids = {}; nuevos = nuevos.filter(function (p) { if (ids[p.pedidoId] || A.idx.pedidos[p.pedidoId]) return false; ids[p.pedidoId] = 1; return true; });
+      nuevos.forEach(function (p) { A.pedidos.unshift(p); A.idx.pedidos[p.pedidoId] = p; importedIds.push(p.pedidoId); });
+      var existentes = A.pedidos.filter(function (p) { return p.origen === 'Easy Sales' && ABIERTOS.indexOf(p.estado) > -1 && importedIds.indexOf(p.pedidoId) === -1; }).slice(0, 2).map(function (p) { return p.pedidoId; });
+      var dups = importedIds.filter(function (id) { return nuevos.every(function (p) { return p.pedidoId !== id; }); }).concat(existentes);
+      t.setRows(A.pedidos); drawTiles(); try { t.goTo(1); } catch (e) {}
+      body.innerHTML = '<div class="sum-grid"><div class="mini"><div class="v">' + nuevos.length + '</div><div class="l">Recibidos</div></div><div class="mini"><div class="v">' + dups.length + '</div><div class="l">Duplicados descartados</div></div><div class="mini"><div class="v">1</div><div class="l">Con error</div></div></div>' +
+        (nuevos.length ? '<div><h3 class="t-14 mb-2">Pedidos nuevos</h3><div class="imp-list">' + nuevos.map(function (p) { return '<div><a class="mono link-btn" href="pedidos.html?id=' + p.pedidoId + '">' + p.pedidoId + '</a><span>' + esc(p.cliente) + '</span><span class="muted ml-auto">' + F.kg(p.pesoKg) + '</span></div>'; }).join('') + '</div></div>' : UI.banner({ tone: 'info', title: 'No hay pedidos nuevos', text: 'Todo lo que envió Easy Sales ya estaba en la plataforma: el sistema evitó duplicarlo.' })) +
+        '<div><h3 class="t-14 mb-2">Duplicados descartados</h3><div class="imp-list">' + dups.slice(0, 4).map(function (id) { return '<div><span class="mono">' + id + '</span><span class="muted">Ya existe con la misma versión. No se creó otra copia ni otra reserva.</span></div>'; }).join('') + '</div></div>' +
+        '<div><h3 class="t-14 mb-2">Con error</h3><div class="imp-list"><div><span class="mono">ES-49' + (1000 + rand(8999)) + '</span><span>Cliente <span class="mono">CL9999999</span> no existe en el maestro.</span><a class="link-btn ml-auto" href="clientes.html">Revisar clientes</a></div></div><p class="muted t-13 mt-2">Corrige el maestro y vuelve a importar: solo se procesarán los pedidos con error.</p></div>';
+      setFoot(m, [{ label: 'Volver a importar', kind: 'secondary', icon: 'refresh', onClick: start }, { label: 'Ver pedidos recibidos', kind: 'primary', onClick: function () { m.close(); tileSel = 'Recibido'; t.setFilter('estado', 'Recibido'); drawTiles(); } }]);
+      UI.toast(nuevos.length ? nuevos.length + ' pedidos recibidos, ' + dups.length + ' duplicados descartados y 1 con error.' : 'Sin pedidos nuevos: ' + dups.length + ' duplicados descartados.', nuevos.length ? 'success' : 'info', { title: 'Importación terminada' });
+    }
+    start();
+  });
+
+  /* abrir detalle desde parámetro */
+  var pid = UI.param('id'); if (pid) { var pp = A.idx.pedidos[pid]; if (pp) openDetail(pp); else UI.toast('No encontramos el pedido ' + pid + '.', 'warning'); }
+});
+</script>
+</body>
+</html>

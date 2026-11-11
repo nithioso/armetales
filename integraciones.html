@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Integraciones · Armetales</title>
+<meta name="description" content="Conexiones de la plataforma logística con SAP, Data Lake y Easy Sales: estado, bitácora, reintentos y calidad de datos.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de integraciones (tokens y componentes viven en app.css) */
+  .conn-grid { display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 1023px) { .conn-grid { grid-template-columns: minmax(0, 1fr); } }
+  .conn { display: flex; flex-direction: column; gap: 12px; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; padding: 16px; transition: border-color .15s, box-shadow .15s; }
+  .conn:hover { border-color: var(--border-strong); box-shadow: var(--shadow-pop); }
+  .conn[aria-pressed="true"] { border-color: var(--text-2); box-shadow: inset 0 0 0 1px var(--text-2); }
+  .conn .c-head { display: flex; align-items: center; gap: 12px; }
+  .conn .c-ico { width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; background: var(--surface-3); color: var(--text-2); flex: none; }
+  .conn .c-name { font-weight: 600; font-size: 15px; line-height: 1.25; } .conn .c-mech { font-size: 12.5px; color: var(--text-2); }
+  .conn .c-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .conn .c-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .conn .c-stat .l { font-size: 11.5px; color: var(--text-2); line-height: 1.3; }
+  .conn .c-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+  @media (max-width: 479px) { .conn .c-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .flow-card svg { width: 100%; height: auto; display: block; }
+  .flow-card svg.flow-v { display: none; max-width: 420px; margin: 0 auto; } @media (max-width: 719px) { .flow-card svg.flow-h { display: none; } .flow-card svg.flow-v { display: block; } }
+  .fl-node rect { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1; }
+  .fl-hub rect { fill: var(--surface-3); stroke: var(--text-3); }
+  .fl-t { fill: var(--text); font: 600 13px var(--font-ui, 'Instrument Sans', sans-serif); } .fl-s { fill: var(--text-2); font: 400 11.5px var(--font-ui, 'Instrument Sans', sans-serif); }
+  .fl-lbl { fill: var(--text-2); font: 400 11px var(--font-ui, 'Instrument Sans', sans-serif); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+  .fl-line { fill: none; stroke: var(--text-3); stroke-width: 1.5; stroke-dasharray: 5 5; animation: flowdash 1.4s linear infinite; }
+  .fl-line.out { stroke: var(--red); }
+  .fl-arrow { fill: var(--text-3); } .fl-arrow.out { fill: var(--red); }
+  @keyframes flowdash { to { stroke-dashoffset: -20; } }
+  @media (prefers-reduced-motion: reduce) { .fl-line { animation: none; } }
+  .st-dot { fill: var(--green); } .st-dot.warn { fill: var(--amber); } .st-dot.bad { fill: var(--red); }
+  .stat-row { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  @media (max-width: 799px) { .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .mini-stat { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); }
+  .mini-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .mini-stat .l { font-size: 12.5px; color: var(--text-2); }
+  .ent-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
+  .ent { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .ent .e-top { display: flex; align-items: center; gap: 10px; } .ent .e-name { font-weight: 600; } .ent .e-n { font-family: var(--font-display); font-weight: 600; font-size: 24px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .ent .e-meta { font-size: 12.5px; color: var(--text-2); } .ent .e-act { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
+  .code-box { margin: 0; padding: 12px 14px; background: var(--surface-3); border: 1px solid var(--border); border-radius: var(--r-ctl); font: 12px/1.6 var(--font-mono); overflow: auto; white-space: pre; color: var(--text); max-height: 340px; }
+  .code-box .k { color: var(--blue); } .code-box .s { color: var(--green); } .code-box .n { color: var(--amber); }
+  .secret { letter-spacing: 3px; }
+  .li-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); } .li-row:last-child { border-bottom: 0; } .li-row .grow { flex: 1; min-width: 0; }
+  .sub-line { font-size: 12.5px; color: var(--text-2); }
+  .check-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px 56px; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; } .check-row:last-child { border-bottom: 0; }
+  .check-row > span:first-child { display: flex; gap: 8px; align-items: center; }
+  .check-row .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  @media (max-width: 479px) { .check-row { grid-template-columns: 1fr 50px; } .check-row .meter { grid-column: 1 / -1; grid-row: 2; } }
+  .trunc { max-width: 38ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+  .tab-scope { display: inline-flex; gap: 6px; align-items: center; }
+  .sec-gap { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+  .tick { color: var(--green); display: inline-flex; vertical-align: middle; } .cross { color: var(--red); display: inline-flex; vertical-align: middle; }
+  .link-inline { color: var(--blue); font-weight: 500; }
+  .select.input-sm { padding-right: 30px; }
+  .chk { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  :root[data-theme="dark"] a.btn { color: var(--b-fg); } /* el color de enlace del tema oscuro pisaba el de los botones-enlace */
+</style>
+</head>
+<body data-page="integraciones">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Administración</div>
+      <h1 class="page-title">Integraciones</h1>
+      <p class="page-desc">SAP, Data Lake y Easy Sales: qué entra, qué sale, qué falló y qué se puede reintentar.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-secondary" id="btnExport"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Exportar bitácora</button>
+      <button type="button" class="btn btn-primary" id="btnSyncAll"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5"/></svg>Sincronizar todo</button>
+    </div>
+  </header>
+
+  <section class="section" aria-label="Estado de las conexiones">
+    <div class="conn-grid" id="connGrid"></div>
+  </section>
+
+  <section class="section" aria-label="Flujo de datos">
+    <div class="card flow-card">
+      <div class="card-head"><div><h2 class="card-title">Flujo de datos</h2><p class="card-sub">Lo que la plataforma recibe de cada sistema y lo que devuelve a SAP.</p></div></div>
+      <div class="card-body" id="flowBox"></div>
+    </div>
+  </section>
+
+  <section class="section" aria-label="Detalle por sistema">
+    <div class="tabs" role="tablist" id="sysTabs" aria-label="Sistemas integrados">
+      <button class="tab" role="tab" id="tSap" aria-controls="pSap" aria-selected="true">SAP <span class="count" id="nSap"></span></button>
+      <button class="tab" role="tab" id="tLake" aria-controls="pLake" aria-selected="false">Data Lake <span class="count" id="nLake"></span></button>
+      <button class="tab" role="tab" id="tEasy" aria-controls="pEasy" aria-selected="false">Easy Sales <span class="count" id="nEasy"></span></button>
+    </div>
+
+    <!-- ============ SAP ============ -->
+    <div class="tab-panel sec-gap" id="pSap" role="tabpanel" aria-labelledby="tSap">
+      <div class="card">
+        <div class="card-head"><div><h2 class="card-title">Conexión segura con SAP on premises</h2><p class="card-sub">Túnel privado, certificado de cliente y usuario técnico. Los secretos nunca se muestran.</p></div><span id="sapConnChip"></span></div>
+        <div class="card-body">
+          <div class="layout-main-side wide-side">
+            <form id="sapForm" novalidate>
+              <div class="form-grid c2">
+                <div class="field"><label class="label" for="sf-host">Servidor de aplicación</label><input class="input mono" id="sf-host" value="sap-prd.armetales.local" autocomplete="off" spellcheck="false"><span class="hint">Nombre interno resuelto por el túnel VPN.</span></div>
+                <div class="field"><label class="label" for="sf-port">Puerto de la pasarela</label><input class="input mono" id="sf-port" inputmode="numeric" value="3300" autocomplete="off"></div>
+                <div class="field"><label class="label" for="sf-mdt">Mandante</label><input class="input mono" id="sf-mdt" inputmode="numeric" maxlength="3" value="400" autocomplete="off"></div>
+                <div class="field"><label class="label" for="sf-usr">Usuario técnico</label><input class="input mono" id="sf-usr" value="SVC_ARMETALES_LOG" autocomplete="off" spellcheck="false"></div>
+                <div class="field"><label class="label" for="sf-sec">Secreto del usuario técnico</label><div class="row gap-2 nowrap"><input class="input secret" id="sf-sec" type="password" value="••••••••••••" disabled aria-describedby="sf-sec-h"><button type="button" class="btn btn-secondary" id="btnRotate">Rotar</button></div><span class="hint" id="sf-sec-h">Almacenado cifrado. Última rotación hace 62 días.</span></div>
+                <div class="field"><label class="label" for="sf-cert">Certificado de cliente</label><div class="row gap-2 nowrap"><input class="input mono" id="sf-cert" readonly value="CN=armetales-logistica · SHA-256 4F:9A:…:C1"><button type="button" class="btn btn-secondary" id="btnCert">Reemplazar</button></div><span class="hint">Vigente hasta <span id="certExp"></span>. Se avisa 30 días antes.</span></div>
+              </div>
+              <div class="row gap-2 mt-4"><button type="submit" class="btn btn-primary" id="btnSapSave">Guardar configuración</button><button type="button" class="btn btn-secondary" id="btnSapTest"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 3 14 9-14 9z"/></svg>Probar conexión</button></div>
+            </form>
+            <div class="card card-pad" style="background:var(--surface-2)" aria-live="polite">
+              <h3 class="mb-2">Prueba de conexión</h3>
+              <div id="sapTest"><p class="muted t-13" style="margin:0">Verifica red, certificado, autenticación y una llamada real de lectura. No modifica datos en SAP.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-head"><h2 class="section-title">Entidades sincronizadas</h2></div>
+        <div class="ent-grid" id="sapEnts"></div>
+      </div>
+
+      <div class="layout-main-side wide-side">
+        <div class="card">
+          <div class="card-head"><div><h2 class="card-title">Conciliación de identificadores de producto</h2><p class="card-sub">Un mismo SKU debe resolverse igual en SAP, Easy Sales y el Data Lake.</p></div></div>
+          <div id="mapBanner" style="padding:0 16px 12px"></div>
+          <div id="mapTable"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><h2 class="card-title">Duplicados evitados</h2><p class="card-sub">Idempotencia de mensajes entrantes</p></div><span class="chip chip-neutral" id="dupN"></span></div>
+          <div class="card-body stack">
+            <p class="muted t-13" style="margin:0">Cada mensaje trae una clave única. Si ya se procesó, se ignora sin crear un segundo registro.</p>
+            <pre class="code-box" style="max-height:none">clave = sistema + entidad + idExterno + versión
+<span class="k">SAP</span>|Material|<span class="s">1000234</span>|v2.4</pre>
+            <div id="dupList"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-head" style="margin-bottom:0"><h2 class="section-title">Bitácora de sincronización de SAP</h2></div>
+      <div id="logSap"></div>
+    </div>
+
+    <!-- ============ DATA LAKE ============ -->
+    <div class="tab-panel sec-gap" id="pLake" role="tabpanel" aria-labelledby="tLake" hidden>
+      <div class="stat-row" id="lakeStats"></div>
+      <div>
+        <div class="section-head"><h2 class="section-title">Lotes consumidos</h2></div>
+        <div id="lotTable"></div>
+      </div>
+      <div class="layout-main-side wide-side">
+        <div class="card">
+          <div class="card-head"><div><h2 class="card-title">Validación de integridad</h2><p class="card-sub" id="intSub"></p></div></div>
+          <div class="card-body" id="intBox"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><h2 class="card-title">Sin georreferencia</h2><p class="card-sub">No se pueden planear hasta tener coordenadas.</p></div><a class="btn btn-ghost btn-sm" href="clientes.html">Ver clientes</a></div>
+          <div class="card-body" style="padding-top:0" id="geoBox"></div>
+        </div>
+      </div>
+      <div>
+        <div class="section-head"><h2 class="section-title">Cola de errores de calidad de datos</h2></div>
+        <div id="dqTable"></div>
+      </div>
+      <div class="section-head" style="margin-bottom:0"><h2 class="section-title">Bitácora de cargas del Data Lake</h2></div>
+      <div id="logLake"></div>
+    </div>
+
+    <!-- ============ EASY SALES ============ -->
+    <div class="tab-panel sec-gap" id="pEasy" role="tabpanel" aria-labelledby="tEasy" hidden>
+      <div id="easyBanner"></div>
+      <div class="stat-row" id="easyStats"></div>
+      <div>
+        <div class="section-head"><h2 class="section-title">Pedidos recibidos</h2><button type="button" class="btn btn-secondary btn-sm" id="btnSimRecv"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 3 14 9-14 9z"/></svg>Simular recepción</button></div>
+        <div id="recvTable"></div>
+      </div>
+      <div class="layout-main-side wide-side">
+        <div class="card">
+          <div class="card-head"><div><h2 class="card-title">Cambios en el pedido de origen</h2><p class="card-sub">Easy Sales modificó un pedido que ya está en la plataforma.</p></div></div>
+          <div id="chgTable"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><h2 class="card-title">Doble importación evitada</h2><p class="card-sub">Pedidos reenviados por Easy Sales</p></div><span class="chip chip-neutral" id="dupEsN"></span></div>
+          <div class="card-body" style="padding-top:14px" id="dupEs"></div>
+        </div>
+      </div>
+      <div>
+        <div class="section-head"><h2 class="section-title">Errores de recepción</h2></div>
+        <div id="errEs"></div>
+      </div>
+      <div class="section-head" style="margin-bottom:0"><h2 class="section-title">Bitácora de Easy Sales</h2></div>
+      <div id="logEasy"></div>
+    </div>
+  </section>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$, ico = UI.icon;
+  var logs = A.logs, conn = A.conexiones, SIS = ['SAP', 'Data Lake', 'Easy Sales'];
+  var nowIso = function () { return new Date().toISOString(); };
+  var pad = function (n, l) { return String(n).padStart(l || 2, '0'); };
+  var connBy = function (s) { return conn.filter(function (c) { return c.sistema === s; })[0]; };
+  var open = function (l) { return l.estado === 'Error' || l.estado === 'Reintentando'; };
+  var logsOf = function (s) { return logs.filter(function (l) { return l.sistemaOrigen === s; }); };
+  var openOf = function (s) { return logsOf(s).filter(open); };
+  var tables = [];
+  function setErr(input, msg) {
+    var f = input.closest('.field'), old = $('.error-text', f); if (old) old.remove();
+    if (msg) { input.setAttribute('aria-invalid', 'true'); var s = document.createElement('span'); s.className = 'error-text'; s.id = input.id + '-err'; s.innerHTML = ico('alert-circle', 'icon-sm') + esc(msg); f.appendChild(s); input.setAttribute('aria-describedby', s.id); }
+    else { input.removeAttribute('aria-invalid'); input.removeAttribute('aria-describedby'); }
+    return !msg;
+  }
+  function delay(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function stat(v, l) { return '<div class="mini-stat"><div class="v">' + v + '</div><div class="l">' + l + '</div></div>'; }
+
+  /* ================= tarjetas de conexión y flujo ================= */
+  var ICO = { 'SAP': 'database', 'Data Lake': 'cloud', 'Easy Sales': 'cart' };
+  var TAB = { 'SAP': 'pSap', 'Data Lake': 'pLake', 'Easy Sales': 'pEasy' };
+  var selSys = 'SAP';
+  function renderConn() {
+    $('#connGrid').innerHTML = conn.map(function (c) {
+      var err = openOf(c.sistema).length;
+      return '<button type="button" class="card conn" data-s="' + c.sistema + '" aria-pressed="' + (c.sistema === selSys) + '" aria-label="' + esc(c.nombre) + ': ' + esc(c.estado) + '. Abrir detalle">' +
+        '<div class="c-head"><span class="c-ico">' + ico(ICO[c.sistema]) + '</span><div style="flex:1;min-width:0"><div class="c-name">' + esc(c.nombre) + '</div><div class="c-mech">' + esc(c.mecanismo) + '</div></div>' + UI.chip(c.estado) + '</div>' +
+        '<div class="c-stats"><div class="c-stat"><div class="v">' + esc(F.relativo(c.ultimaSync).replace('hace ', '')) + '</div><div class="l">Última sincronización</div></div><div class="c-stat"><div class="v">' + F.num(c.latenciaMs) + ' <small class="t-12 muted">ms</small></div><div class="l">Latencia</div></div><div class="c-stat"><div class="v">' + c.colaPendiente + '</div><div class="l">En cola</div></div><div class="c-stat"><div class="v" style="' + (err ? 'color:var(--red-fg)' : '') + '">' + err + '</div><div class="l">Errores sin resolver</div></div></div>' +
+        '<div class="c-foot"><span>' + esc(c.frecuencia) + ' · ' + esc(c.version) + '</span><span class="row gap-1 nowrap" style="color:var(--text)">Ver detalle ' + ico('arrow-right', 'icon-sm') + '</span></div></button>';
+    }).join('');
+    $('#nSap').textContent = openOf('SAP').length || ''; $('#nLake').textContent = openOf('Data Lake').length || ''; $('#nEasy').textContent = openOf('Easy Sales').length || '';
+    drawFlow();
+  }
+  $('#connGrid').addEventListener('click', function (e) { var b = e.target.closest('[data-s]'); if (!b) return; selSys = b.dataset.s; sysTabs.select(TAB[selSys]); renderConn(); $('#sysTabs').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  function drawFlow() {
+    var cls = function (s) { var c = connBy(s); return c.estado === 'Operativa' ? '' : c.estado === 'Caída' ? ' bad' : ' warn'; };
+    var node = function (x, y, w, h, name, sub, s) { return '<g class="fl-node"><rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="10"/><circle class="st-dot' + (s ? cls(s) : '') + '" cx="' + (x + 16) + '" cy="' + (y + h / 2) + '" r="4.5"/><text class="fl-t" x="' + (x + 30) + '" y="' + (y + h / 2 - 3) + '">' + name + '</text><text class="fl-s" x="' + (x + 30) + '" y="' + (y + h / 2 + 13) + '">' + sub + '</text></g>'; };
+    var H = '<svg class="flow-h" viewBox="0 0 900 220" role="img" aria-label="Flujo: SAP, Data Lake y Easy Sales entregan datos a la plataforma, que devuelve reservas y estados de entrega a SAP">' +
+      '<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="fl-arrow" d="M0 0 10 5 0 10z"/></marker><marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="fl-arrow out" d="M0 0 10 5 0 10z"/></marker></defs>' +
+      node(8, 14, 190, 48, 'SAP ERP', 'Maestros y existencias', 'SAP') + node(8, 86, 190, 48, 'Data Lake', 'Clientes y coordenadas', 'Data Lake') + node(8, 158, 190, 48, 'Easy Sales', 'Pedidos de venta', 'Easy Sales') +
+      '<path class="fl-line" d="M198 38 L 292 38 C 340 38 340 98 380 102" marker-end="url(#ah)"/><path class="fl-line" d="M198 110 L 380 110" marker-end="url(#ah)"/><path class="fl-line" d="M198 182 L 292 182 C 340 182 340 122 380 118" marker-end="url(#ah)"/>' +
+      '<text class="fl-lbl" x="212" y="28">Materiales · clientes · existencias</text><text class="fl-lbl" x="212" y="102">Lotes normalizados</text><text class="fl-lbl" x="212" y="200">Pedidos y cambios</text>' +
+      '<g class="fl-node fl-hub"><rect x="382" y="62" width="150" height="96" rx="12"/><text class="fl-t" x="457" y="104" text-anchor="middle">Plataforma</text><text class="fl-s" x="457" y="122" text-anchor="middle">logística Armetales</text></g>' +
+      '<path class="fl-line out" d="M532 110 L 700 110" marker-end="url(#ahr)"/><text class="fl-lbl" x="616" y="100" text-anchor="middle">Reservas y estados</text>' +
+      node(702, 86, 190, 48, 'SAP ERP', 'Entregas y movimientos', 'SAP') + '</svg>';
+    var V = '<svg class="flow-v" viewBox="0 0 340 430" role="img" aria-label="Flujo de datos entre SAP, Data Lake, Easy Sales y la plataforma">' +
+      '<defs><marker id="avh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="fl-arrow" d="M0 0 10 5 0 10z"/></marker><marker id="avr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="fl-arrow out" d="M0 0 10 5 0 10z"/></marker></defs>' +
+      node(6, 6, 100, 54, 'SAP', 'ERP', 'SAP') + node(120, 6, 100, 54, 'Data Lake', 'Datos', 'Data Lake') + node(234, 6, 100, 54, 'Easy', 'Pedidos', 'Easy Sales') +
+      '<path class="fl-line" d="M56 60 L 56 120 L 150 150" marker-end="url(#avh)"/><path class="fl-line" d="M170 60 L 170 146" marker-end="url(#avh)"/><path class="fl-line" d="M284 60 L 284 120 L 190 150" marker-end="url(#avh)"/>' +
+      '<text class="fl-lbl" x="10" y="100">Maestros</text><text class="fl-lbl" x="178" y="100">Lotes</text><text class="fl-lbl" x="240" y="100">Pedidos</text>' +
+      '<g class="fl-node fl-hub"><rect x="60" y="150" width="220" height="76" rx="12"/><text class="fl-t" x="170" y="184" text-anchor="middle">Plataforma</text><text class="fl-s" x="170" y="202" text-anchor="middle">logística Armetales</text></g>' +
+      '<path class="fl-line out" d="M170 226 L 170 296" marker-end="url(#avr)"/><text class="fl-lbl" x="182" y="266">Reservas · despachos · estados</text>' +
+      node(60, 300, 220, 54, 'SAP ERP', 'Entregas y movimientos', 'SAP') + '</svg>';
+    $('#flowBox').innerHTML = H + V;
+  }
+
+  /* ================= reintento (HU-176) ================= */
+  var PERM = /correspondencia|no existe|no mapeado|sin unidad|sin factor|borrado|ausente|nulas|inconsistente|fuera del rango|cartera|ya despachado|sin pedido|sin georreferencia|Dirección con calidad/i;
+  function retry(list) {
+    list = list.filter(open); if (!list.length) { UI.toast('No hay mensajes fallidos para reintentar.', 'info'); return Promise.resolve(); }
+    list.forEach(function (l) { l.estado = 'Reintentando'; l.intentos = (l.intentos || 0) + 1; }); refreshAll();
+    var t = UI.toast('Reintentando ' + list.length + (list.length === 1 ? ' mensaje' : ' mensajes') + '…', 'info', { duration: 1800 });
+    return delay(1700).then(function () {
+      var ok = 0, bad = 0;
+      list.forEach(function (l) { if (PERM.test(l.error || '')) { l.estado = 'Error'; l.nota = 'El error persiste: el dato debe corregirse en el sistema de origen.'; bad++; } else { l.estado = 'Procesado'; l.error = null; l.nota = null; l.duracionMs = 220 + Math.round(Math.random() * 600); ok++; } });
+      refreshAll();
+      if (ok) UI.toast(ok + (ok === 1 ? ' mensaje procesado' : ' mensajes procesados') + ' correctamente' + (bad ? '; ' + bad + ' siguen con error.' : '.'), bad ? 'warning' : 'success');
+      else UI.toast('El error persiste: corrige el dato en el sistema de origen y vuelve a intentar.', 'error', { title: 'No se pudo procesar' });
+    });
+  }
+
+  /* ================= payloads y drawer de mensaje (HU-175) ================= */
+  function payloadOf(l) {
+    var base = { _meta: { sistema: l.sistemaOrigen, entidad: l.entidad, version: l.version, payloadId: l.payloadId, correlacionId: l.correlacionId, direccion: l.direccion } };
+    var p = A.idx.productos[l.idExterno] || A.productos.filter(function (x) { return x.skuSAP === String(l.idExterno).split('@')[0]; })[0], c = A.idx.clientes[l.idExterno], ped = A.idx.pedidos[l.idExterno], body;
+    if (l.entidad === 'Material' || l.entidad === 'Atributos de producto') body = p ? { MATNR: p.skuSAP, MAKTX: p.descripcion, MEINS: p.unidadBase.toUpperCase().slice(0, 3), BRGEW: p.pesoKg, GEWEI: 'KG', VOLUM: p.volumenM3, VOLEH: 'M3', LAENG: p.largoM, FAMILIA: p.familia } : { MATNR: l.idExterno };
+    else if (l.entidad.indexOf('Cliente') === 0 || l.entidad === 'Coordenadas') body = c ? (l.entidad === 'Coordenadas' ? { clienteId: c.clienteIdSAP, latitud: c.latitud, longitud: c.longitud, calidadDireccion: c.calidadDireccion, fuente: 'geocodificador-datalake' } : { KUNNR: c.clienteIdSAP, NAME1: c.razonSocial, STCD1: c.nit, ORT01: c.municipio, REGIO: c.departamento, ventana: c.ventanaInicio + '-' + c.ventanaFin }) : { KUNNR: l.idExterno };
+    else if (l.entidad === 'Existencias') body = { MATNR: String(l.idExterno).split('@')[0], WERKS: 'BOG1', LGORT: '0001', LABST: p && p.stock['CEDI-BOG'] ? p.stock['CEDI-BOG'].fisico : 120, SPEME: 0, MEINS: 'BAR' };
+    else if (l.entidad === 'Documento de entrega') body = { VBELN: l.idExterno, LFART: 'LF', WADAT_IST: l.fechaEvento.slice(0, 10), WBSTK: 'B', VSTEL: 'BOG1' };
+    else if (l.entidad === 'Pedido') body = ped ? { pedidoIdOrigen: ped.pedidoId, clienteId: ped.clienteId, entregaSolicitada: ped.entregaSolicitada, lineas: ped.lineas.map(function (x) { return { sku: x.sku, cantidad: x.cantidad, unidad: x.unidad }; }) } : { pedidoIdOrigen: l.idExterno, clienteId: 'CL1009999', lineas: [{ sku: '1009999', cantidad: 4, unidad: 'Unidad' }] };
+    else body = { pedidoIdOrigen: l.idExterno, cambio: { campo: 'lineas[1].cantidad', antes: 12, despues: 18 }, motivo: 'Ajuste solicitado por el cliente' };
+    base.data = body; return base;
+  }
+  function hl(obj) {
+    return esc(JSON.stringify(obj, null, 2)).replace(/(&quot;[^&]*?&quot;)(\s*:)/g, '<span class="k">$1</span>$2').replace(/:\s*(&quot;[^&]*?&quot;)/g, function (m, s) { return ': <span class="s">' + s + '</span>'; }).replace(/: (-?\d+\.?\d*)/g, ': <span class="n">$1</span>');
+  }
+  function relLink(l) {
+    if (l.entidad === 'Pedido' || l.entidad === 'Cambio de pedido') return A.idx.pedidos[l.idExterno] ? '<a class="link-inline" href="pedidos.html?id=' + encodeURIComponent(l.idExterno) + '">Abrir el pedido ' + esc(l.idExterno) + '</a>' : '';
+    if (l.entidad.indexOf('Cliente') === 0 || l.entidad === 'Coordenadas') return A.idx.clientes[l.idExterno] ? '<a class="link-inline" href="clientes.html?id=' + encodeURIComponent(l.idExterno) + '">Abrir el cliente ' + esc(A.idx.clientes[l.idExterno].razonSocial) + '</a>' : '';
+    return '';
+  }
+  function logDrawer(l) {
+    var d = UI.drawer({ title: l.logId, subtitle: l.sistemaOrigen + ' · ' + l.entidad + ' · ' + F.fechaHora(l.fechaEvento), width: 600,
+      onOpen: function (api) { paint(api); },
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Copiar correlación', kind: 'secondary', icon: 'copy', keepOpen: true, onClick: function () { try { navigator.clipboard.writeText(l.correlacionId); } catch (e) {} UI.toast('Correlación ' + l.correlacionId + ' copiada.', 'info'); } }, { label: 'Reintentar', kind: 'primary', icon: 'refresh', id: 'ldRetry', keepOpen: true, onClick: function (api) { retry([l]).then(function () { paint(api); }); } }] });
+    function paint(api) {
+      var b = api.body, rl = relLink(l);
+      b.innerHTML = '<div class="stack-lg">' + (l.estado === 'Error' || l.estado === 'Reintentando' ? UI.banner({ tone: l.estado === 'Error' ? 'danger' : 'warning', title: l.estado === 'Error' ? 'Mensaje con error' : 'Reintentando…', text: l.error + (l.nota ? ' ' + l.nota : '') }) : l.estado === 'Duplicado ignorado' ? UI.banner({ tone: 'info', title: 'Duplicado ignorado', text: l.error }) : '') +
+        UI.kv([['Estado', UI.chip(l.estado)], ['Sistema', esc(l.sistemaOrigen) + ' · ' + esc(l.direccion)], ['Entidad', esc(l.entidad)], ['Id externo', '<span class="mono">' + esc(l.idExterno) + '</span>'], ['Versión del contrato', '<span class="mono">' + esc(l.version) + '</span>'], ['Correlación', '<span class="mono">' + esc(l.correlacionId) + '</span>'], ['Payload', '<span class="mono">' + esc(l.payloadId) + '</span>'], ['Intentos', l.intentos + ' de 5 automáticos'], ['Duración', F.num(l.duracionMs) + ' ms']]) + (rl ? '<div>' + rl + '</div>' : '') +
+        '<section><h3 class="mb-2">Mensaje (payload)</h3><pre class="code-box" tabindex="0">' + hl(payloadOf(l)) + '</pre></section></div>';
+      var btn = $('#ldRetry', api.el); if (btn) btn.hidden = !open(l);
+    }
+  }
+
+  /* ================= tabla de bitácora reutilizable ================= */
+  function logTable(host, sis, opt) {
+    opt = opt || {};
+    var rowsFn = opt.rows || function () { return logsOf(sis); };
+    var t = UI.table($(host), {
+      rows: rowsFn(), rowKey: 'logId', pageSize: opt.pageSize || 8, selectable: true, caption: 'Bitácora de ' + sis, searchable: { placeholder: 'Buscar por id, entidad o error' }, searchKeys: ['logId', 'idExterno', 'correlacionId', 'error'],
+      filters: [{ key: 'estado', label: 'Estado', all: 'Todos los estados', options: 'auto' }, { key: 'entidad', label: 'Entidad', all: 'Todas las entidades', options: 'auto' }],
+      toolbar: '<button type="button" class="btn btn-secondary btn-sm ml-auto" data-retry-all>' + ico('refresh') + 'Reintentar fallidos</button>',
+      columns: [
+        { key: 'fechaEvento', label: 'Fecha', render: function (l) { return esc(F.fechaHora(l.fechaEvento)); } },
+        { key: 'logId', label: 'Registro', mono: true, title: true },
+        { key: 'entidad', label: 'Entidad' },
+        { key: 'idExterno', label: 'Id externo', mono: true, hideMobile: true },
+        { key: 'direccion', label: 'Sentido', hideMobile: true },
+        { key: 'estado', label: 'Estado', render: function (l) { return UI.chip(l.estado); } },
+        { key: 'error', label: 'Detalle', hideMobile: true, render: function (l) { return l.error ? '<span class="trunc" title="' + esc(l.error) + '">' + esc(l.error) + '</span>' : '<span class="subtle">—</span>'; } }
+      ],
+      onRowClick: logDrawer,
+      bulkActions: [{ label: 'Reintentar selección', icon: 'refresh', onClick: function (rows) { var f = rows.filter(open); if (!f.length) { UI.toast('Ninguno de los mensajes seleccionados tiene error.', 'info'); return; } t.clearSelection(); retry(f); } }],
+      actions: function (l) { return [{ label: 'Ver mensaje', icon: 'eye', onClick: function () { logDrawer(l); } }, { label: 'Reintentar', icon: 'refresh', disabled: !open(l), onClick: function () { retry([l]); } }]; }
+    });
+    var ra = $('[data-retry-all]', $(host)); if (ra) { ra.addEventListener('click', function () { var f = rowsFn().filter(open); UI.confirm({ title: 'Reintentar mensajes fallidos', tone: 'primary', confirmLabel: 'Reintentar ' + f.length, message: f.length ? 'Se reenviarán ' + f.length + ' mensajes con error. Los que fallan por datos incorrectos en el origen seguirán con error hasta corregirlos.' : 'No hay mensajes con error en esta vista.' }).then(function (ok) { if (ok && f.length) retry(f); }); }); }
+    tables.push({ t: t, rows: rowsFn }); return t;
+  }
+  function refreshAll() { tables.forEach(function (x) { x.t.setRows(x.rows()); }); renderConn(); renderSapExtras(); renderLakeExtras(); renderEasyExtras(); }
+
+  /* ================= SAP ================= */
+  var certDays = 148; $('#certExp').textContent = F.fecha(A.ymd(certDays));
+  function sapChip() { var c = connBy('SAP'); $('#sapConnChip').innerHTML = UI.chip(c.estado); }
+  sapChip();
+  function sapValidate() {
+    var h = $('#sf-host'), p = $('#sf-port'), m = $('#sf-mdt'), u = $('#sf-usr'), ok = true;
+    ok = setErr(h, !h.value.trim() ? 'El servidor es obligatorio.' : /\s/.test(h.value) || h.value.indexOf('.') < 0 ? 'Usa un nombre completo sin espacios, por ejemplo sap-prd.armetales.local.' : '') && ok;
+    ok = setErr(p, !/^\d+$/.test(p.value) || +p.value < 1 || +p.value > 65535 ? 'El puerto debe ser un número entre 1 y 65535.' : '') && ok;
+    ok = setErr(m, !/^\d{3}$/.test(m.value) ? 'El mandante tiene 3 dígitos (por ejemplo 400).' : '') && ok;
+    ok = setErr(u, !/^[A-Z0-9_]{4,20}$/.test(u.value) ? 'Usa de 4 a 20 caracteres en mayúscula, números o guion bajo.' : '') && ok;
+    if (!ok) { var b = $('#sapForm [aria-invalid="true"]'); if (b) b.focus(); } return ok;
+  }
+  $('#sapForm').addEventListener('submit', function (e) { e.preventDefault(); if (!sapValidate()) return; UI.toast('Configuración de SAP guardada. Se aplicará en la próxima sincronización.', 'success'); });
+  $('#sapTest').insertAdjacentHTML('beforeend', '<div class="mt-3">' + UI.timeline([['Resolución de red privada', 'Sin ejecutar'], ['Túnel VPN', 'Sin ejecutar'], ['Certificado de cliente', 'Sin ejecutar'], ['Autenticación del usuario técnico', 'Sin ejecutar'], ['Lectura de prueba', 'Sin ejecutar']].map(function (s) { return { title: s[0], meta: s[1], state: 'pending' }; })) + '</div>');
+  $('#btnSapTest').onclick = function () {
+    if (!sapValidate()) return; var btn = $('#btnSapTest'), box = $('#sapTest'), mdt = $('#sf-mdt').value, host = $('#sf-host').value.trim();
+    var steps = [['Resolviendo ' + host + ' por la red privada', 380], ['Túnel VPN IPsec establecido', 520], ['Certificado de cliente válido (TLS 1.3)', 600], ['Autenticando usuario técnico ' + $('#sf-usr').value, 700], ['Lectura de prueba · BAPI_SYSTEM_GET_STATUS', 650]];
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Probando…'; var done = [], failed = false, i = 0;
+    function draw(cur, err) { box.innerHTML = UI.timeline(steps.map(function (s, k) { return { title: s[0], meta: k < done.length ? done[k] : (k === cur ? (err ? err : 'En curso…') : 'Pendiente'), state: k < done.length ? 'done' : k === cur ? (err ? 'error' : 'current') : 'pending' }; })); }
+    (function next() {
+      if (i >= steps.length) { var ms = 380 + Math.round(Math.random() * 90); box.innerHTML = UI.banner({ tone: 'success', title: 'Conexión operativa', text: 'Respuesta de SAP en ' + ms + ' ms. Mandante ' + mdt + ' disponible.' }) + '<div class="mt-3">' + UI.timeline(steps.map(function (s, k) { return { title: s[0], meta: done[k], state: 'done' }; })) + '</div>'; connBy('SAP').latenciaMs = ms; renderConn(); btn.disabled = false; btn.innerHTML = ico('play') + 'Probar conexión'; return; }
+      draw(i); delay(steps[i][1]).then(function () {
+        if (i === 3 && mdt !== '400') { draw(3, 'El mandante ' + mdt + ' no existe en este sistema.'); box.insertAdjacentHTML('beforeend', '<div class="mt-3">' + UI.banner({ tone: 'danger', title: 'No se pudo autenticar', text: 'Verifica el mandante (producción usa 400) y vuelve a probar.' }) + '</div>'); btn.disabled = false; btn.innerHTML = ico('play') + 'Probar conexión'; return; }
+        done.push(['', 'Resuelto en ' + steps[i][1] + ' ms', 'Cifrado AES-256', 'Correcto', 'Correcto'][i] || 'Correcto'); done[i] = ['Resuelto en 38 ms', 'Túnel activo', 'Huella verificada', 'Autenticado', 'Respuesta recibida'][i]; i++; next();
+      });
+    })();
+  };
+  $('#btnRotate').onclick = function () {
+    var m = UI.modal({ title: 'Rotar secreto del usuario técnico', width: 480, body: '<div class="stack"><p style="margin:0">El secreto nuevo se guarda cifrado y no se vuelve a mostrar. La integración usará el nuevo valor desde la próxima sincronización.</p><div class="field"><label class="label" for="rt-s">Secreto nuevo</label><input class="input" id="rt-s" type="password" autocomplete="new-password"><span class="hint">Mínimo 12 caracteres.</span></div><div class="field"><label class="label" for="rt-c">Confirma el secreto</label><input class="input" id="rt-c" type="password" autocomplete="new-password"></div></div>',
+      footer: [{ label: 'Cancelar', kind: 'secondary' }, { label: 'Rotar secreto', kind: 'primary', keepOpen: true, onClick: function () { var s = $('#rt-s', m.el), c = $('#rt-c', m.el), ok = setErr(s, s.value.length < 12 ? 'El secreto debe tener al menos 12 caracteres.' : ''); ok = setErr(c, ok && c.value !== s.value ? 'No coincide con el secreto nuevo.' : '') && ok; if (!ok) return; m.close(); $('#sf-sec-h').textContent = 'Almacenado cifrado. Rotado hace un momento.'; UI.toast('Secreto rotado. No se almacenó en texto claro.', 'success'); } }] });
+  };
+  $('#btnCert').onclick = function () {
+    var m = UI.modal({ title: 'Reemplazar certificado de cliente', width: 480, body: '<div class="stack"><div class="field"><label class="label" for="ct-f">Archivo del certificado</label><input class="input" id="ct-f" type="file" accept=".pem,.cer,.crt,.p12"><span class="hint">Formatos .pem, .cer, .crt o .p12. Debe incluir la cadena completa.</span></div></div>',
+      footer: [{ label: 'Cancelar', kind: 'secondary' }, { label: 'Cargar certificado', kind: 'primary', keepOpen: true, onClick: function () { var f = $('#ct-f', m.el); if (!setErr(f, f.files && f.files.length ? '' : 'Selecciona el archivo del certificado.')) return; certDays = 365; $('#certExp').textContent = F.fecha(A.ymd(certDays)); m.close(); UI.toast('Certificado ' + f.files[0].name + ' cargado. Vigente un año más.', 'success'); } }] });
+  };
+
+  /* entidades sincronizadas (HU-170/171/172/174) */
+  var docs = A.despachos.slice(0, 14).map(function (d, i) { var cerr = d.estado === 'Cerrado'; return { documento: '80' + pad(41200 + i * 7, 6), despacho: d.despachoId, estadoSAP: cerr ? 'C · Completo' : d.estado === 'En ruta' ? 'B · Parcial' : 'A · Abierto', estadoApp: d.estado, fecha: d.fechaSalida || nowIso() }; });
+  var ENT = [
+    { id: 'mat', n: 'Materiales', ic: 'package', count: A.productos.length, unit: 'materiales', frec: 'Cada hora', cols: function () { return { rows: A.productos, columns: [{ key: 'skuSAP', label: 'Material', mono: true }, { key: 'descripcion', label: 'Descripción', title: true }, { key: 'familia', label: 'Familia' }, { key: 'unidadBase', label: 'Unidad base' }, { key: 'sincronizado', label: 'Sincronizado', render: function (p) { return esc(F.fechaHora(p.sincronizado)); } }], filters: [{ key: 'familia', label: 'Familia', all: 'Todas', options: 'auto' }] }; }, link: 'productos.html', linkL: 'Abrir maestro de productos' },
+    { id: 'cli', n: 'Clientes', ic: 'users', count: A.clientes.length, unit: 'clientes', frec: 'Cada 15 minutos', cols: function () { return { rows: A.clientes, columns: [{ key: 'clienteIdSAP', label: 'Cliente SAP', mono: true }, { key: 'razonSocial', label: 'Razón social', title: true }, { key: 'municipio', label: 'Municipio' }, { key: 'nit', label: 'NIT', mono: true, hideMobile: true }, { key: 'calidadDireccion', label: 'Dirección', render: function (c) { return UI.chip(c.calidadDireccion === 'Validada' ? 'Validada' : c.calidadDireccion, { tone: c.calidadDireccion === 'Validada' ? 'success' : c.calidadDireccion === 'Aproximada' ? 'warning' : 'danger' }); } }], filters: [{ key: 'calidadDireccion', label: 'Dirección', all: 'Todas', options: 'auto' }] }; }, link: 'clientes.html', linkL: 'Abrir maestro de clientes' },
+    { id: 'stk', n: 'Existencias', ic: 'layers', count: A.productos.length * 2, unit: 'saldos por bodega', frec: 'Cada 15 minutos', cols: function () { var r = []; A.productos.forEach(function (p) { Object.keys(p.stock).forEach(function (b) { r.push({ sku: p.skuSAP, descripcion: p.descripcion, bodega: A.idx.sedes[b] ? A.idx.sedes[b].nombre : b, fisico: p.stock[b].fisico, reservado: p.stock[b].reservado, disponible: p.stock[b].disponible }); }); }); return { rows: r, columns: [{ key: 'sku', label: 'Material', mono: true }, { key: 'descripcion', label: 'Descripción', title: true }, { key: 'bodega', label: 'Bodega' }, { key: 'fisico', label: 'Físico', num: true, render: function (x) { return F.num(x.fisico); } }, { key: 'reservado', label: 'Reservado', num: true, render: function (x) { return F.num(x.reservado); } }, { key: 'disponible', label: 'Disponible', num: true, render: function (x) { return '<strong>' + F.num(x.disponible) + '</strong>'; } }], filters: [{ key: 'bodega', label: 'Bodega', all: 'Todas', options: 'auto' }] }; }, link: 'inventario.html', linkL: 'Abrir inventario' },
+    { id: 'doc', n: 'Estados de documentos', ic: 'file-text', count: docs.length, unit: 'entregas seguidas', frec: 'Cada 15 minutos', cols: function () { return { rows: docs, columns: [{ key: 'documento', label: 'Entrega SAP', mono: true }, { key: 'despacho', label: 'Despacho', mono: true, title: true, render: function (x) { return '<a class="link-inline mono" href="despachos.html?id=' + x.despacho + '">' + x.despacho + '</a>'; } }, { key: 'estadoSAP', label: 'Estado en SAP' }, { key: 'estadoApp', label: 'Estado en la plataforma', render: function (x) { return UI.chip(x.estadoApp); } }], filters: [{ key: 'estadoSAP', label: 'Estado SAP', all: 'Todos', options: 'auto' }] }; }, link: 'despachos.html', linkL: 'Abrir despachos' }
+  ];
+  function renderSapExtras() {
+    var c = connBy('SAP'); sapChip();
+    $('#sapEnts').innerHTML = ENT.map(function (e) { return '<div class="card ent"><div class="e-top"><span class="c-ico" style="width:32px;height:32px;border-radius:8px;display:grid;place-items:center;background:var(--surface-3);color:var(--text-2)">' + ico(e.ic) + '</span><div class="e-name">' + e.n + '</div></div><div><span class="e-n">' + F.num(e.count) + '</span> <span class="muted t-13">' + e.unit + '</span></div><div class="e-meta">' + e.frec + ' · última ' + esc(F.relativo(e.last || c.ultimaSync)) + '</div><div class="e-act"><button type="button" class="btn btn-secondary btn-sm" data-sync="' + e.id + '">' + ico('refresh') + 'Sincronizar</button><button type="button" class="btn btn-ghost btn-sm" data-view="' + e.id + '">Ver registros</button></div></div>'; }).join('');
+    var dups = logsOf('SAP').filter(function (l) { return l.estado === 'Duplicado ignorado'; });
+    $('#dupN').textContent = dups.length + ' hoy';
+    $('#dupList').innerHTML = dups.length ? dups.slice(0, 4).map(function (l) { return '<div class="li-row"><div class="grow"><div class="mono t-13">' + esc(l.idExterno) + '</div><div class="sub-line">' + esc(l.entidad) + ' · ' + esc(F.fechaHora(l.fechaEvento)) + '</div></div>' + UI.chip('Duplicado ignorado', { small: true }) + '</div>'; }).join('') : '<p class="muted t-13" style="margin:0">Hoy no llegaron mensajes repetidos.</p>';
+  }
+  $('#sapEnts').addEventListener('click', function (e) {
+    var s = e.target.closest('[data-sync]'), v = e.target.closest('[data-view]');
+    if (s) { var ent = ENT.filter(function (x) { return x.id === s.dataset.sync; })[0]; s.disabled = true; s.innerHTML = '<span class="spin"></span>Sincronizando'; delay(1300).then(function () { ent.last = nowIso(); connBy('SAP').ultimaSync = ent.last; connBy('SAP').colaPendiente = Math.max(0, connBy('SAP').colaPendiente - 1); refreshAll(); UI.toast(ent.n + ' al día: ' + F.num(ent.count) + ' registros revisados, 0 cambios nuevos.', 'success'); }); }
+    if (v) { var en = ENT.filter(function (x) { return x.id === v.dataset.view; })[0], cfg = en.cols(); UI.drawer({ title: en.n + ' desde SAP', subtitle: F.num(en.count) + ' registros · ' + en.frec.toLowerCase(), width: 760, onOpen: function (api) { api.body.innerHTML = '<div id="entTbl"></div><a class="btn btn-ghost btn-sm mt-3" href="' + en.link + '">' + esc(en.linkL) + ' ' + ico('arrow-right') + '</a>'; UI.table($('#entTbl', api.body), { rows: cfg.rows, columns: cfg.columns, filters: cfg.filters, pageSize: 8, searchable: { placeholder: 'Buscar' }, caption: en.n }); } }); }
+  });
+
+  /* conciliación de identificadores (HU-173) */
+  var cmap = A.productos.slice(0, 22).map(function (p, i) { var bad = i === 3 || i === 9 || i === 15; return { sku: p.skuSAP, descripcion: p.descripcion, easy: bad ? null : 'ES-' + p.skuSAP.slice(-4), lake: 'DL-' + p.skuSAP, estado: bad ? 'Sin correspondencia' : 'Conciliado' }; });
+  var freeCodes = ['ES-9031', 'ES-9047', 'ES-9052', 'ES-9068'];
+  function drawMap() {
+    var n = cmap.filter(function (r) { return r.estado !== 'Conciliado'; }).length;
+    $('#mapBanner').innerHTML = n ? UI.banner({ tone: 'warning', title: n + (n === 1 ? ' producto sin correspondencia' : ' productos sin correspondencia'), text: 'Los pedidos de Easy Sales con estos SKU no se pueden importar hasta conciliarlos.' }) : UI.banner({ tone: 'success', text: 'Todos los identificadores están conciliados entre SAP, Easy Sales y el Data Lake.' });
+    mapT.setRows(cmap);
+  }
+  var mapT = UI.table($('#mapTable'), { rows: cmap, rowKey: 'sku', pageSize: 6, caption: 'Conciliación de identificadores', searchable: { placeholder: 'Buscar SKU o descripción' },
+    filters: [{ key: 'estado', label: 'Estado', all: 'Todos los estados', options: ['Conciliado', 'Sin correspondencia'] }],
+    columns: [{ key: 'sku', label: 'SKU SAP', mono: true }, { key: 'descripcion', label: 'Descripción', title: true }, { key: 'easy', label: 'Easy Sales', mono: true, render: function (r) { return r.easy ? esc(r.easy) : '<span class="subtle">Sin código</span>'; } }, { key: 'lake', label: 'Data Lake', mono: true, hideMobile: true }, { key: 'estado', label: 'Estado', render: function (r) { return UI.chip(r.estado, { tone: r.estado === 'Conciliado' ? 'success' : 'danger' }); } }],
+    actions: function (r) { return r.estado === 'Conciliado' ? [{ label: 'Ver producto', icon: 'eye', href: 'productos.html' }] : [{ label: 'Conciliar', icon: 'link', onClick: function () { conciliar(r); } }]; },
+    onRowClick: function (r) { if (r.estado !== 'Conciliado') conciliar(r); } });
+  function conciliar(r) {
+    var m = UI.modal({ title: 'Conciliar identificador', subtitle: r.sku + ' · ' + r.descripcion, width: 480, body: '<div class="stack"><p style="margin:0">Easy Sales no reconoce este SKU de SAP. Elige el código de Easy Sales que corresponde al mismo producto.</p><div class="field"><label class="label" for="cn-c">Código en Easy Sales</label><select class="select" id="cn-c"><option value="">Selecciona un código</option>' + freeCodes.map(function (c) { return '<option>' + c + '</option>'; }).join('') + '</select><span class="hint">Solo se listan códigos de Easy Sales sin asociar.</span></div></div>',
+      footer: [{ label: 'Cancelar', kind: 'secondary' }, { label: 'Conciliar', kind: 'primary', keepOpen: true, onClick: function () { var s = $('#cn-c', m.el); if (!setErr(s, s.value ? '' : 'Elige el código de Easy Sales que corresponde.')) { s.focus(); return; } r.easy = s.value; r.estado = 'Conciliado'; freeCodes.splice(freeCodes.indexOf(s.value), 1); m.close(); drawMap(); UI.toast(r.sku + ' ahora corresponde a ' + r.easy + ' en Easy Sales.', 'success'); } }] });
+  }
+  logTable('#logSap', 'SAP');
+
+  /* ================= DATA LAKE ================= */
+  var LOTS = []; (function () {
+    var T = [['Clientes normalizados', 'datalake.curated.clientes_norm', 'cliente'], ['Coordenadas', 'datalake.curated.geocodificacion', 'coordenada'], ['Atributos de producto', 'datalake.curated.producto_attr', 'producto']];
+    for (var i = 0; i < 9; i++) { var t = T[i % 3], reg = [A.clientes.length * 12, A.clientes.length * 9, A.productos.length * 14][i % 3] + i * 7, rej = [3, 7, 4][i % 3] * (i % 2 ? 2 : 1); LOTS.push({ lote: 'DL-' + A.ymd(0).slice(2, 7).replace('-', '') + '-' + pad(30 - i, 3), tipo: t[0], origen: t[1], fecha: new Date(Date.now() - (52 + i * 60) * 60000).toISOString(), registros: reg, rechazados: rej, integridad: rej > 8 ? 'Con observaciones' : 'Íntegro', estado: i === 0 ? 'Con alertas' : 'Procesado', hash: Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 10) }); }
+  })();
+  UI.table($('#lotTable'), { rows: LOTS, rowKey: 'lote', pageSize: 6, caption: 'Lotes consumidos del Data Lake', searchable: { placeholder: 'Buscar lote o tipo' },
+    filters: [{ key: 'tipo', label: 'Tipo', all: 'Todos los tipos', options: 'auto' }, { key: 'integridad', label: 'Integridad', all: 'Toda integridad', options: 'auto' }],
+    columns: [{ key: 'lote', label: 'Lote', mono: true, title: true }, { key: 'tipo', label: 'Contenido' }, { key: 'origen', label: 'Origen', mono: true, hideMobile: true }, { key: 'fecha', label: 'Recibido', render: function (l) { return esc(F.fechaHora(l.fecha)); } }, { key: 'registros', label: 'Registros', num: true, render: function (l) { return F.num(l.registros); } }, { key: 'rechazados', label: 'Rechazados', num: true, render: function (l) { return l.rechazados ? '<span style="color:var(--amber)">' + l.rechazados + '</span>' : '0'; } }, { key: 'integridad', label: 'Integridad', render: function (l) { return UI.chip(l.integridad, { tone: l.integridad === 'Íntegro' ? 'success' : 'warning' }); } }],
+    onRowClick: function (l) { UI.drawer({ title: l.lote, subtitle: l.tipo + ' · ' + F.fechaHora(l.fecha), width: 520, body: '<div class="stack-lg">' + (l.integridad === 'Íntegro' ? UI.banner({ tone: 'success', text: 'El lote pasó todas las validaciones de integridad.' }) : UI.banner({ tone: 'warning', title: l.rechazados + ' registros rechazados', text: 'Se enviaron a la cola de errores de calidad para su resolución.' })) + UI.kv([['Origen', '<span class="mono">' + esc(l.origen) + '</span>'], ['Fecha del origen', esc(F.fechaHora(l.fecha))], ['Registros recibidos', F.num(l.registros)], ['Aceptados', F.num(l.registros - l.rechazados)], ['Rechazados', l.rechazados], ['Suma de verificación', '<span class="mono">sha256:' + l.hash + '…</span>'], ['Esquema', '<span class="mono">v3.1</span>']]) + '</div>', footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Descargar rechazados', kind: 'secondary', icon: 'download', onClick: function () { UI.toast('Se generó el archivo de rechazados del lote ' + l.lote + '.', 'success'); } }] }); } });
+  var geo = A.clientes.filter(function (c) { return c.calidadDireccion === 'Por validar'; }), asked = {};
+  var dq = []; (function () {
+    logsOf('Data Lake').filter(open).forEach(function (l) { dq.push({ id: 'DQ-' + l.logId.slice(-4), tipo: l.entidad, registro: l.idExterno, desc: l.error, sev: /georreferencia|fuera del rango|nulas/.test(l.error) ? 'Alta' : 'Media', estado: 'Abierto', fecha: l.fechaEvento }); });
+    A.productos.slice(0, 2).forEach(function (p, i) { dq.push({ id: 'DQ-P' + (i + 1), tipo: 'Atributos de producto', registro: p.skuSAP, desc: 'Dimensiones nulas en atributos de producto', sev: 'Media', estado: 'Abierto', fecha: new Date(Date.now() - (5 + i) * 36e5).toISOString() }); });
+    A.productos.slice(4, 7).forEach(function (p, i) { dq.push({ id: 'DQ-W' + (i + 1), tipo: 'Atributos de producto', registro: p.skuSAP, desc: 'Peso por unidad inconsistente con SAP (desviación ' + (9 + i * 3) + ' %)', sev: 'Media', estado: 'Abierto', fecha: new Date(Date.now() - (9 + i) * 36e5).toISOString() }); });
+    geo.forEach(function (c) { dq.push({ id: 'DQ-G' + c.clienteIdSAP.slice(-3), tipo: 'Coordenadas', registro: c.clienteIdSAP, desc: 'Registro sin georreferencia (latitud/longitud nulas)', sev: 'Alta', estado: 'Abierto', fecha: new Date(Date.now() - 20 * 36e5).toISOString() }); });
+  })();
+  var dqT = UI.table($('#dqTable'), { rows: dq, rowKey: 'id', pageSize: 6, caption: 'Errores de calidad de datos', searchable: { placeholder: 'Buscar registro o descripción' }, searchKeys: ['registro'],
+    filters: [{ key: 'estado', label: 'Estado', all: 'Todos los estados', options: ['Abierto', 'Resuelto'] }, { key: 'sev', label: 'Severidad', all: 'Toda severidad', options: ['Alta', 'Media'] }, { key: 'tipo', label: 'Tipo', all: 'Todos los tipos', options: 'auto' }],
+    columns: [{ key: 'id', label: 'Caso', mono: true }, { key: 'tipo', label: 'Tipo', hideMobile: true }, { key: 'registro', label: 'Registro', mono: true, title: true }, { key: 'desc', label: 'Problema', render: function (r) { return '<span class="trunc" title="' + esc(r.desc) + '">' + esc(r.desc) + '</span>'; } }, { key: 'sev', label: 'Severidad', render: function (r) { return UI.chip(r.sev, { tone: r.sev === 'Alta' ? 'danger' : 'warning', small: true }); } }, { key: 'estado', label: 'Estado', render: function (r) { return UI.chip(r.estado, { tone: r.estado === 'Resuelto' ? 'success' : 'danger' }); } }],
+    onRowClick: function (r) { if (r.estado === 'Abierto') resolveDq(r); else UI.toast(r.id + ' ya está resuelto: ' + r.resolucion, 'info'); },
+    actions: function (r) { return r.estado === 'Abierto' ? [{ label: 'Resolver', icon: 'check', onClick: function () { resolveDq(r); } }] : [{ label: 'Ver resolución', icon: 'eye', onClick: function () { UI.toast(r.resolucion, 'info'); } }]; } });
+  function resolveDq(r) {
+    var m = UI.modal({ title: 'Resolver caso ' + r.id, subtitle: r.tipo + ' · ' + r.registro, width: 520,
+      body: '<div class="stack">' + UI.banner({ tone: r.sev === 'Alta' ? 'danger' : 'warning', text: r.desc }) + '<div class="field"><label class="label" for="dq-a">Resolución</label><select class="select" id="dq-a"><option value="">Selecciona una acción</option><option>Corregir el valor en la plataforma</option><option>Solicitar corrección al Data Lake</option><option>Aceptar el valor recibido</option><option>Descartar el registro</option></select></div><div class="field"><label class="label" for="dq-n">Nota</label><textarea class="textarea" id="dq-n" rows="2" placeholder="Qué se verificó y con quién."></textarea></div></div>',
+      footer: [{ label: 'Cancelar', kind: 'secondary' }, { label: 'Marcar resuelto', kind: 'primary', keepOpen: true, onClick: function () { var a = $('#dq-a', m.el), n = $('#dq-n', m.el), ok = setErr(a, a.value ? '' : 'Elige cómo se resolvió el caso.'); ok = setErr(n, n.value.trim().length < 5 ? 'Deja una nota breve para el registro de calidad.' : '') && ok; if (!ok) return; r.estado = 'Resuelto'; r.resolucion = a.value + '.'; m.close(); renderLakeExtras(); UI.toast('Caso ' + r.id + ' resuelto: ' + a.value.toLowerCase() + '.', 'success'); } }] });
+  }
+  function renderLakeExtras() {
+    var cd = A.calidadDatos, abiertos = dq.filter(function (r) { return r.estado === 'Abierto'; }).length;
+    $('#lakeStats').innerHTML = stat(F.num(cd.registrosRecibidos), 'Registros recibidos hoy') + stat(cd.registrosRechazados, 'Rechazados por validación') + stat(geo.length, 'Clientes sin georreferencia') + stat(abiertos, 'Casos de calidad abiertos');
+    $('#intSub').textContent = F.num(cd.registrosRecibidos) + ' registros evaluados en los lotes de hoy';
+    var tot = cd.registrosRecibidos, chk = [['Esquema v3.1 y tipos de dato', 0], ['Claves obligatorias presentes', cd.registrosRechazados - 6], ['Rango de coordenadas en Colombia', 4], ['Suma de verificación del lote', 0], ['Sin duplicados dentro del lote', 3]];
+    $('#intBox').innerHTML = chk.map(function (c) { var ok = tot - c[1]; return '<div class="check-row"><span>' + ico(c[1] ? 'alert-triangle' : 'check-circle', 'icon-sm') + ' ' + c[0] + '</span>' + UI.meter(ok, tot, { showValue: false, label: c[0], level: c[1] ? 'warn' : 'ok', mode: 'util' }) + '<span class="n">' + (c[1] ? c[1] : 'OK') + '</span></div>'; }).join('');
+    $('#geoBox').innerHTML = geo.length ? geo.map(function (c) { return '<div class="li-row"><div class="grow"><a class="link-inline" href="clientes.html?id=' + c.clienteIdSAP + '" style="font-weight:600">' + esc(c.razonSocial) + '</a><div class="sub-line">' + esc(c.direccionEntrega) + ' · ' + esc(c.municipio) + '</div></div>' + (asked[c.clienteIdSAP] ? UI.chip('Solicitada', { tone: 'info', small: true }) : '<button type="button" class="btn btn-secondary btn-sm" data-ask="' + c.clienteIdSAP + '">Solicitar</button>') + '</div>'; }).join('') : UI.empty({ icon: 'map-pin', title: 'Todos los clientes tienen coordenadas', text: 'No hay registros pendientes de georreferenciar.' });
+    dqT.setRows(dq);
+  }
+  $('#geoBox').addEventListener('click', function (e) { var b = e.target.closest('[data-ask]'); if (!b) return; asked[b.dataset.ask] = true; renderLakeExtras(); UI.toast('Se pidió al Data Lake geocodificar ' + A.idx.clientes[b.dataset.ask].razonSocial + '.', 'success'); });
+  logTable('#logLake', 'Data Lake');
+
+  /* ================= EASY SALES ================= */
+  $('#easyBanner').innerHTML = UI.banner({ tone: 'warning', title: 'Alcance por confirmar', text: 'La forma exacta de recibir los pedidos (webhook, consulta periódica o ambos) y las reglas de cambio de pedido están pendientes de definir con Easy Sales. Esta pantalla muestra el comportamiento propuesto.' });
+  var esPed = A.pedidos.filter(function (p) { return p.origen === 'Easy Sales'; }), rsvOf = function (id) { return A.reservas.filter(function (r) { return r.pedidoId === id; }); };
+  var recv = esPed.slice().sort(function (a, b) { return rsvOf(b.pedidoId).length - rsvOf(a.pedidoId).length; }).slice(0, 30).map(function (p, i) { var rs = rsvOf(p.pedidoId), skuBad = i === 11, cliBad = i === 17; return { pedidoId: p.pedidoId, cliente: p.cliente, clienteId: p.clienteId, fecha: p.fecha, lineas: p.lineas.length, kg: p.pesoKg, cliOk: !cliBad, skuOk: !skuBad, reserva: !rs.length ? 'Sin reserva' : rs.some(function (r) { return r.estado === 'Parcial' || r.faltante > 0; }) ? 'Parcial' : 'Completa', estado: p.estado }; });
+  var recvT = UI.table($('#recvTable'), { rows: recv, rowKey: 'pedidoId', pageSize: 6, caption: 'Pedidos recibidos de Easy Sales', searchable: { placeholder: 'Buscar pedido o cliente' },
+    filters: [{ key: 'reserva', label: 'Reserva', all: 'Toda reserva', options: ['Completa', 'Parcial', 'Sin reserva'] }, { key: 'estado', label: 'Estado', all: 'Todos los estados', options: 'auto' }],
+    columns: [{ key: 'pedidoId', label: 'Pedido', mono: true }, { key: 'cliente', label: 'Cliente', title: true }, { key: 'fecha', label: 'Recibido', render: function (r) { return esc(F.fechaHora(r.fecha)); } }, { key: 'lineas', label: 'Líneas', num: true }, { key: 'cliOk', label: 'Cliente en SAP', render: function (r) { return '<span class="chk">' + (r.cliOk ? '<span class="tick">' + ico('check-circle', 'icon-sm') + '</span> Coincide' : '<span class="cross">' + ico('x-circle', 'icon-sm') + '</span> Sin coincidencia') + '</span>'; } }, { key: 'skuOk', label: 'SKU en catálogo', render: function (r) { return '<span class="chk">' + (r.skuOk ? '<span class="tick">' + ico('check-circle', 'icon-sm') + '</span> Válidos' : '<span class="cross">' + ico('x-circle', 'icon-sm') + '</span> SKU inexistente') + '</span>'; } }, { key: 'reserva', label: 'Reserva local', render: function (r) { return UI.chip(r.reserva, { tone: r.reserva === 'Completa' ? 'success' : r.reserva === 'Parcial' ? 'warning' : 'neutral' }); } }, { key: 'estado', label: 'Estado', hideMobile: true, render: function (r) { return UI.chip(r.estado); } }],
+    onRowClick: recvDrawer });
+  function recvDrawer(r) {
+    var ped = A.idx.pedidos[r.pedidoId], rs = rsvOf(r.pedidoId), cl = A.idx.clientes[r.clienteId], block = !r.cliOk || !r.skuOk;
+    UI.drawer({ title: r.pedidoId, subtitle: r.cliente, width: 560, body: '<div class="stack-lg">' + (block ? UI.banner({ tone: 'danger', title: 'Pedido con validaciones fallidas', text: (!r.cliOk ? 'El cliente ' + r.clienteId + ' no tiene correspondencia en el maestro. ' : '') + (!r.skuOk ? 'Una de las líneas usa un SKU que no existe en SAP. ' : '') + 'No pasa a reserva hasta corregirlo.' }) : UI.banner({ tone: 'success', text: 'Cliente y SKU validados. El pedido se importó una sola vez.' })) +
+      '<section><h3 class="mb-2">Validaciones</h3>' + UI.kv([['Cliente', r.cliOk ? 'Coincide con ' + (cl ? esc(cl.razonSocial) : r.clienteId) : '<span style="color:var(--red)">Sin correspondencia (' + esc(r.clienteId) + ')</span>'], ['SKU de las líneas', r.skuOk ? 'Todos existen en el catálogo SAP' : '<span style="color:var(--red)">1009999 no existe</span>'], ['Importación', 'Única · clave ' + esc(r.pedidoId) + '|Pedido|v1.8'], ['Recibido', esc(F.fechaHora(r.fecha))], ['Peso', F.kg(r.kg)]]) + '</section>' +
+      '<section><h3 class="mb-2">Reserva local</h3>' + (rs.length ? rs.map(function (x) { return '<div class="li-row"><div class="grow"><a class="link-inline mono" href="reservas.html">' + x.reservaId + '</a><div class="sub-line">SKU ' + x.sku + ' · ' + F.num(x.cantidad) + ' ' + esc(x.unidad.toLowerCase()) + 's</div></div>' + UI.chip(x.estado, { small: true }) + '</div>'; }).join('') : '<p class="muted t-13" style="margin:0">Aún no tiene reservas.</p>') + '</section></div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, ped ? { label: 'Abrir pedido', kind: 'primary', icon: 'arrow-right', onClick: function () { location.href = 'pedidos.html?id=' + encodeURIComponent(r.pedidoId); } } : { label: 'Cerrar', kind: 'secondary' }] });
+  }
+  /* cambios del pedido de origen (HU-233/234) */
+  var chg = esPed.slice(30, 35).map(function (p, i) {
+    var l = p.lineas[0], pr = A.idx.productos[l.sku], disp = pr && pr.stock['CEDI-BOG'] ? pr.stock['CEDI-BOG'].disponible : 40, delta = i === 0 ? disp + 25 : Math.max(1, Math.min(disp, 2 + i * 3));
+    return { id: 'CH-' + pad(i + 1, 3), pedidoId: p.pedidoId, campo: ['Cantidad línea 1', 'Cantidad línea 1', 'Fecha de entrega', 'Cantidad línea 1', 'Dirección de entrega'][i], sku: l.sku, desc: l.descripcion, antes: l.cantidad, delta: delta, disp: disp, recibido: new Date(Date.now() - (i * 3 + 1) * 36e5).toISOString(), estado: i === 4 ? 'Conciliado' : 'Pendiente', isQty: i !== 2 && i !== 4 };
+  });
+  var chgT = UI.table($('#chgTable'), { rows: chg, rowKey: 'id', pageSize: 5, caption: 'Cambios en el pedido de origen',
+    columns: [{ key: 'pedidoId', label: 'Pedido', mono: true, title: true }, { key: 'campo', label: 'Campo' }, { key: 'antes', label: 'Cambio', render: function (c) { return c.isQty ? c.antes + ' → <strong>' + (c.antes + c.delta) + '</strong>' : c.campo.indexOf('Fecha') === 0 ? '<span class="sub-line">Se adelanta 1 día</span>' : '<span class="sub-line">Nueva dirección</span>'; } }, { key: 'recibido', label: 'Recibido', hideMobile: true, render: function (c) { return esc(F.relativo(c.recibido)); } }, { key: 'estado', label: 'Estado', render: function (c) { return UI.chip(c.estado === 'Conciliado' ? 'Conciliado' : 'Pendiente de conciliar', { tone: c.estado === 'Conciliado' ? 'success' : 'warning' }); } }],
+    actions: function (c) { return c.estado === 'Conciliado' ? [{ label: 'Abrir pedido', icon: 'arrow-right', href: 'pedidos.html?id=' + c.pedidoId }] : [{ label: 'Conciliar con la reserva', icon: 'link', onClick: function () { conciliarChg(c); } }, { label: 'Abrir pedido', icon: 'arrow-right', href: 'pedidos.html?id=' + c.pedidoId }]; },
+    onRowClick: function (c) { if (c.estado !== 'Conciliado') conciliarChg(c); } });
+  function conciliarChg(c) {
+    var short = c.isQty && c.delta > c.disp, rs = rsvOf(c.pedidoId)[0];
+    var m = UI.modal({ title: 'Conciliar con la reserva', subtitle: c.pedidoId + ' · ' + c.campo, width: 540,
+      body: '<div class="stack">' + (c.isQty ? '<div class="grid c2 gap-3"><div class="mini-stat"><div class="v">' + c.antes + '</div><div class="l">Reservado hoy</div></div><div class="mini-stat"><div class="v">' + (c.antes + c.delta) + '</div><div class="l">Nueva cantidad en Easy Sales</div></div></div>' + UI.kv([['SKU', '<span class="mono">' + c.sku + '</span> · ' + esc(c.desc)], ['Disponible en CEDI Bogotá', '<strong>' + F.num(c.disp) + '</strong>'], ['Faltante para cubrir el cambio', short ? '<strong style="color:var(--red)">' + F.num(c.delta - c.disp) + '</strong>' : '0']]) +
+        (short ? UI.banner({ tone: 'danger', title: 'El disponible no cubre el aumento', text: 'Si aplicas el cambio, el pedido queda «Bloqueado por stock» con una reserva parcial. Puedes aplicar solo lo disponible y dejar el resto pendiente.' }) : UI.banner({ tone: 'success', text: 'Hay disponible para ampliar la reserva' + (rs ? ' ' + rs.reservaId : '') + '.' })) : UI.banner({ tone: 'info', text: 'El cambio no afecta cantidades: se actualiza el pedido y se avisa a planeación para revisar el viaje.' })) + '</div>',
+      footer: [{ label: 'Cancelar', kind: 'secondary' }, { label: short ? 'Aplicar solo lo disponible' : 'Aplicar cambio', kind: 'primary', onClick: function () { c.estado = 'Conciliado'; chgT.setRows(chg); renderEasyExtras(); UI.toast(short ? 'Reserva ampliada en ' + c.disp + ' unidades; faltan ' + (c.delta - c.disp) + ' por stock.' : 'Pedido ' + c.pedidoId + ' conciliado con su reserva.', short ? 'warning' : 'success'); } }] });
+  }
+  function renderEasyExtras() {
+    var l = logsOf('Easy Sales'), dups = l.filter(function (x) { return x.estado === 'Duplicado ignorado'; }), errs = l.filter(open);
+    $('#easyStats').innerHTML = stat(F.num(esPed.length), 'Pedidos recibidos') + stat(dups.length, 'Reenvíos ignorados hoy') + stat(errs.length, 'Errores de recepción') + stat(chg.filter(function (c) { return c.estado === 'Pendiente'; }).length, 'Cambios por conciliar');
+    $('#dupEsN').textContent = dups.length + ' hoy';
+    $('#dupEs').innerHTML = dups.length ? dups.slice(0, 5).map(function (x) { return '<div class="li-row"><div class="grow"><a class="link-inline mono" href="pedidos.html?id=' + encodeURIComponent(x.idExterno) + '">' + esc(x.idExterno) + '</a><div class="sub-line">Reenviado ' + esc(F.relativo(x.fechaEvento)) + ' · se conservó el primer registro</div></div>' + UI.chip('Duplicado ignorado', { small: true }) + '</div>'; }).join('') : '<p class="muted t-13" style="margin:0 0 12px">Hoy no hubo reenvíos.</p>';
+    $('#dupEs').insertAdjacentHTML('beforeend', '<p class="muted t-13" style="margin:0 0 10px">Cada pedido trae un identificador único. Si ya se importó, el reenvío se ignora y se conserva el primer registro, sin crear un segundo pedido ni una segunda reserva.</p><pre class="code-box" style="margin:0">clave = Easy Sales + pedido + idExterno + v1.8</pre>');
+    errT.setRows(errs);
+  }
+  var errT = UI.table($('#errEs'), { rows: [], rowKey: 'logId', pageSize: 5, caption: 'Errores de recepción de pedidos', emptyText: 'No hay errores de recepción abiertos.', selectable: true,
+    columns: [{ key: 'logId', label: 'Registro', mono: true, title: true }, { key: 'idExterno', label: 'Pedido de origen', mono: true }, { key: 'fechaEvento', label: 'Fecha', render: function (x) { return esc(F.fechaHora(x.fechaEvento)); } }, { key: 'error', label: 'Causa', render: function (x) { return '<span class="trunc" title="' + esc(x.error) + '">' + esc(x.error) + '</span>'; } }, { key: 'estado', label: 'Estado', render: function (x) { return UI.chip(x.estado); } }],
+    onRowClick: logDrawer, bulkActions: [{ label: 'Reintentar selección', icon: 'refresh', onClick: function (rows) { errT.clearSelection(); retry(rows); } }], actions: function (x) { return [{ label: 'Ver mensaje', icon: 'eye', onClick: function () { logDrawer(x); } }, { label: 'Reintentar', icon: 'refresh', onClick: function () { retry([x]); } }]; } });
+  logTable('#logEasy', 'Easy Sales');
+  $('#btnSimRecv').onclick = function () {
+    var m = UI.modal({ title: 'Simular recepción de pedido', subtitle: 'Comprueba cómo reacciona la plataforma ante cada caso.', width: 520,
+      body: '<div class="stack"><fieldset class="stack-sm" style="border:0;padding:0;margin:0"><legend class="label mb-2">Escenario</legend>' + [['ok', 'Pedido válido'], ['cli', 'Cliente sin correspondencia'], ['sku', 'SKU que no existe en SAP'], ['dup', 'Pedido ya importado']].map(function (s, i) { return '<label class="radio"><input type="radio" name="sc" value="' + s[0] + '"' + (i === 0 ? ' checked' : '') + '> ' + s[1] + '</label>'; }).join('') + '</fieldset><div id="simOut" aria-live="polite"></div></div>',
+      footer: [{ label: 'Cerrar', kind: 'secondary' }, { label: 'Recibir pedido', kind: 'primary', id: 'simGo', keepOpen: true, onClick: function () {
+        var sc = $('input[name=sc]:checked', m.el).value, out = $('#simOut', m.el), go = $('#simGo', m.el), id = 'ES-' + (sc === 'dup' ? esPed[2].pedidoId.slice(3) : (489700 + Math.floor(Math.random() * 99)));
+        go.disabled = true; out.innerHTML = UI.timeline([{ title: 'Pedido ' + id + ' recibido', state: 'current', meta: 'Validando…' }]);
+        delay(900).then(function () {
+          var estado = sc === 'ok' ? 'Procesado' : sc === 'dup' ? 'Duplicado ignorado' : 'Error', err = sc === 'cli' ? 'Cliente CL1009999 sin correspondencia en el maestro' : sc === 'sku' ? 'SKU 1009999 no existe en el catálogo SAP' : sc === 'dup' ? 'Mensaje idempotente ya procesado (' + id + ')' : null;
+          logs.unshift({ logId: 'LOG-' + (49000 + logs.length), sistemaOrigen: 'Easy Sales', entidad: 'Pedido', idExterno: id, fechaEvento: nowIso(), payloadId: 'PL-' + Math.random().toString(16).slice(2, 8).toUpperCase(), version: 'v1.8', estado: estado, error: err, correlacionId: 'cor-' + Math.random().toString(16).slice(2, 9), direccion: 'Entrada', intentos: estado === 'Error' ? 1 : 1, duracionMs: 300 });
+          var msg = { ok: ['success', 'Pedido importado', 'Cliente y SKU validados. Quedó «Recibido» y listo para validar stock.'], cli: ['danger', 'Pedido rechazado', 'El cliente no existe en el maestro. Se registró un error de recepción para corregirlo en el origen.'], sku: ['danger', 'Pedido rechazado', 'Una línea usa un SKU inexistente. Se registró un error de recepción.'], dup: ['info', 'Doble importación evitada', 'Ese pedido ya estaba en la plataforma: se ignoró el reenvío.'] }[sc];
+          out.innerHTML = UI.banner({ tone: msg[0], title: msg[1], text: msg[2] }); go.disabled = false; refreshAll();
+        });
+      } }] });
+  };
+
+  /* ================= acciones de cabecera ================= */
+  function syncSystem(s) { var c = connBy(s); c.ultimaSync = nowIso(); c.colaPendiente = 0; }
+  $('#btnSyncAll').onclick = function () {
+    var b = $('#btnSyncAll'); b.disabled = true; b.innerHTML = '<span class="spin"></span>Sincronizando…';
+    delay(1800).then(function () { SIS.forEach(syncSystem); b.disabled = false; b.innerHTML = ico('refresh') + 'Sincronizar todo'; refreshAll(); UI.toast('Los tres sistemas están al día. Las colas quedaron en cero.', 'success'); });
+  };
+  $('#btnExport').onclick = function () {
+    var rows = logs.slice(), head = ['registro', 'sistema', 'entidad', 'id_externo', 'fecha', 'estado', 'intentos', 'correlacion', 'error'];
+    var csv = [head.join(',')].concat(rows.map(function (l) { return [l.logId, l.sistemaOrigen, l.entidad, l.idExterno, l.fechaEvento, l.estado, l.intentos, l.correlacionId, '"' + (l.error || '').replace(/"/g, '""') + '"'].join(','); })).join('\n');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'bitacora-integraciones.csv'; document.body.appendChild(a); a.click(); a.remove(); UI.toast('Se exportaron ' + rows.length + ' registros de la bitácora.', 'success');
+  };
+
+  /* ================= arranque ================= */
+  var sysTabs = UI.tabs($('#sysTabs'), { onChange: function (id) { selSys = { pSap: 'SAP', pLake: 'Data Lake', pEasy: 'Easy Sales' }[id]; if (typeof renderConn === 'function') renderConn(); } });
+  drawMap(); renderSapExtras(); renderLakeExtras(); renderEasyExtras(); renderConn();
+  var q = (UI.param('sistema') || UI.param('tab') || '').toLowerCase();
+  var qm = { sap: 'pSap', datalake: 'pLake', 'data-lake': 'pLake', easysales: 'pEasy', 'easy-sales': 'pEasy', easy: 'pEasy' };
+  if (qm[q]) sysTabs.select(qm[q]);
+});
+</script>
+</body>
+</html>

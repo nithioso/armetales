@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seguimiento de ruta · Armetales</title>
+<meta name="description" content="Torre de control de Armetales: vehículos en ruta, paradas, ETA contra ventana horaria y alertas en vivo.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de la torre de control (tokens y componentes viven en app.css) */
+  .live-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .clock { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface); font-size: 13px; color: var(--text-2); white-space: nowrap; }
+  .clock b { font-family: var(--font-mono); font-weight: 500; color: var(--text); font-size: 13px; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 55%, transparent); animation: livePulse 1.8s ease-out infinite; flex: none; }
+  .is-paused .live-dot { background: var(--amber); animation: none; }
+  @keyframes livePulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 55%, transparent); } 100% { box-shadow: 0 0 0 9px transparent; } }
+  @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+
+  .strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); box-shadow: var(--shadow-1); margin-bottom: 16px; overflow: hidden; }
+  .strip .cell { padding: 12px 16px; display: flex; flex-direction: column; gap: 2px; min-width: 0; border-left: 1px solid var(--border); text-align: left; }
+  .strip .cell:first-child { border-left: 0; }
+  .strip button.cell { cursor: pointer; transition: background .12s; }
+  .strip button.cell:hover { background: var(--surface-2); }
+  .strip .l { font-size: 12px; color: var(--text-2); }
+  .strip .v { font-family: var(--font-display); font-weight: 600; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .strip .v small { font-size: 14px; color: var(--text-2); font-weight: 500; margin-left: 3px; }
+  .strip .v.is-bad { color: var(--red-fg); }
+  @media (max-width: 719px) { .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .strip .cell:nth-child(3) { border-left: 0; } .strip .cell:nth-child(n+3) { border-top: 1px solid var(--border); } .strip .v { font-size: 22px; } .strip .cell { padding: 10px 14px; } }
+
+  .tower { display: grid; grid-template-columns: minmax(0, 1fr); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); box-shadow: var(--shadow-1); overflow: hidden; }
+  .tower-map { position: relative; height: 340px; }
+  .tower-map .map { --h: 100%; height: 100%; border: 0; border-radius: 0; }
+  .map-tools { position: absolute; z-index: 500; top: 12px; right: 12px; display: flex; gap: 8px; }
+  .map-tools .btn { box-shadow: var(--shadow-1); }
+  .tower-panel { display: flex; flex-direction: column; min-height: 0; background: var(--surface); position: relative; z-index: 2; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; margin-top: -14px; box-shadow: 0 -6px 18px rgba(0,0,0,.08); }
+  .tower-panel::before { content: ""; align-self: center; width: 36px; height: 4px; border-radius: 2px; background: var(--border-strong); margin: 8px 0 2px; flex: none; }
+  @media (min-width: 900px) {
+    .tower { grid-template-columns: 400px minmax(0, 1fr); height: clamp(580px, calc(100vh - 262px), 880px); }
+    .tower-map { height: auto; order: 2; }
+    .tower-panel { order: 1; border-top: 0; border-radius: 0; margin-top: 0; box-shadow: none; border-right: 1px solid var(--border); }
+    .tower-panel::before { display: none; }
+  }
+  .tp-head { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none; }
+  .tp-scroll { flex: 1; overflow: auto; min-height: 0; overscroll-behavior: contain; }
+  @media (max-width: 899px) { .tp-scroll { overflow: visible; } }
+  .tp-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 16px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+  .tp-h .n { font-family: var(--font-mono); letter-spacing: 0; }
+
+  .alert-row .ar-body { flex: 1; min-width: 0; }
+  .alert-row .ar-title { font-weight: 600; font-size: 13.5px; line-height: 1.35; }
+  .alert-row .ar-meta { font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
+  .alert-row .ar-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .alert-row .ar-actions .btn { height: 28px; font-size: 12.5px; padding: 0 10px; }
+
+  .run-card { display: block; width: 100%; text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border); background: transparent; cursor: pointer; transition: background .12s; position: relative; }
+  .run-card:hover { background: var(--surface-2); }
+  .run-card:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+  .run-card .rc-top { display: flex; align-items: center; gap: 8px; }
+  .run-card .rc-sw { width: 4px; align-self: stretch; border-radius: 2px; flex: none; }
+  .run-card .rc-name { font-weight: 600; font-size: 14px; margin-top: 8px; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .run-card .rc-sub { font-size: 12.5px; color: var(--text-2); }
+  .run-card .rc-next { margin-top: 8px; font-size: 12.5px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; color: var(--text-2); }
+  .run-card .rc-next strong { color: var(--text); font-weight: 600; }
+  .run-card .rc-bad { color: var(--red-fg); font-weight: 600; }
+  .run-card .meter { margin-top: 8px; }
+  .badge-n { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: inline-grid; place-items: center; font-size: 11.5px; font-weight: 700; background: var(--red-bg); color: var(--red-fg); }
+
+  .feed { padding: 0 16px 16px; display: grid; gap: 0; }
+  .feed li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; padding: 7px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
+  .feed li:last-child { border-bottom: 0; }
+  .feed time { font-family: var(--font-mono); font-size: 12px; color: var(--text-2); padding-top: 1px; }
+
+  .dt-top { padding: 14px 16px; border-bottom: 1px solid var(--border); display: grid; gap: 12px; }
+  .dt-id { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .dt-id .sw { width: 6px; height: 36px; border-radius: 3px; flex: none; }
+  .dt-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .dt-grid .mini { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); min-width: 0; }
+  .dt-grid .mini .l { font-size: 11.5px; color: var(--text-2); }
+  .dt-grid .mini .v { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+  .dt-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .stops { list-style: none; margin: 0; padding: 4px 0 24px; }
+  .stop { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; padding: 12px 16px; position: relative; border-bottom: 1px solid var(--border); }
+  .stop:last-child { border-bottom: 0; }
+  .stop.is-sel { background: color-mix(in srgb, var(--blue) 7%, transparent); }
+  .stop-n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 600 12px/1 var(--font-mono); background: var(--surface); border: 2px solid var(--steel); color: var(--text); flex: none; }
+  .stop.is-Entregada .stop-n { background: var(--green); border-color: var(--green); color: #fff; }
+  .stop.is-Parcial .stop-n { background: var(--amber); border-color: var(--amber); color: #111; }
+  .stop.is-Fallida .stop-n { background: var(--ink); border-color: var(--red); color: #fff; }
+  .stop.is-En-camino .stop-n, .stop.is-En-sitio .stop-n { background: var(--red); border-color: var(--red); color: #fff; }
+  .stop-name { font-weight: 600; font-size: 14px; text-align: left; line-height: 1.3; color: var(--text); }
+  .stop-name:hover { text-decoration: underline; }
+  .stop-meta, .stop-times { font-size: 12.5px; color: var(--text-2); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; }
+  .stop-times b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stop-flags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .stop-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .stop-cta { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .stop-cta .btn { height: 28px; font-size: 12.5px; padding: 0 10px; }
+
+  .rt-legend { position: absolute; z-index: 500; left: 12px; bottom: 28px; }
+  .modal .field + .field { margin-top: 0; }
+  .call-card { display: flex; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); margin-bottom: 16px; }
+  .call-card a.phone { font-family: var(--font-mono); font-size: 18px; font-weight: 500; color: var(--text); }
+  .dev-note { font-size: 12px; color: var(--text-2); }
+.map-legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+</style>
+</head>
+<body data-page="seguimiento">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Operación</div>
+      <h1 class="page-title">Seguimiento de ruta</h1>
+      <p class="page-desc">Torre de control de los despachos en curso: posición de cada vehículo, avance por parada y ETA contra la ventana horaria del cliente.</p>
+    </div>
+    <div class="page-actions live-bar" id="liveBar" aria-label="Control de la simulación en vivo">
+      <span class="clock" title="Hora simulada de la operación">Hora de operación <b id="clock">--:--</b></span>
+      <span class="chip chip-success" id="liveChip"><span class="live-dot" aria-hidden="true"></span>En vivo</span>
+      <div class="segmented" role="group" aria-label="Velocidad de la simulación" id="rateSeg">
+        <button type="button" data-r="1" aria-pressed="true">1×</button><button type="button" data-r="4" aria-pressed="false">4×</button><button type="button" data-r="10" aria-pressed="false">10×</button>
+      </div>
+      <button type="button" class="btn btn-secondary btn-sm" id="pauseBtn"></button>
+    </div>
+  </header>
+
+  <section class="strip" id="strip" aria-label="Resumen de la operación en ruta"></section>
+
+  <section class="tower" aria-label="Torre de control">
+    <div class="tower-map">
+      <div id="tMap" role="region" aria-label="Mapa con vehículos, rutas y paradas"></div>
+      <div class="map-tools" id="mapTools"></div>
+    </div>
+    <aside class="tower-panel" id="panel" aria-label="Despachos en ruta" aria-live="off"></aside>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+/* Seguimiento de ruta · HU-121…129
+   Todo se calcula en memoria a partir de ARM y del reloj global del demo (new Date() = 2:10 p. m. de hoy). */
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$;
+  var COLORS = ['#2A6BDB', '#0E8F9E', '#7A4B9A', '#C98A00', '#15915A', '#56616B'];
+  var COS = Math.cos(4.7 * Math.PI / 180), RATE = 0.6; /* minutos simulados por segundo real, a 1× */
+  function p2(n) { return (n < 10 ? '0' : '') + n; }
+  function hhmm(ms) { var d = new Date(ms); return p2(d.getHours()) + ':' + p2(d.getMinutes()); }
+  function dur(min) { min = Math.round(min); if (min < 60) return min + ' min'; var h = Math.floor(min / 60), m = min % 60; return h + ' h' + (m ? ' ' + m + ' min' : ''); }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  /* ---------- reloj de operación ---------- */
+  var tgt = new Date(A.ahora), simNow = tgt.getTime(), dayStart = new Date(tgt).setHours(0, 0, 0, 0);
+  function T(iso) { return iso ? new Date(iso).getTime() : null; }
+  function winOf(v) { var m = String(v || '00:00–23:59').split('–'); function mm(x) { var p = x.split(':'); return +p[0] * 60 + +p[1]; } return { a: mm(m[0]), b: mm(m[1]) }; }
+  function minOfDay(ms) { return (ms - dayStart) / 60000; }
+
+  /* ---------- geometría ---------- */
+  function hav(a, b) { var R = 6371, dLa = (b[0] - a[0]) * Math.PI / 180, dLo = (b[1] - a[1]) * Math.PI / 180, x = Math.sin(dLa / 2) * Math.sin(dLa / 2) + Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLo / 2) * Math.sin(dLo / 2); return 2 * R * Math.asin(Math.sqrt(x)); }
+  function proj(r, lat, lng) {
+    var best = { dist: 0, off: 1e9 };
+    for (var i = 1; i < r.poly.length; i++) {
+      var a = r.poly[i - 1], b = r.poly[i], ax = a[1] * COS, ay = a[0], bx = b[1] * COS, by = b[0], px = lng * COS, py = lat, dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy, t = L2 ? ((px - ax) * dx + (py - ay) * dy) / L2 : 0;
+      t = Math.max(0, Math.min(1, t)); var qx = ax + dx * t, qy = ay + dy * t, off = Math.hypot(px - qx, py - qy) * 111.32;
+      if (off < best.off) best = { dist: r.cum[i - 1] + (r.cum[i] - r.cum[i - 1]) * t, off: off };
+    }
+    return best;
+  }
+  function pointAt(r, dist, off) {
+    var c = r.cum, i = 1; while (i < c.length - 1 && c[i] < dist) i++;
+    var d0 = c[i - 1], d1 = c[i], t = d1 > d0 ? Math.max(0, Math.min(1, (dist - d0) / (d1 - d0))) : 0, a = r.poly[i - 1], b = r.poly[i];
+    var lat = a[0] + (b[0] - a[0]) * t, lng = a[1] + (b[1] - a[1]) * t;
+    if (off) { var dy = b[0] - a[0], dx = (b[1] - a[1]) * COS, n = Math.hypot(dx, dy) || 1; lat += (dx / n) * off / 111320; lng += (-dy / n) * off / (111320 * COS); }
+    return [lat, lng];
+  }
+
+  /* Los trazos de ARM.polilineas son rectas largas entre pocos puntos: se densifican con una ondulación suave
+     (máx. ~0,6 km) para que parezcan corredores viales y no líneas trazadas con regla. */
+  function curvy(poly, seed) {
+    var out = [poly[0]];
+    for (var i = 1; i < poly.length; i++) {
+      var a = poly[i - 1], b = poly[i], L = hav(a, b);
+      if (L > 1.6) {
+        var n = Math.round(L / 0.9), amp = Math.min(0.6, 0.06 * L) * (((seed + i) % 2) ? 1 : -1), ph = (seed * 1.7 + i) % 6.28;
+        var dy = b[0] - a[0], dx = (b[1] - a[1]) * COS, nn = Math.hypot(dx, dy) || 1;
+        for (var j = 1; j < n; j++) {
+          var t = j / n, o = amp * Math.sin(Math.PI * t) * (0.75 + 0.25 * Math.sin(2 * Math.PI * 2 * t + ph));
+          out.push([a[0] + dy * t + (dx / nn) * o / 111.32, a[1] + (b[1] - a[1]) * t + (-dy / nn) * o / (111.32 * COS)]);
+        }
+      }
+      out.push(b);
+    }
+    return out;
+  }
+  var CEDI = A.sedes[0];
+
+  /* ---------- modelo de la simulación ---------- */
+  var CLOSED = { Entregada: 1, Parcial: 1, Fallida: 1 };
+  var runs = [], feed = [], ack = {}, state = { sel: null, filter: 'all', alertsAll: false, rate: 1, paused: false, selStop: null };
+  A.despachos.filter(function (d) { return d.estado === 'En ruta'; }).forEach(function (d, i) {
+    var poly = curvy(A.polilineas[d.despachoId], i + 1), cum = [0], pos = A.posiciones.filter(function (p) { return p.despachoId === d.despachoId; })[0];
+    for (var k = 1; k < poly.length; k++) cum.push(cum[k - 1] + hav(poly[k - 1], poly[k]));
+    var r = { id: d.despachoId, d: d, ru: A.idx.rutas[d.rutaId], ve: A.idx.vehiculos[d.vehiculoId], cd: A.idx.conductores[d.conductorId], pos: pos, color: COLORS[i % COLORS.length], poly: poly, cum: cum, total: cum[cum.length - 1], speed: Math.max(38, Math.min(52, pos.velocidadKmh || 42)), dev: 0, devTarget: 0, lostAt: null, batt: pos.bateriaPct };
+    r.stops = A.paradas.filter(function (s) { return s.despachoId === d.despachoId; }).sort(function (a, b) { return a.secuencia - b.secuencia; }).map(function (s) {
+      var nov = A.novedades.filter(function (n) { return n.paradaId === s.paradaId; })[0], c = A.idx.clientes[s.clienteId], pe = A.idx.pedidos[s.pedidoId];
+      return { id: s.paradaId, seq: s.secuencia, pedidoId: s.pedidoId, clienteId: s.clienteId, cliente: s.cliente, municipio: s.municipio, lat: s.latitud, lng: s.longitud, ventana: s.ventana, w: winOf(s.ventana), descMin: s.descargueMin, estado: s.estado, evento: CLOSED[s.estado] ? T(s.horaEvento) : null, llegada: null, etaMs: null, motivo: nov ? nov.motivo : '', obs: s.observacion || '', kg: pe ? pe.pesoKg : 0, m3: pe ? pe.volumenM3 : 0, dir: c ? c.direccionEntrega + ', ' + c.barrio : s.municipio, contacto: c ? c.contacto : null, intentos: 1, reintento: nov && nov.reintento ? { fecha: nov.reintento.programado, franja: 'Dentro de la ventana del cliente', vehiculo: d.vehiculoId, estado: nov.reintento.estado } : null, novId: nov ? nov.novedadId : null, evid: A.evidencias.filter(function (e) { return e.paradaId === s.paradaId; }), log: [] };
+    });
+    /* eventos de paradas ya cerradas, ajustados a su ventana y en orden */
+    var prev = tgt.getTime() - 300 * 60000;
+    r.stops.forEach(function (s, k) {
+      if (!CLOSED[s.estado]) return;
+      var lo = dayStart + (s.w.a + 8 + (k * 7) % 25) * 60000, hi = Math.min(dayStart + s.w.b * 60000, simNow - 4 * 60000), ev = s.evento;
+      ev = Math.max(ev, lo, prev + 14 * 60000); ev = Math.min(ev, Math.max(hi, lo)); s.evento = Math.min(ev, simNow - 3 * 60000); prev = s.evento;
+      s.llegada = s.evento - s.descMin * 60000;
+      s.log = [{ t: s.llegada, e: 'En sitio', n: 'Llegada al cliente' }, { t: s.evento, e: s.estado, n: s.motivo || s.obs || 'Registrado desde la app del conductor' }];
+    });
+    /* posición inicial sobre la polilínea */
+    var N = r.stops.findIndex(function (s) { return !CLOSED[s.estado]; }), pj = proj(r, pos.lat, pos.lng), dd = 0;
+    r.stops.forEach(function (s) { dd = Math.max(dd + 0.9, proj(r, s.lat, s.lng).dist); s.dist = Math.min(dd, r.total); dd = s.dist; });
+    r.vdist = pj.dist; if (N > 0) r.vdist = Math.max(r.vdist, r.stops[N - 1].dist + 0.4);
+    if (N < 0) { r.status = 'complete'; r.vdist = r.total; }
+    else if (r.stops[N].estado === 'En sitio' || pos.estado === 'Descargando') { r.status = 'dwell'; r.stops[N].estado = 'En sitio'; r.vdist = r.stops[N].dist; r.stops[N].llegada = simNow - 8 * 60000; r.dwellLeft = Math.max(4, r.stops[N].descMin - 8); r.stops[N].log = [{ t: r.stops[N].llegada, e: 'En sitio', n: 'Llegada al cliente' }]; }
+    else { r.status = 'moving'; r.stops[N].estado = 'En camino'; r.vdist = Math.max((N > 0 ? r.stops[N - 1].dist : 0.2) + 0.4, Math.min(r.vdist, r.stops[N].dist - (7 + 3 * i))); if (r.stops[N].dist <= r.vdist + 0.8) r.stops[N].dist = Math.min(r.total, r.vdist + 1.6); for (var q = N + 1; q < r.stops.length; q++) r.stops[q].dist = Math.min(r.total, Math.max(r.stops[q].dist, r.stops[q - 1].dist + 0.9)); }
+    runs.push(r);
+  });
+  /* escenarios de alerta: sin señal (último despacho) y desvío (segundo) */
+  var rLost = runs[runs.length - 1], rDev = runs[1];
+  if (rLost) { rLost.status = 'nosignal'; rLost.lostAt = simNow - 14 * 60000; }
+  if (rDev) { rDev.dev = rDev.devTarget = 900; }
+
+  function logFeed(t, runId, text, tone) { feed.unshift({ t: t, run: runId, text: text, tone: tone || '' }); if (feed.length > 12) feed.pop(); }
+  runs.forEach(function (r) { r.stops.forEach(function (s) { if (CLOSED[s.estado]) feed.push({ t: s.evento, run: r.id, text: s.estado === 'Entregada' ? 'Entrega completada en ' + s.cliente : s.estado === 'Parcial' ? 'Entrega parcial en ' + s.cliente : 'Entrega fallida en ' + s.cliente, tone: s.estado === 'Fallida' ? 'bad' : '' }); }); });
+  feed.sort(function (a, b) { return b.t - a.t; }); feed = feed.slice(0, 12);
+  logFeed(simNow - 14 * 60000, rLost && rLost.id, 'Se perdió la señal GPS de ' + (rLost ? rLost.d.vehiculoId : ''), 'bad'); feed.sort(function (a, b) { return b.t - a.t; });
+
+  function nextIdx(r) { return r.stops.findIndex(function (s) { return !CLOSED[s.estado]; }); }
+  function closedN(r) { return r.stops.filter(function (s) { return CLOSED[s.estado]; }).length; }
+  function runById(id) { return runs.filter(function (r) { return r.id === id; })[0]; }
+  function stopById(id) { for (var i = 0; i < runs.length; i++) for (var j = 0; j < runs[i].stops.length; j++) if (runs[i].stops[j].id === id) return { r: runs[i], s: runs[i].stops[j] }; return null; }
+
+  /* ETA de cada parada pendiente según distancia restante, velocidad y descargues previos */
+  function computeEtas(r) {
+    var N = nextIdx(r); if (N < 0) return; var t = simNow, d = r.vdist;
+    for (var k = N; k < r.stops.length; k++) {
+      var s = r.stops[k];
+      if (k === N && r.status === 'dwell') { s.etaMs = s.llegada; t = simNow + r.dwellLeft * 60000; d = s.dist; continue; }
+      var travel = Math.max(0, s.dist - d) / r.speed * 60;
+      s.etaMs = t + travel * 60000; t = s.etaMs + s.descMin * 60000; d = s.dist;
+    }
+  }
+  /* estado de la ventana: ok | late | early */
+  function winState(s) {
+    var ms = CLOSED[s.estado] ? s.evento : s.etaMs; if (ms == null) return null; var m = minOfDay(ms);
+    if (m > s.w.b + 0.5) return { k: 'late', min: Math.round(m - s.w.b) }; if (m < s.w.a - 0.5 && !CLOSED[s.estado]) return { k: 'early', min: Math.round(s.w.a - m) };
+    return { k: 'ok', min: 0 };
+  }
+  function winChip(s) { var w = winState(s); if (!w) return ''; return w.k === 'late' ? '<span class="chip chip-danger chip-sm">Fuera de ventana · +' + dur(w.min) + '</span>' : w.k === 'early' ? '<span class="chip chip-info chip-sm no-dot">Llega antes · espera ' + dur(w.min) + '</span>' : '<span class="chip chip-success chip-sm">En ventana</span>'; }
+  function allEtas() { runs.forEach(computeEtas); }
+
+  /* ---------- alertas (HU-125, HU-127) ---------- */
+  function alertsFor() {
+    var out = [];
+    runs.forEach(function (r) {
+      var pl = r.d.vehiculoId;
+      if (r.dev > 50 && r.devTarget > 0 && !ack['desvio:' + r.id]) out.push({ id: 'desvio:' + r.id, run: r.id, tone: 'peligro', icon: 'alert-triangle', title: 'Desvío de ruta · ' + pl, meta: 'Está a ' + F.num(r.dev / 1000, 1) + ' km del corredor planificado de ' + r.ru.nombre + '. Verifica si es por cierre vial.', acts: [['focus', 'Ver en el mapa'], ['call', 'Llamar'], ['ack', 'Marcar revisada']] });
+      if (r.status === 'nosignal' && !ack['senal:' + r.id]) out.push({ id: 'senal:' + r.id, run: r.id, tone: 'peligro', icon: 'alert-circle', title: 'Sin señal GPS · ' + pl, meta: 'Último reporte hace ' + dur((simNow - r.lostAt) / 60000) + '. La posición y los ETA son estimados.', acts: [['focus', 'Última posición'], ['call', 'Llamar al conductor']] });
+      r.stops.forEach(function (s) {
+        if (s.estado === 'Fallida' && !s.reintento) out.push({ id: 'fall:' + s.id, run: r.id, stop: s.id, tone: 'peligro', icon: 'x-circle', title: 'Entrega fallida · ' + s.cliente, meta: (s.motivo || 'Sin motivo registrado') + ' · sin reintento programado.', acts: [['retry', 'Registrar reintento'], ['stop', 'Ver parada']] });
+        var w = winState(s);
+        if (!CLOSED[s.estado] && w && w.k === 'late' && !ack['vent:' + s.id]) out.push({ id: 'vent:' + s.id, run: r.id, stop: s.id, tone: 'alerta', icon: 'clock', title: 'Llegaría fuera de ventana · ' + s.cliente, meta: 'ETA ' + hhmm(s.etaMs) + ' · ventana ' + s.ventana + ' · +' + dur(w.min) + ' · ' + pl, acts: [['stop', 'Ver parada'], ['call', 'Llamar'], ['ack', 'Marcar revisada']] });
+      });
+    });
+    var ord = { peligro: 0, alerta: 1 }; out.sort(function (a, b) { return ord[a.tone] - ord[b.tone]; }); return out;
+  }
+  function runAlerts(id) { return alertsFor().filter(function (a) { return a.run === id; }); }
+
+  /* ---------- mapa ---------- */
+  var mp = UI.map($('#tMap'), { center: [4.68, -74.12], zoom: 10 }), vm = {}, devLine = null, needMap = true, L = window.L;
+  function stState(s) { return s.estado === 'Entregada' ? 'done' : s.estado === 'Fallida' ? 'failed' : s.estado === 'Parcial' ? 'partial' : (s.estado === 'En camino' || s.estado === 'En sitio') ? 'current' : 'pending'; }
+  function vehPos(r) { return pointAt(r, r.vdist, r.dev); }
+  function drawMap(fitIt) {
+    mp.clear(); vm = {}; devLine = null; var fitPts = [], sel = state.sel, o = A.sedes[0];
+    mp.pin({ lat: o.lat, lng: o.lng, state: 'origin', n: 'C', title: 'CEDI Bogotá', popup: '<strong>CEDI Bogotá</strong><br>Punto de salida' });
+    runs.forEach(function (r) {
+      var dim = sel && sel !== r.id, vp = vehPos(r), cut = 1; while (cut < r.cum.length - 1 && r.cum[cut] < r.vdist) cut++;
+      var done = r.poly.slice(0, cut).concat([pointAt(r, r.vdist, 0)]), rest = [pointAt(r, r.vdist, 0)].concat(r.poly.slice(cut));
+      mp.route(done, { color: r.color, weight: dim ? 2 : 3, opacity: dim ? .18 : .4, dashed: true });
+      /* tramos a más de 30 km del CEDI: trayecto interurbano (punteado fino) */
+      var seg = [], far = null;
+      function flush() { if (seg.length > 1) { if (far) L.polyline(seg, { color: r.color, weight: dim ? 2 : 3, opacity: dim ? .25 : .6, dashArray: '2 7', lineCap: 'round' }).addTo(mp.layer); else mp.route(seg, { color: r.color, weight: dim ? 3 : 5, opacity: dim ? .3 : .88 }); } }
+      rest.forEach(function (pt) { var f = hav([CEDI.lat, CEDI.lng], pt) > 30; if (far === null) far = f; if (f !== far) { seg.push(pt); flush(); seg = [pt]; far = f; } else seg.push(pt); });
+      flush();
+      if (!dim) r.stops.forEach(function (s) {
+        var w = winState(s);
+        mp.pin({ lat: s.lat, lng: s.lng, n: s.seq, state: stState(s), title: s.cliente, onClick: function () { selectRun(r.id, s.id); }, popup: '<strong>' + esc(s.cliente) + '</strong><br><span class="mono">' + s.pedidoId + '</span> · ' + UI.chip(s.estado, { small: true }) + '<br>' + (CLOSED[s.estado] ? 'Evento ' + hhmm(s.evento) : 'ETA ' + (s.etaMs ? hhmm(s.etaMs) : '—')) + ' · ventana ' + s.ventana + (w && w.k === 'late' ? '<br><strong style="color:var(--red-fg)">Fuera de ventana (+' + dur(w.min) + ')</strong>' : '') });
+      });
+      vm[r.id] = mp.vehicle({ lat: vp[0], lng: vp[1], placa: r.d.vehiculoId, state: r.status === 'moving' ? 'moving' : r.status === 'nosignal' ? 'off' : 'stopped', onClick: function () { selectRun(r.id); } });
+      if (r.dev > 50 && L) { devLine = L.polyline([pointAt(r, r.vdist, 0), vp], { color: UI.cssVar('--amber'), weight: 3, dashArray: '4 5' }).addTo(mp.layer); r._devLine = devLine; }
+      if (!dim) { fitPts = fitPts.concat(r.poly); }
+    });
+    if (fitIt) {
+      if (sel) { var r2 = runById(sel); mp.fit(r2.poly.concat([vehPos(r2)]), { padding: 48, maxZoom: 14 }); }
+      else mp.fit(runs.map(function (r) { return vehPos(r); }).concat([[o.lat, o.lng]]), { padding: 56, maxZoom: 12 });
+    }
+    needMap = false;
+  }
+  var lg = document.createElement('div'); lg.className = 'map-legend'; lg.style.cssText = 'bottom:24px;right:12px;gap:4px 12px'; lg.innerHTML = '<span><i class="dot ok"></i> Entregada</span><span><i class="dot bad"></i> Fallida</span><span><i class="dot warn"></i> Parcial</span><span><i class="dot info"></i> En camino o en sitio</span><span><svg width="22" height="6" aria-hidden="true"><line x1="1" y1="3" x2="21" y2="3" stroke="currentColor" stroke-width="2" stroke-dasharray="2 5" stroke-linecap="round"/></svg> Trayecto interurbano</span>'; $('#tMap').appendChild(lg);
+
+  /* ---------- resumen superior ---------- */
+  function renderStrip() {
+    var tot = 0, cl = 0, ok = 0, okN = 0; runs.forEach(function (r) { tot += r.stops.length; r.stops.forEach(function (s) { if (CLOSED[s.estado]) { cl++; var w = winState(s); okN++; if (w && w.k !== 'late' && s.estado === 'Entregada') ok++; } }); });
+    var al = alertsFor(), inWin = okN ? ok / okN * 100 : 100;
+    $('#strip').innerHTML =
+      '<div class="cell"><span class="l">Vehículos en ruta</span><span class="v">' + runs.length + '<small>de ' + A.vehiculos.length + '</small></span></div>' +
+      '<div class="cell"><span class="l">Paradas cerradas</span><span class="v">' + cl + '<small>/ ' + tot + '</small></span></div>' +
+      '<button type="button" class="cell" data-go="alerts"><span class="l">Alertas activas</span><span class="v' + (al.length ? ' is-bad' : '') + '">' + al.length + '<small>' + al.filter(function (a) { return a.tone === 'peligro'; }).length + ' críticas</small></span></button>' +
+      '<div class="cell"><span class="l">Entregas completas y a tiempo</span><span class="v">' + F.num(inWin, 0) + '<small>%</small></span></div>';
+  }
+  $('#strip').addEventListener('click', function (e) { if (e.target.closest('[data-go="alerts"]')) { state.sel = null; state.filter = 'all'; renderPanel(); drawMap(true); var p = $('#panel'); p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } });
+
+  /* ---------- panel lateral ---------- */
+  var panel = $('#panel');
+  function menuOpen() { return !!document.querySelector('.menu'); }
+  var dirty = false;
+  function renderAll() { if (menuOpen()) { dirty = true; return; } dirty = false; allEtas(); renderStrip(); renderPanel(); if (needMap) drawMap(false); }
+
+  function statusChip(r) { return r.status === 'moving' ? '<span class="chip chip-info chip-sm">En movimiento · ' + r.speed + ' km/h</span>' : r.status === 'dwell' ? '<span class="chip chip-warning chip-sm">Descargando</span>' : r.status === 'nosignal' ? '<span class="chip chip-danger chip-sm">Sin señal</span>' : '<span class="chip chip-success chip-sm">Ruta completada</span>'; }
+
+  function alertRow(a) {
+    return '<div class="alert-row" data-alert="' + esc(a.id) + '"><span class="notif-ico ' + a.tone + '">' + UI.icon(a.icon, 'icon-sm') + '</span><div class="ar-body"><div class="ar-title">' + esc(a.title) + '</div><div class="ar-meta">' + esc(a.meta) + '</div><div class="ar-actions">' +
+      a.acts.map(function (x, i) { return '<button type="button" class="btn ' + (i === 0 ? 'btn-secondary' : 'btn-ghost') + '" data-act="' + x[0] + '" data-run="' + a.run + '"' + (a.stop ? ' data-stop="' + a.stop + '"' : '') + ' data-aid="' + esc(a.id) + '">' + esc(x[1]) + '</button>'; }).join('') + '</div></div></div>';
+  }
+
+  function listView() {
+    var al = alertsFor(), lateRuns = {}; al.forEach(function (a) { if (a.id.indexOf('vent:') === 0) lateRuns[a.run] = 1; });
+    var alRuns = {}; al.forEach(function (a) { alRuns[a.run] = (alRuns[a.run] || 0) + 1; });
+    var vis = runs.filter(function (r) { return state.filter === 'alerts' ? alRuns[r.id] : state.filter === 'late' ? lateRuns[r.id] : true; });
+    var shown = state.alertsAll ? al : al.slice(0, 2);
+    var h = '<div class="tp-head"><div class="filter-bar" role="group" aria-label="Filtrar despachos">' +
+      '<button type="button" class="filter-chip" data-f="all" aria-pressed="' + (state.filter === 'all') + '">Todos <span class="n">' + runs.length + '</span></button>' +
+      '<button type="button" class="filter-chip" data-f="alerts" aria-pressed="' + (state.filter === 'alerts') + '">Con alertas <span class="n">' + Object.keys(alRuns).length + '</span></button>' +
+      '<button type="button" class="filter-chip" data-f="late" aria-pressed="' + (state.filter === 'late') + '">Fuera de ventana <span class="n">' + Object.keys(lateRuns).length + '</span></button></div></div><div class="tp-scroll" id="tpScroll">';
+    if (al.length) h += '<h3 class="tp-h">Alertas activas <span class="n">' + al.length + '</span></h3>' + shown.map(alertRow).join('') + (al.length > 2 ? '<div style="padding:8px 16px"><button type="button" class="btn btn-ghost btn-sm" data-act="alerts-toggle">' + (state.alertsAll ? 'Mostrar menos' : 'Ver las ' + (al.length - 2) + ' restantes') + '</button></div>' : '');
+    h += '<h3 class="tp-h">Despachos en ruta <span class="n">' + vis.length + '</span></h3>';
+    if (!vis.length) h += UI.empty({ icon: 'check-circle', title: 'Sin despachos con ese filtro', text: 'Ningún despacho en curso tiene alertas de este tipo ahora mismo.', action: { label: 'Ver todos' } });
+    else h += vis.map(function (r) {
+      var N = nextIdx(r), s = N > -1 ? r.stops[N] : null, w = s && winState(s), n = alRuns[r.id] || 0;
+      return '<button type="button" class="run-card" data-run="' + r.id + '" aria-label="Abrir seguimiento de ' + esc(r.d.vehiculoId) + ', ' + esc(r.ru.nombre) + '"><div class="rc-top"><i class="rc-sw" style="background:' + r.color + ';height:22px"></i>' + UI.plate(r.d.vehiculoId) + statusChip(r) + (n ? '<span class="badge-n" style="margin-left:auto" title="' + n + ' alertas">' + n + '</span>' : '') + '</div>' +
+        '<div class="rc-name"><span>' + esc(r.ru.nombre) + '</span><span class="rc-sub mono">' + r.id.slice(-3) + '</span></div><div class="rc-sub">' + esc(r.cd.nombre) + ' · ' + esc(r.ve.tipo) + '</div>' +
+        UI.meter(closedN(r), r.stops.length, { level: 'info', text: closedN(r) + ' / ' + r.stops.length + ' paradas', label: 'Avance de paradas' }) +
+        '<div class="rc-next">' + (s ? 'Próxima: <strong>' + esc(s.cliente) + '</strong> · ETA <strong class="' + (w && w.k === 'late' ? 'rc-bad' : '') + '">' + hhmm(s.etaMs) + '</strong>' + (w && w.k === 'late' ? ' <span class="rc-bad">fuera de ventana</span>' : '') : 'Todas las paradas cerradas') + '</div></button>';
+    }).join('');
+    h += '<h3 class="tp-h">Últimos eventos</h3><ul class="feed" style="list-style:none;margin:0">' + feed.slice(0, 6).map(function (f) { return '<li><time>' + hhmm(f.t) + '</time><span' + (f.tone === 'bad' ? ' style="color:var(--red-fg)"' : '') + '>' + (f.run ? '<span class="mono">' + esc(runById(f.run).d.vehiculoId) + '</span> · ' : '') + esc(f.text) + '</span></li>'; }).join('') + '</ul></div>';
+    return h;
+  }
+
+  function stopRow(r, s, N) {
+    var isNext = r.stops.indexOf(s) === N, hasEv = s.evid.length, kinds = {}; s.evid.forEach(function (e) { kinds[e.tipo] = 1; });
+    var time = CLOSED[s.estado] ? 'Evento <b>' + hhmm(s.evento) + '</b>' : 'ETA <b>' + (s.etaMs ? hhmm(s.etaMs) : '—') + '</b>' + (r.status === 'nosignal' ? ' <span class="muted">(estimado)</span>' : '');
+    return '<li class="stop is-' + s.estado.replace(' ', '-') + (state.selStop === s.id ? ' is-sel' : '') + '" data-stop="' + s.id + '" id="st-' + s.id + '">' +
+      '<span class="stop-n" aria-label="Parada ' + s.seq + '">' + s.seq + '</span><div style="min-width:0">' +
+      '<button type="button" class="stop-name" data-act="stop-focus" data-run="' + r.id + '" data-stop="' + s.id + '">' + esc(s.cliente) + '</button>' +
+      '<div class="stop-meta"><span>' + esc(s.municipio) + '</span><a class="mono" href="pedidos.html?id=' + encodeURIComponent(s.pedidoId) + '">' + s.pedidoId + '</a><span>' + F.kg(s.kg) + '</span></div>' +
+      '<div class="stop-times"><span>Ventana <b>' + s.ventana.replace('–', ' – ') + '</b></span><span>' + time + '</span>' + winChip(s) + '</div>' +
+      ((hasEv || s.reintento || s.motivo && CLOSED[s.estado] && s.estado !== 'Entregada') ? '<div class="stop-flags">' + (s.motivo && s.estado !== 'Entregada' && CLOSED[s.estado] ? '<span class="tag">' + esc(s.motivo) + '</span>' : '') + (s.reintento ? '<span class="chip chip-info chip-sm">Reintento ' + esc(/^\d{4}-/.test(s.reintento.fecha) ? F.fecha(s.reintento.fecha) : s.reintento.fecha) + '</span>' : '') + (hasEv ? '<a class="tag" href="evidencias.html?despacho=' + r.id + '" title="' + Object.keys(kinds).join(', ') + '">' + UI.icon('camera', 'icon-sm') + '&nbsp;' + hasEv + ' evidencia' + (hasEv > 1 ? 's' : '') + '</a>' : '') + '</div>' : '') +
+      ((isNext && r.status !== 'complete') || (s.estado === 'Fallida' && !s.reintento) ? '<div class="stop-cta">' + (isNext ? '<button type="button" class="btn btn-primary" data-act="upd" data-run="' + r.id + '" data-stop="' + s.id + '">Actualizar estado</button>' : '') + (s.estado === 'Fallida' && !s.reintento ? '<button type="button" class="btn btn-secondary" data-act="retry" data-run="' + r.id + '" data-stop="' + s.id + '">Registrar reintento</button>' : '') + '</div>' : '') +
+      '</div><div class="stop-side">' + UI.chip(s.estado, { small: true }) + '<button type="button" class="btn btn-ghost btn-icon btn-sm" data-act="stop-menu" data-run="' + r.id + '" data-stop="' + s.id + '" aria-label="Acciones de la parada ' + s.seq + ', ' + esc(s.cliente) + '" aria-haspopup="menu">' + UI.icon('more') + '</button></div></li>';
+  }
+
+  function detailView(r) {
+    var N = nextIdx(r), ra = runAlerts(r.id), kmLeft = Math.max(0, r.total - r.vdist), lastS = r.stops[r.stops.length - 1], endEta = lastS.etaMs && !CLOSED[lastS.estado] ? lastS.etaMs + lastS.descMin * 60000 : null;
+    var sig = r.status === 'nosignal' ? 'hace ' + dur((simNow - r.lostAt) / 60000) : 'hace ' + (1 + (r.id.charCodeAt(r.id.length - 1) % 3)) + ' min';
+    var h = '<div class="tp-head"><button type="button" class="btn btn-ghost btn-sm" data-act="back">' + UI.icon('arrow-left', 'icon-sm') + 'Todos los despachos</button><span class="mono muted" style="margin-left:auto;font-size:12px">' + r.id + '</span></div><div class="tp-scroll" id="tpScroll">';
+    h += '<div class="dt-top"><div class="dt-id"><i class="sw" style="background:' + r.color + '"></i><div>' + UI.plate(r.d.vehiculoId, { large: true }) + '</div><div style="min-width:0"><div class="strong">' + esc(r.ru.nombre) + '</div><div class="muted t-13">' + esc(r.ve.tipo) + ' · ' + esc(r.ve.marca) + '</div></div></div><div>' + statusChip(r) + '</div>' +
+      '<div class="dt-grid"><div class="mini"><div class="l">Conductor</div><div class="v">' + esc(r.cd.nombre) + '</div></div><div class="mini"><div class="l">Última señal</div><div class="v" data-sig>' + sig + '</div></div>' +
+      '<div class="mini"><div class="l">Falta por recorrer</div><div class="v" data-kmleft>' + F.num(kmLeft, 1) + ' km</div></div><div class="mini"><div class="l">Fin estimado de ruta</div><div class="v">' + (endEta ? hhmm(endEta) : 'Completada') + '</div></div></div>' +
+      UI.meter(closedN(r), r.stops.length, { level: 'info', text: closedN(r) + ' / ' + r.stops.length + ' paradas cerradas', label: 'Avance' }) +
+      '<div class="dt-actions"><button type="button" class="btn btn-primary btn-sm" data-act="call" data-run="' + r.id + '">' + UI.icon('phone') + 'Llamar</button><a class="btn btn-secondary btn-sm" href="evidencias.html?despacho=' + r.id + '">' + UI.icon('camera') + 'Evidencias</a><a class="btn btn-secondary btn-sm" href="despachos.html?id=' + r.id + '">' + UI.icon('clipboard-list') + 'Despacho</a><a class="btn btn-ghost btn-icon btn-sm" href="motor-rutas.html" aria-label="Reoptimizar la ruta en el motor de rutas" data-tip="Reoptimizar ruta">' + UI.icon('route') + '</a></div></div>';
+    if (ra.length) h += '<h3 class="tp-h">Alertas de este vehículo <span class="n">' + ra.length + '</span></h3>' + ra.map(alertRow).join('');
+    h += '<h3 class="tp-h">Paradas y secuencia <span class="n">' + r.stops.length + '</span></h3><ol class="stops">' + r.stops.map(function (s) { return stopRow(r, s, N); }).join('') + '</ol></div>';
+    return h;
+  }
+
+  function renderPanel() {
+    var sc = $('#tpScroll'), top = sc ? sc.scrollTop : 0, key = state.sel;
+    panel.innerHTML = state.sel ? detailView(runById(state.sel)) : listView();
+    var sc2 = $('#tpScroll'); if (sc2 && panel.dataset.last === String(key)) sc2.scrollTop = top; panel.dataset.last = String(key);
+    renderTools();
+  }
+  function renderTools() {
+    $('#mapTools').innerHTML = state.sel ? '<button type="button" class="btn btn-secondary btn-sm" data-act="back">Ver todas las rutas</button><button type="button" class="btn btn-secondary btn-sm" data-act="center">' + UI.icon('navigation') + 'Centrar vehículo</button>' : '<button type="button" class="btn btn-secondary btn-sm" data-act="fit-all">' + UI.icon('map') + 'Ver todas</button>';
+  }
+
+  /* ---------- selección ---------- */
+  function selectRun(id, stopId) {
+    state.sel = id; state.selStop = stopId || null; renderPanel(); drawMap(true);
+    if (stopId) focusStop(id, stopId, true);
+    if (window.matchMedia('(max-width: 899px)').matches) $('#tMap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function focusStop(rid, sid, open) {
+    var r = runById(rid), s = r.stops.filter(function (x) { return x.id === sid; })[0]; state.selStop = sid;
+    $$('.stop', panel).forEach(function (x) { x.classList.toggle('is-sel', x.dataset.stop === sid); });
+    mp.map.setView([s.lat, s.lng], Math.max(mp.map.getZoom(), 14), { animate: true });
+    mp.layer.eachLayer(function (l) { if (l.getLatLng && l.getLatLng().lat === s.lat && l.getLatLng().lng === s.lng && open) l.openPopup(); });
+    var row = $('#st-' + sid); if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  function clearSel() { state.sel = null; state.selStop = null; renderPanel(); drawMap(true); }
+
+  /* ---------- acciones ---------- */
+  panel.addEventListener('click', onAct); $('#mapTools').addEventListener('click', onAct);
+  function onAct(e) {
+    var rc = e.target.closest('.run-card'); if (rc) { selectRun(rc.dataset.run); return; }
+    var f = e.target.closest('[data-f]'); if (f) { state.filter = f.dataset.f; renderPanel(); return; }
+    var b = e.target.closest('[data-act]'); if (!b) return; var act = b.dataset.act, r = b.dataset.run && runById(b.dataset.run), s = b.dataset.stop && stopById(b.dataset.stop);
+    if (act === 'back') clearSel();
+    else if (act === 'fit-all') drawMap(true);
+    else if (act === 'center') { var rr = runById(state.sel), vp = vehPos(rr); mp.map.setView(vp, 14, { animate: true }); }
+    else if (act === 'alerts-toggle') { state.alertsAll = !state.alertsAll; renderPanel(); }
+    else if (act === 'focus') { selectRun(r.id); }
+    else if (act === 'stop') { selectRun(r.id, s.s.id); }
+    else if (act === 'stop-focus') { if (state.sel !== r.id) selectRun(r.id, s.s.id); else focusStop(r.id, s.s.id, true); }
+    else if (act === 'ack') { ack[b.dataset.aid] = true; if (b.dataset.aid.indexOf('desvio:') === 0) runById(b.dataset.aid.split(':')[1]).devTarget = 0; UI.toast('Alerta marcada como revisada. Queda en el registro del turno.', 'success'); renderAll(); needMap = true; }
+    else if (act === 'call') callModal(r);
+    else if (act === 'upd') stateModal(s.r, s.s);
+    else if (act === 'retry') retryModal(s.r, s.s);
+    else if (act === 'stop-menu') stopMenu(b, s.r, s.s);
+    else if (act === 'empty-action') { state.filter = 'all'; renderPanel(); }
+  }
+  panel.addEventListener('click', function (e) { if (e.target.closest('.empty .btn')) { state.filter = 'all'; renderPanel(); } });
+
+  function stopMenu(anchor, r, s) {
+    var items = [{ heading: 'Parada ' + s.seq }, { label: 'Ver detalle y eventos', icon: 'eye', onClick: function () { stopDrawer(r, s); } }, { label: 'Actualizar estado', icon: 'edit', disabled: !!CLOSED[s.estado], onClick: function () { stateModal(r, s); } }];
+    if (s.estado === 'Fallida') items.push({ label: s.reintento ? 'Reprogramar reintento' : 'Registrar reintento', icon: 'refresh', onClick: function () { retryModal(r, s); } });
+    items.push({ sep: true }, { label: 'Ver pedido ' + s.pedidoId, icon: 'package', href: 'pedidos.html?id=' + encodeURIComponent(s.pedidoId) }, { label: 'Ver cliente', icon: 'users', href: 'clientes.html?id=' + encodeURIComponent(s.clienteId) }, { label: 'Ver evidencias', icon: 'camera', href: 'evidencias.html?despacho=' + r.id });
+    if (s.estado === 'Fallida' || s.estado === 'Parcial') items.push({ label: 'Ver novedad', icon: 'alert-triangle', href: 'novedades.html' + (s.novId ? '?id=' + s.novId : '') });
+    UI.menu(anchor, items, { align: 'end' });
+  }
+
+  /* detalle de parada con historial de eventos (HU-126) */
+  function stopDrawer(r, s) {
+    var ev = [{ state: 'done', title: 'Salida del CEDI', meta: hhmm(T(r.d.fechaSalida)) + ' · ' + r.d.vehiculoId }];
+    s.log.forEach(function (l) { ev.push({ state: l.e === 'Fallida' ? 'error' : 'done', titleHtml: UI.chip(l.e, { small: true }) + ' ' + esc(l.n || ''), meta: hhmm(l.t) }); });
+    if (!CLOSED[s.estado]) ev.push({ state: 'current', title: s.estado === 'En sitio' ? 'Descargando en el cliente' : 'ETA a la parada', meta: s.etaMs ? hhmm(s.etaMs) + ' · ventana ' + s.ventana : 'Pendiente' });
+    if (s.reintento) ev.push({ state: 'pending', title: 'Reintento programado', meta: /^\d{4}-/.test(s.reintento.fecha) ? F.fecha(s.reintento.fecha) + ' · ' + s.reintento.franja : s.reintento.fecha });
+    var c = s.contacto;
+    UI.drawer({ title: s.seq + '. ' + s.cliente, subtitleHtml: UI.plate(r.d.vehiculoId) + ' ' + esc(r.ru.nombre) + ' · ' + UI.chip(s.estado, { small: true }), width: 480,
+      body: '<div class="stack-lg">' + UI.kv([['Pedido', '<a class="mono" href="pedidos.html?id=' + s.pedidoId + '">' + s.pedidoId + '</a>'], ['Cliente', '<a href="clientes.html?id=' + s.clienteId + '">' + esc(s.cliente) + '</a>'], ['Dirección', esc(s.dir)], ['Contacto', c ? esc(c.nombre) + ' · ' + esc(c.telefono) : '—'], ['Ventana horaria', s.ventana.replace('–', ' – ')], ['Descargue estimado', s.descMin + ' min'], ['Carga', F.kg(s.kg) + ' · ' + F.m3(s.m3)], ['Ventana vs. ETA', winChip(s) || '—']]) +
+        '<section><h3 class="mb-2">Eventos de la parada</h3>' + UI.timeline(ev) + '</section>' + (s.evid.length ? '<section><h3 class="mb-2">Evidencias</h3><div class="row gap-2" style="flex-wrap:wrap">' + s.evid.map(function (e) { return '<span class="tag">' + esc(e.tipo) + ' · ' + hhmm(T(e.fechaHora)) + '</span>'; }).join('') + '</div></section>' : '') + '</div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Actualizar estado', kind: 'primary', onClick: function () { if (CLOSED[s.estado]) { UI.toast('La parada ya está cerrada. Si hubo un error, registra una novedad.', 'warning'); return false; } setTimeout(function () { stateModal(r, s); }, 220); } }] });
+  }
+
+  /* HU-128: actualizar estado de una entrega */
+  function stateModal(r, s) {
+    var N = nextIdx(r), idx = r.stops.indexOf(s), opts = ['En camino', 'En sitio', 'Entregada', 'Parcial', 'Fallida'], def = s.estado === 'En camino' ? 'En sitio' : s.estado === 'En sitio' ? 'Entregada' : 'En camino';
+    var m = UI.modal({ title: 'Actualizar estado de la entrega', subtitleHtml: esc(s.seq + '. ' + s.cliente) + ' · <span class="mono">' + s.pedidoId + '</span>', width: 520,
+      body: '<form class="form-grid" id="fsForm" novalidate>' +
+        '<div class="field"><label class="label" for="fsEst">Nuevo estado</label><select class="select" id="fsEst">' + opts.map(function (o) { return '<option' + (o === def ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select><span class="error-text" id="fsEstE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="fsHora">Hora del evento</label><input class="input" id="fsHora" type="time" value="' + hhmm(simNow) + '"><span class="hint">Hora de operación actual: ' + hhmm(simNow) + '. No puede ser posterior.</span><span class="error-text" id="fsHoraE" hidden></span></div>' +
+        '<div class="field" id="fsMotG" hidden><label class="label" for="fsMot">Motivo</label><select class="select" id="fsMot"></select><span class="error-text" id="fsMotE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="fsObs">Observación <span class="opt" id="fsObsOpt">(opcional)</span></label><textarea class="textarea" id="fsObs" placeholder="Quién recibió, qué quedó pendiente, cómo se contactó al cliente…"></textarea><span class="error-text" id="fsObsE" hidden></span></div></form>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Guardar estado', kind: 'primary', onClick: function () { return save(); } }] });
+    var est = $('#fsEst', m.el), motG = $('#fsMotG', m.el), mot = $('#fsMot', m.el);
+    function sync() { var v = est.value, lst = v === 'Fallida' ? A.motivos.fallida : v === 'Parcial' ? A.motivos.parcial : null; motG.hidden = !lst; if (lst) mot.innerHTML = '<option value="">Selecciona un motivo</option>' + lst.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join(''); $('#fsObsOpt', m.el).textContent = v === 'Parcial' ? '(obligatoria)' : '(opcional)'; }
+    est.addEventListener('change', sync); sync();
+    function err(id, msg) { var e = $('#' + id + 'E', m.el), c = $('#' + id, m.el); e.hidden = !msg; e.innerHTML = msg ? UI.icon('alert-circle', 'icon-sm') + esc(msg) : ''; if (c) c.setAttribute('aria-invalid', msg ? 'true' : 'false'); return !!msg; }
+    function save() {
+      var v = est.value, bad = false, hv = $('#fsHora', m.el).value, hm = hv ? +hv.split(':')[0] * 60 + +hv.split(':')[1] : null, ms = hv ? dayStart + hm * 60000 : simNow;
+      bad = err('fsEst', CLOSED[s.estado] ? 'La parada ya está cerrada como «' + s.estado + '». Registra una novedad para corregirla.' : v === s.estado ? 'La parada ya está en ese estado.' : (idx > N && v !== 'En camino') ? 'Primero cierra la parada ' + r.stops[N].seq + ' (' + r.stops[N].cliente + '): la secuencia de la ruta es obligatoria.' : (idx > N) ? 'La parada ' + s.seq + ' aún no es la siguiente en la ruta.' : '') || bad;
+      bad = err('fsHora', !hv ? 'Indica la hora del evento.' : ms > simNow + 30000 ? 'La hora no puede ser posterior a ' + hhmm(simNow) + '.' : (idx > 0 && r.stops[idx - 1].evento && ms < r.stops[idx - 1].evento) ? 'No puede ser anterior al cierre de la parada anterior (' + hhmm(r.stops[idx - 1].evento) + ').' : '') || bad;
+      bad = err('fsMot', (v === 'Fallida' || v === 'Parcial') && !mot.value ? 'Selecciona el motivo para clasificarlo en novedades.' : '') || bad;
+      bad = err('fsObs', v === 'Parcial' && $('#fsObs', m.el).value.trim().length < 8 ? 'Describe qué se entregó y qué quedó pendiente.' : '') || bad;
+      if (bad) { var first = $('[aria-invalid="true"]', m.el); if (first) first.focus(); return false; }
+      applyState(r, s, v, ms, v === 'Fallida' || v === 'Parcial' ? mot.value : '', $('#fsObs', m.el).value.trim()); return true;
+    }
+  }
+  function applyState(r, s, v, ms, motivo, obs) {
+    s.estado = v; s.log.push({ t: ms, e: v, n: motivo || obs || 'Actualizado por la torre de control' });
+    if (v === 'En camino') { r.status = r.status === 'nosignal' ? 'nosignal' : 'moving'; }
+    else if (v === 'En sitio') { s.llegada = ms; if (r.status !== 'nosignal') { r.status = 'dwell'; r.vdist = Math.max(r.vdist, s.dist); r.dwellLeft = s.descMin; } }
+    else { s.evento = ms; s.motivo = motivo; if (obs) s.obs = obs; r.vdist = Math.max(r.vdist, s.dist); var N = nextIdx(r); if (N < 0) { r.status = 'complete'; } else { if (r.status !== 'nosignal') r.status = 'moving'; if (r.stops[N].estado === 'Pendiente') r.stops[N].estado = 'En camino'; r.dwellLeft = 0; } }
+    logFeed(ms, r.id, (v === 'En sitio' ? 'Llegó a ' : v === 'En camino' ? 'En camino a ' : v === 'Entregada' ? 'Entrega completada en ' : v === 'Parcial' ? 'Entrega parcial en ' : 'Entrega fallida en ') + s.cliente + ' (actualizado por la torre)', v === 'Fallida' ? 'bad' : '');
+    UI.toast(s.cliente + ': ' + v.toLowerCase() + '.' + (v === 'Fallida' ? ' Programa el reintento desde la parada.' : v === 'Parcial' ? ' Registra la devolución en Novedades.' : ''), v === 'Fallida' ? 'warning' : 'success', { title: 'Estado actualizado' });
+    needMap = true; renderAll(); drawMap(false);
+  }
+
+  /* HU-129: registrar reintento de entrega */
+  function retryModal(r, s) {
+    var today = A.ymd(0), max = A.ymd(7), cw = s.w, ve = A.vehiculos.filter(function (v) { return v.estado === 'Disponible' || v.placa === r.d.vehiculoId; });
+    var m = UI.modal({ title: s.reintento ? 'Reprogramar reintento' : 'Registrar reintento de entrega', subtitleHtml: esc(s.cliente) + ' · <span class="mono">' + s.pedidoId + '</span>', width: 520,
+      body: '<div class="stack">' + UI.banner({ tone: 'info', text: 'Intento n.º ' + (s.intentos + 1) + ' de 3. Ventana del cliente: ' + s.ventana.replace('–', ' – ') + '.' + (s.motivo ? ' Motivo de la falla: ' + s.motivo + '.' : '') }) +
+        '<div class="form-grid c2"><div class="field"><label class="label" for="rtF">Fecha del reintento</label><input class="input" id="rtF" type="date" min="' + today + '" max="' + max + '" value="' + A.ymd(1) + '"><span class="error-text" id="rtFE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="rtJ">Franja</label><select class="select" id="rtJ"><option value="v">Ventana del cliente</option><option value="m">Mañana · 07:00 – 12:00</option><option value="t">Tarde · 13:00 – 17:00</option></select><span class="error-text" id="rtJE" hidden></span></div>' +
+        '<div class="field span-2"><label class="label" for="rtV">Vehículo</label><select class="select" id="rtV">' + ve.map(function (v) { return '<option value="' + v.placa + '"' + (v.placa === r.d.vehiculoId ? ' selected' : '') + '>' + v.placa + ' · ' + esc(v.tipo) + (v.placa === r.d.vehiculoId ? ' (el mismo del despacho)' : '') + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field span-2"><label class="label" for="rtN">Nota para el cliente y el conductor <span class="opt">(opcional)</span></label><textarea class="textarea" id="rtN" placeholder="Confirmar con el residente antes de salir."></textarea></div></div></div>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: s.reintento ? 'Guardar nueva fecha' : 'Programar reintento', kind: 'primary', onClick: function () { return go(); } }] });
+    function err(id, msg) { var e = $('#' + id + 'E', m.el), c = $('#' + id, m.el); e.hidden = !msg; e.innerHTML = msg ? UI.icon('alert-circle', 'icon-sm') + esc(msg) : ''; c.setAttribute('aria-invalid', msg ? 'true' : 'false'); return !!msg; }
+    function go() {
+      var f = $('#rtF', m.el).value, j = $('#rtJ', m.el).value, bad = false, rng = j === 'm' ? [420, 720] : j === 't' ? [780, 1020] : [cw.a, cw.b];
+      bad = err('rtF', !f ? 'Indica la fecha del reintento.' : f < today ? 'La fecha no puede estar en el pasado.' : f > max ? 'El reintento debe quedar dentro de los próximos 7 días.' : s.intentos >= 3 ? 'Se alcanzó el máximo de 3 intentos: escala el pedido a coordinación logística.' : '') || bad;
+      bad = err('rtJ', Math.max(rng[0], cw.a) >= Math.min(rng[1], cw.b) ? 'El cliente solo recibe entre ' + s.ventana.replace('–', ' y ') + '. Elige una franja que se cruce con su ventana.' : '') || bad;
+      if (bad) { var x = $('[aria-invalid="true"]', m.el); if (x) x.focus(); return false; }
+      var veh = $('#rtV', m.el).value; s.reintento = { fecha: f, franja: j === 'v' ? 'Dentro de la ventana del cliente' : j === 'm' ? 'Mañana' : 'Tarde', vehiculo: veh, estado: 'Programado' }; s.log.push({ t: simNow, e: 'Fallida', n: 'Reintento programado para ' + F.fecha(f) + ' · ' + veh });
+      logFeed(simNow, r.id, 'Reintento programado para ' + s.cliente + ' (' + F.fecha(f) + ')');
+      UI.toast('Reintento programado para el ' + F.fecha(f) + ' con ' + veh + '. Se notificó al cliente y al despachador.', 'success', { title: 'Reintento registrado' }); needMap = true; renderAll(); return true;
+    }
+  }
+
+  /* llamar al conductor */
+  function callModal(r) {
+    var m = UI.modal({ title: 'Llamar al conductor', subtitleHtml: UI.plate(r.d.vehiculoId) + ' ' + esc(r.ru.nombre), width: 460,
+      body: '<div class="call-card">' + UI.avatar(r.cd.nombre, { size: 'lg' }) + '<div style="min-width:0"><div class="strong">' + esc(r.cd.nombre) + '</div><a class="phone" href="tel:' + r.cd.telefono.replace(/\D/g, '') + '">' + esc(r.cd.telefono) + '</a><div class="muted t-13">Licencia ' + esc(r.cd.licencia) + ' · ' + (r.status === 'nosignal' ? 'sin señal GPS' : r.status === 'dwell' ? 'descargando' : 'en movimiento') + '</div></div></div>' +
+        '<div class="form-grid"><div class="field"><label class="label" for="clR">Resultado de la llamada</label><select class="select" id="clR"><option value="">Selecciona un resultado</option><option value="ok">Contestó: continúa con normalidad</option><option value="obra">Contestó: desvío por cierre vial, retomará la ruta</option><option value="gps">Contestó: reinició el GPS, señal restablecida</option><option value="no">No contestó: reintentar en 10 minutos</option></select><span class="error-text" id="clRE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="clN">Nota <span class="opt">(opcional)</span></label><textarea class="textarea" id="clN" placeholder="Qué informó el conductor"></textarea></div></div>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Registrar llamada', kind: 'primary', icon: 'phone', onClick: function () {
+        var v = $('#clR', m.el).value, e = $('#clRE', m.el); e.hidden = !!v; e.innerHTML = v ? '' : UI.icon('alert-circle', 'icon-sm') + 'Registra cómo terminó la llamada.'; $('#clR', m.el).setAttribute('aria-invalid', v ? 'false' : 'true'); if (!v) { $('#clR', m.el).focus(); return false; }
+        var txt = { ok: 'Llamada al conductor: continúa con normalidad', obra: 'Llamada al conductor: desvío por cierre vial confirmado', gps: 'Llamada al conductor: señal GPS restablecida', no: 'Llamada sin respuesta' }[v];
+        if (v === 'gps' && r.status === 'nosignal') { r.status = nextIdx(r) < 0 ? 'complete' : 'moving'; r.lostAt = null; ack['senal:' + r.id] = true; UI.toast('Señal restablecida: ' + r.d.vehiculoId + ' vuelve a reportar su posición.', 'success'); }
+        else if (v === 'obra') { ack['desvio:' + r.id] = true; r.devTarget = 0; UI.toast('Desvío justificado. El vehículo retomará el corredor planificado.', 'success'); }
+        else if (v === 'no') UI.toast('Sin respuesta. Se programó un nuevo intento de llamada en 10 minutos.', 'warning');
+        else UI.toast('Llamada registrada en el seguimiento.', 'success');
+        logFeed(simNow, r.id, txt, v === 'no' ? 'bad' : ''); needMap = true; renderAll(); return true; } }] });
+  }
+
+  /* ---------- controles en vivo ---------- */
+  function paintLive() { $('#liveChip').className = 'chip ' + (state.paused ? 'chip-warning is-paused' : 'chip-success'); $('#liveChip').innerHTML = '<span class="live-dot" aria-hidden="true"></span>' + (state.paused ? 'Pausado' : 'En vivo'); $('#pauseBtn').innerHTML = UI.icon(state.paused ? 'play' : 'minus') + (state.paused ? 'Reanudar' : 'Pausar'); $('#pauseBtn').setAttribute('aria-pressed', state.paused); }
+  $('#pauseBtn').addEventListener('click', function () { state.paused = !state.paused; paintLive(); UI.toast(state.paused ? 'Simulación en pausa: los vehículos conservan su última posición.' : 'Simulación reanudada.', 'info', { duration: 2200 }); });
+  $('#rateSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; state.rate = +b.dataset.r; $$('button', $('#rateSeg')).forEach(function (x) { x.setAttribute('aria-pressed', x === b); }); });
+
+  /* ---------- bucle de simulación (HU-124) ---------- */
+  var last = performance.now(), acc = 0, reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function step(dMin) {
+    simNow += dMin * 60000; var events = false;
+    runs.forEach(function (r) {
+      if (r.status === 'nosignal' || r.status === 'complete') return;
+      var N = nextIdx(r); if (N < 0) { r.status = 'complete'; events = true; return; } var s = r.stops[N];
+      if (r.status === 'dwell') { r.dwellLeft -= dMin; if (r.dwellLeft <= 0) { s.estado = 'Entregada'; s.evento = simNow; s.log.push({ t: simNow, e: 'Entregada', n: 'Registrado desde la app del conductor' }); logFeed(simNow, r.id, 'Entrega completada en ' + s.cliente); var N2 = nextIdx(r); if (N2 < 0) r.status = 'complete'; else { r.status = 'moving'; if (r.stops[N2].estado === 'Pendiente') r.stops[N2].estado = 'En camino'; } events = true; } }
+      else { r.vdist = Math.min(s.dist, r.vdist + r.speed * dMin / 60); if (r.vdist >= s.dist - 0.01) { r.status = 'dwell'; s.estado = 'En sitio'; s.llegada = simNow; s.log.push({ t: simNow, e: 'En sitio', n: 'Llegada al cliente' }); r.dwellLeft = s.descMin; logFeed(simNow, r.id, 'Llegó a ' + s.cliente); events = true; } }
+    });
+    runs.forEach(function (r) { if (r.dev !== r.devTarget) { var d = r.devTarget - r.dev, st = dMin * 90; r.dev = Math.abs(d) <= st ? r.devTarget : r.dev + Math.sign(d) * st; if (r.dev < 50 && r.devTarget === 0) { r.dev = 0; events = true; } } });
+    if (events) { needMap = true; }
+    return events;
+  }
+  var slow = 0;
+  function frame(now) {
+    var dt = Math.min(0.25, (now - last) / 1000); last = now;
+    if (!state.paused && !document.hidden) {
+      var ev = step(dt * RATE * state.rate);
+      runs.forEach(function (r) { var mk = vm[r.id]; if (mk && !needMap) { var p = vehPos(r); mk.setLatLng(p); if (r._devLine && r.dev > 50) r._devLine.setLatLngs([pointAt(r, r.vdist, 0), p]); } });
+      slow += dt; $('#clock').textContent = hhmm(simNow);
+      if (ev || needMap) { if (menuOpen()) dirty = true; else { allEtas(); renderStrip(); renderPanel(); drawMap(false); } }
+      else if (slow > 1) { slow = 0; if (dirty && !menuOpen()) renderAll(); var kl = $('[data-kmleft]', panel); if (kl && state.sel) { var rr = runById(state.sel); kl.textContent = F.num(Math.max(0, rr.total - rr.vdist), 1) + ' km'; } var sg = $('[data-sig]', panel); if (sg && state.sel && runById(state.sel).status === 'nosignal') sg.textContent = 'hace ' + dur((simNow - runById(state.sel).lostAt) / 60000); }
+    } else if (dirty && !menuOpen()) renderAll();
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- arranque ---------- */
+  paintLive(); $('#clock').textContent = hhmm(simNow); allEtas(); renderStrip();
+  panel.innerHTML = '<div class="tp-head"><span class="skeleton sk-line" style="width:60%"></span></div><div class="tp-scroll" style="padding:16px">' + UI.skeleton(5) + '</div>';
+  var qs = UI.param('despacho') || UI.param('id'), qStop = UI.param('parada');
+  setTimeout(function () {
+    var pre = qs && runById(qs); if (pre) { state.sel = pre.id; state.selStop = qStop || null; }
+    renderPanel(); drawMap(true);
+    if (pre && qStop && stopById(qStop)) focusStop(pre.id, qStop, false);
+    requestAnimationFrame(function (t) { last = t; requestAnimationFrame(frame); });
+  }, 350);
+});
+</script>
+</body>
+</html>

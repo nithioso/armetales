@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel de control · Armetales</title>
+<meta name="description" content="Panel de control logístico de Armetales: pedidos, carga, flota, utilización y OTIF en una sola vista.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico del panel (los tokens y componentes viven en app.css) */
+  .kpi-row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .kpi-row > :last-child:nth-child(odd) { grid-column: span 2; } .kpi .kpi-value { font-size: 28px; } .kpi .kpi-spark { display: none; } .kpi { padding: 12px; } }
+  .period-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .map-card .map { --h: 460px; border: 0; border-radius: 0; }
+  @media (max-width: 639px) { .map-card .map { --h: 340px; } }
+  .route-chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 16px; border-bottom: 1px solid var(--border); scrollbar-width: thin; }
+  .route-chips .filter-chip { flex: none; }
+  .rc-sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .alert-list { overflow: auto; }
+  .alert-row .ar-body { flex: 1; min-width: 0; }
+  .alert-row .ar-title { font-weight: 600; font-size: 13.5px; line-height: 1.35; }
+  .alert-row .ar-meta { font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
+  .trend-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; justify-content: space-between; }
+  .state-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 44px; gap: 12px; align-items: center; padding: 7px 0; }
+  .state-row .count { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  @media (max-width: 479px) { .state-row { grid-template-columns: 1fr 44px; } .state-row .meter { grid-column: 1 / -1; grid-row: 2; } }
+  .mini-stat { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .mini-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .mini-stat .l { font-size: 12px; color: var(--text-2); }
+  .donut-wrap { display: grid; gap: 16px; }
+  .donut-wrap .chart { --h: 200px; }
+  .legend-list { display: grid; gap: 8px; }
+  .legend-list .li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .legend-list .li b { margin-left: auto; font-variant-numeric: tabular-nums; }
+  .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .updated { font-size: 12.5px; color: var(--text-2); }
+  .kpi, .kpi .kpi-foot, .kpi .kpi-note { white-space: normal; }
+  .select.input-sm { padding-right: 30px; }
+  :root[data-theme="dark"] a.btn { color: var(--b-fg); } /* el color de enlace del tema oscuro pisaba el de los botones-enlace */
+</style>
+</head>
+<body data-page="panel">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow" id="phDate">Operación</div>
+      <h1 class="page-title" id="phTitle">Panel de control</h1>
+      <p class="page-desc" id="phDesc">Estado de la operación logística en tiempo real.</p>
+    </div>
+    <div class="page-actions">
+      <div class="segmented" role="group" aria-label="Periodo" id="periodSeg">
+        <button type="button" data-p="1" aria-pressed="false">Hoy</button>
+        <button type="button" data-p="7" aria-pressed="false">7 días</button>
+        <button type="button" data-p="30" aria-pressed="true">30 días</button>
+      </div>
+      <select class="select input-sm" id="sedeSel" aria-label="Sede" style="width:auto;min-width:170px"></select>
+      <button type="button" class="btn btn-secondary btn-sm" id="refreshBtn"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5"/></svg>Actualizar</button>
+    </div>
+  </header>
+
+  <section aria-label="Indicadores principales">
+    <div class="kpi-row" id="kpiRow"></div>
+  </section>
+
+  <section class="section layout-main-side" aria-label="Mapa operativo y alertas">
+    <div class="card map-card">
+      <div class="card-head"><div><h2 class="card-title">Mapa operativo por ruta</h2><p class="card-sub" id="mapSub">Vehículos en curso y paradas del día</p></div><span class="chip chip-success" id="liveChip"><span class="sr-only">Estado: </span>En vivo</span></div>
+      <div class="route-chips" id="routeChips" role="group" aria-label="Filtrar por ruta"></div>
+      <div id="opsMap" role="region" aria-label="Mapa con vehículos y paradas"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2 class="card-title">Alertas operativas</h2><p class="card-sub" id="alertSub"></p></div><a class="btn btn-ghost btn-sm" href="notificaciones.html">Ver todas</a></div>
+      <div class="alert-list" id="alertList"></div>
+    </div>
+  </section>
+
+  <section class="section" aria-label="Viajes de hoy">
+    <div class="section-head"><h2 class="section-title">Viajes de hoy</h2><a class="btn btn-ghost btn-sm" href="despachos.html">Ir a despachos <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-7-7 7 7-7 7"/></svg></a></div>
+    <div id="tripsTable"></div>
+  </section>
+
+  <section class="section layout-main-side" aria-label="Tendencia y composición">
+    <div class="card">
+      <div class="card-head trend-head"><div><h2 class="card-title">Tendencia de indicadores</h2><p class="card-sub" id="trendSub"></p></div>
+        <div class="segmented" role="group" aria-label="Indicador" id="metricSeg"><button type="button" data-m="otifPct" aria-pressed="true">OTIF</button><button type="button" data-m="utilizacionPesoPct" aria-pressed="false">Utilización</button><button type="button" data-m="kmPorEntrega" aria-pressed="false">Km por entrega</button></div></div>
+      <div class="card-body"><div class="chart" id="trendChart" style="--h:280px"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2 class="card-title">Pedidos por etapa</h2><p class="card-sub">Cartera abierta y entregas de hoy</p></div></div>
+      <div class="card-body donut-wrap"><div class="chart" id="donut"></div><div class="legend-list" id="donutLegend"></div></div>
+    </div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$;
+  var ABIERTOS = ['Recibido', 'Stock validado', 'Bloqueado por stock', 'En firme', 'En preparación', 'Listo para despacho', 'Planificado'];
+  var state = { period: 30, metric: 'otifPct', route: 'all' };
+  var routeColors = {}; var RC = ['#2A6BDB', '#15915A', '#C98A00', '#7A4B9A', '#D4122D', '#0E8F9E'];
+  var hoyDsp = A.despachos.filter(function (d) { return d.estado === 'En ruta' || d.estado === 'Cargando'; });
+  hoyDsp.forEach(function (d, i) { routeColors[d.despachoId] = RC[i % RC.length]; });
+
+  /* ---------- encabezado ---------- */
+  (function () {
+    var h = new Date().getHours(), me = A.usuarioActual.nombre.split(' ')[0];
+    $('#phTitle').textContent = (h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches') + ', ' + me;
+    var d = new Date(), t = d.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' }); $('#phDate').textContent = t.charAt(0).toUpperCase() + t.slice(1);
+    $('#phDesc').innerHTML = 'Así va la operación de <strong>' + esc(UI.sede().nombre) + '</strong>. Última actualización ' + F.relativo(A.ahora) + '.';
+    $('#sedeSel').innerHTML = '<option value="">Todas las sedes</option>' + A.sedes.map(function (s) { return '<option value="' + s.id + '"' + (s.id === UI.sede().id ? ' selected' : '') + '>' + esc(s.nombre) + '</option>'; }).join('');
+  })();
+
+  /* ---------- cálculo de indicadores ---------- */
+  function serieP() { return A.kpis.serie.slice(-state.period); }
+  function prevP() { var n = state.period, p = A.kpis.serie.slice(-2 * n, -n); return p.length >= n ? p : A.kpis.serie.slice(0, 15); }
+  function avg(arr, k) { return arr.reduce(function (a, x) { return a + x[k]; }, 0) / arr.length; }
+  function delta(k) { var n = state.period, cur = A.kpis.serie.slice(-n), prev = A.kpis.serie.slice(-2 * n, -n); if (prev.length < n) { cur = A.kpis.serie.slice(-15); prev = A.kpis.serie.slice(0, 15); } return avg(cur, k) - avg(prev, k); }
+  function calc() {
+    var pend = A.pedidos.filter(function (p) { return ABIERTOS.indexOf(p.estado) > -1; });
+    var kg = pend.reduce(function (s, p) { return s + p.pesoKg; }, 0), m3 = pend.reduce(function (s, p) { return s + p.volumenM3; }, 0);
+    var disp = A.vehiculos.filter(function (v) { return v.estado === 'Disponible'; }), req = A.plan.viajes.length;
+    var s = serieP(), util = state.period === 1 ? avg(hoyDsp.concat(A.plan.viajes), 'utilizacionPesoPct') : avg(s, 'utilizacionPesoPct');
+    return { pend: pend, kg: kg, m3: m3, disp: disp, req: req, util: util, dUtil: delta('utilizacionPesoPct'), otif: avg(s, 'otifPct'), dOtif: delta('otifPct'), s: s };
+  }
+  var C = calc();
+
+  /* ---------- KPIs ---------- */
+  function renderKpis() {
+    C = calc(); var alta = C.pend.filter(function (p) { return p.prioridad === 'Alta'; }).length, bloq = C.pend.filter(function (p) { return p.estado === 'Bloqueado por stock'; }).length;
+    var sP = A.kpis.serie.map(function (x) { return x.utilizacionPesoPct; }), sO = A.kpis.serie.map(function (x) { return x.otifPct; });
+    var lbl = state.period === 1 ? 'hoy' : 'últimos ' + state.period + ' días';
+    $('#kpiRow').innerHTML =
+      UI.kpi({ id: 'pend', label: 'Pedidos pendientes', icon: 'package', value: C.pend.length, note: alta + ' de prioridad alta · ' + bloq + ' bloqueados', onClick: true }) +
+      UI.kpi({ id: 'carga', label: 'Por despachar', icon: 'layers', valueHtml: F.num(C.kg / 1000, 1) + '<small>t</small>', unit: '· ' + F.num(C.m3, 0) + ' m³', note: 'Carga de ' + C.pend.length + ' pedidos', onClick: true }) +
+      UI.kpi({ id: 'flota', label: 'Vehículos disponibles', icon: 'truck', valueHtml: C.disp.length + '<small>de ' + C.req + ' requeridos</small>', note: C.disp.length >= C.req ? 'Cubre el plan de hoy' : 'Faltan ' + (C.req - C.disp.length) + ' para el plan', onClick: true }) +
+      UI.kpi({ id: 'util', label: 'Utilización promedio', icon: 'gauge', valueHtml: F.num(C.util, 0) + '<small>%</small>', delta: { v: C.dUtil, unit: ' pts', better: 'up' }, spark: sP.slice(-Math.max(state.period, 7)), sparkColor: 'var(--blue)', onClick: true }) +
+      UI.kpi({ id: 'otif', label: 'OTIF · ' + lbl, icon: 'target', valueHtml: F.num(C.otif, 1) + '<small>%</small>', delta: { v: C.dOtif, unit: ' pts', better: 'up' }, spark: sO.slice(-Math.max(state.period, 7)), sparkColor: 'var(--green)', note: '', onClick: true });
+  }
+  $('#kpiRow').addEventListener('click', function (e) { var k = e.target.closest('[data-kpi]'); if (k) kpiDrawer(k.dataset.kpi); });
+
+  /* ---------- drawers de detalle (HU-168) ---------- */
+  function stat(v, l) { return '<div class="mini-stat"><div class="v">' + v + '</div><div class="l">' + l + '</div></div>'; }
+  function kpiDrawer(id) {
+    var d;
+    if (id === 'pend') {
+      var by = {}; C.pend.forEach(function (p) { by[p.estado] = (by[p.estado] || 0) + 1; });
+      var urgentes = C.pend.filter(function (p) { return p.prioridad === 'Alta' || p.estado === 'Bloqueado por stock'; }).slice(0, 8);
+      d = UI.drawer({ title: 'Pedidos pendientes', subtitle: C.pend.length + ' pedidos abiertos en ' + UI.sede().nombre, width: 560,
+        body: '<div class="stack-lg"><div class="grid c2 gap-3">' + stat(C.pend.length, 'Pedidos abiertos') + stat(C.pend.filter(function (p) { return p.prioridad === 'Alta'; }).length, 'Prioridad alta') + stat(by['Bloqueado por stock'] || 0, 'Bloqueados por stock') + stat(C.pend.filter(function (p) { return p.entregaSolicitada <= A.ymd(0); }).length, 'Entrega solicitada para hoy') + '</div>' +
+          '<section><h3 class="mb-2">Por estado</h3>' + ABIERTOS.map(function (s) { var n = by[s] || 0; return '<div class="state-row"><span>' + UI.chip(s) + '</span>' + UI.meter(n, C.pend.length, { level: s === 'Bloqueado por stock' ? 'crit' : 'info', showValue: false, label: s }) + '<span class="count">' + n + '</span></div>'; }).join('') + '</section>' +
+          '<section><h3 class="mb-2">Requieren atención</h3>' + urgentes.map(function (p) { return '<div class="alert-row" style="padding-left:0;padding-right:0"><div class="ar-body"><div class="ar-title"><span class="mono">' + p.pedidoId + '</span> · ' + esc(p.cliente) + '</div><div class="ar-meta">' + (p.bloqueo ? 'Faltan ' + p.bloqueo.faltante + ' ' + p.lineas[0].unidad.toLowerCase() + 's de ' + esc(p.bloqueo.descripcion) : F.kg(p.pesoKg) + ' · entrega ' + F.fecha(p.entregaSolicitada)) + '</div></div>' + UI.chip(p.estado) + '</div>'; }).join('') + '</section></div>',
+        footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Ver pedidos', kind: 'primary', icon: 'arrow-right', onClick: function () { location.href = 'pedidos.html'; } }] });
+    } else if (id === 'carga') {
+      var rows = {}; C.pend.forEach(function (p) { var r = rows[p.rutaId] || (rows[p.rutaId] = { kg: 0, m3: 0, n: 0 }); r.kg += p.pesoKg; r.m3 += p.volumenM3; r.n++; });
+      var ids = Object.keys(rows).sort(function (a, b) { return rows[b].kg - rows[a].kg; }), mx = rows[ids[0]].kg;
+      d = UI.drawer({ title: 'Carga por despachar', subtitle: F.ton(C.kg) + ' y ' + F.m3(C.m3, 0) + ' en ' + C.pend.length + ' pedidos', width: 560,
+        body: '<div class="stack-lg"><div class="grid c2 gap-3">' + stat(F.ton(C.kg), 'Peso total') + stat(F.m3(C.m3, 1), 'Volumen total') + '</div><section><h3 class="mb-2">Por ruta</h3><div class="table-wrap"><table class="table is-dense"><thead><tr><th>Ruta</th><th class="num">Pedidos</th><th>Peso</th><th class="num">m³</th></tr></thead><tbody>' +
+          ids.map(function (r) { var ru = A.idx.rutas[r]; return '<tr><td>' + esc(ru.nombre) + '<div class="cell-sub">' + r + '</div></td><td class="num">' + rows[r].n + '</td><td style="min-width:150px">' + UI.meter(rows[r].kg, mx, { text: F.ton(rows[r].kg), level: 'info', label: 'Peso' }) + '</td><td class="num">' + F.num(rows[r].m3, 1) + '</td></tr>'; }).join('') + '</tbody></table></div></section>' +
+          '<section>' + UI.banner({ tone: 'info', text: 'Los productos de longitud mayor a 6 m (' + C.pend.filter(function (p) { return p.lineas.some(function (l) { return A.idx.productos[l.sku].restricciones.indexOf('LARGA') > -1; }); }).length + ' pedidos) requieren planchón o tractomula.' }) + '</section></div>',
+        footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Ir a planeación', kind: 'primary', icon: 'arrow-right', onClick: function () { location.href = 'planeacion.html'; } }] });
+    } else if (id === 'flota') {
+      var pl = A.plan.viajes; var falta = Math.max(0, C.req - C.disp.length);
+      d = UI.drawer({ title: 'Flota disponible vs. requerida', subtitle: C.disp.length + ' disponibles para ' + C.req + ' viajes propuestos', width: 560,
+        body: '<div class="stack-lg">' + UI.banner({ tone: falta ? 'warning' : 'success', title: falta ? 'Faltan ' + falta + ' vehículos' : 'La flota cubre el plan', text: falta ? 'Considera reprogramar pedidos o liberar vehículos en mantenimiento.' : 'Todos los viajes propuestos tienen vehículo asignado.' }) +
+          '<section><h3 class="mb-2">Vehículos por estado</h3><div class="grid c2 gap-3">' + ['Disponible', 'En ruta', 'Cargando', 'Mantenimiento'].map(function (s) { return stat(A.vehiculos.filter(function (v) { return v.estado === s; }).length, s); }).join('') + '</div></section>' +
+          '<section><h3 class="mb-2">Asignación propuesta</h3>' + pl.map(function (v) { var ve = A.idx.vehiculos[v.vehiculoId]; return '<div class="alert-row" style="padding-left:0;padding-right:0"><div class="ar-body"><div class="row gap-2">' + UI.plate(v.vehiculoId) + '<span class="strong">' + esc(ve.tipo) + '</span></div><div class="ar-meta">' + esc(A.idx.rutas[v.rutaId].nombre) + ' · ' + v.paradas + ' paradas · ' + F.kg(v.pesoKg) + ' de ' + F.kg(ve.pesoMaxKg) + '</div></div>' + UI.meter(v.utilizacionPesoPct, 100, { label: 'Utilización' }) + '</div>'; }).join('') + '</section></div>',
+        footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Ver vehículos', kind: 'primary', icon: 'arrow-right', onClick: function () { location.href = 'vehiculos.html'; } }] });
+    } else if (id === 'util') {
+      var items = hoyDsp.map(function (x) { return { id: x.despachoId, placa: x.vehiculoId, ruta: x.rutaId, u: x.utilizacionPesoPct, uv: x.utilizacionVolPct, kg: x.pesoKg }; }).concat(A.plan.viajes.map(function (x) { return { id: x.viajeId, placa: x.vehiculoId, ruta: x.rutaId, u: x.utilizacionPesoPct, uv: x.utilizacionVolPct, kg: x.pesoKg, plan: true }; })).sort(function (a, b) { return a.u - b.u; });
+      d = UI.drawer({ title: 'Utilización de la flota', subtitle: 'Peso y volumen contra la capacidad del vehículo', width: 600,
+        body: '<div class="stack-lg"><div class="grid c2 gap-3">' + stat(F.pct(C.util), 'Utilización promedio · ' + (state.period === 1 ? 'hoy' : state.period + ' días')) + stat(F.pct(80), 'Meta de la operación') + '</div><section><h3 class="mb-2">Tendencia de 30 días</h3><div class="chart" id="dUtil" style="--h:180px"></div></section>' +
+          '<section><h3 class="mb-2">Por viaje (menor a mayor)</h3><div class="table-wrap"><table class="table is-dense"><thead><tr><th>Vehículo</th><th>Peso</th><th>Volumen</th></tr></thead><tbody>' + items.map(function (i) { return '<tr><td>' + UI.plate(i.placa) + '<div class="cell-sub">' + A.idx.rutas[i.ruta].nombre + (i.plan ? ' · propuesto' : '') + '</div></td><td style="min-width:140px">' + UI.meter(i.u, 100, { label: 'Peso' }) + '</td><td style="min-width:140px">' + UI.meter(i.uv, 100, { label: 'Volumen', low: 40 }) + '</td></tr>'; }).join('') + '</tbody></table></div></section></div>',
+        footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Abrir reportes', kind: 'primary', icon: 'arrow-right', onClick: function () { location.href = 'reportes.html'; } }] });
+      UI.chart.line($('#dUtil', d.body), { labels: A.kpis.serie.map(function (x) { return x.fecha.slice(5); }), datasets: [{ label: 'Utilización', data: A.kpis.serie.map(function (x) { return x.utilizacionPesoPct; }), fill: true }], unit: '%', min: 50, max: 100, beginAtZero: false, target: { value: 80, label: 'Meta' } });
+    } else if (id === 'otif') {
+      var rr = A.kpis.porRuta.slice().sort(function (a, b) { return a.otifPct - b.otifPct; });
+      d = UI.drawer({ title: 'OTIF · entregas a tiempo y completas', subtitle: 'Periodo: ' + (state.period === 1 ? 'hoy' : 'últimos ' + state.period + ' días'), width: 600,
+        body: '<div class="stack-lg"><div class="grid c2 gap-3">' + stat(F.pct(C.otif, 1), 'OTIF (meta ' + A.kpis.metas.otifPct + ' %)') + stat(F.pct(avg(C.s, 'completasPct'), 1) + ' · ' + F.pct(avg(C.s, 'aTiempoPct'), 1), 'Completas · a tiempo') + '</div>' +
+          '<section><h3 class="mb-2">Evolución</h3><div class="chart" id="dOtif" style="--h:180px"></div></section>' +
+          '<section><h3 class="mb-2">Rutas con menor cumplimiento</h3>' + rr.slice(0, 4).map(function (r) { return '<div class="state-row" style="grid-template-columns:minmax(0,1fr) 140px 56px"><span class="truncate">' + esc(r.nombre) + '</span>' + UI.meter(r.otifPct, 100, { level: r.otifPct < 92 ? 'warn' : 'ok', showValue: false, label: 'OTIF' }) + '<span class="count">' + F.pct(r.otifPct, 1) + '</span></div>'; }).join('') + '</section>' +
+          '<section><h3 class="mb-2">Notas crédito por causa (30 días)</h3>' + A.kpis.notasCreditoPorCausa.slice(0, 4).map(function (c) { return '<div class="row between" style="padding:6px 0;border-bottom:1px solid var(--border)"><span>' + esc(c.causa) + '</span><span class="num strong">' + c.n + ' · ' + F.cop(c.valorCOP) + '</span></div>'; }).join('') + '</section></div>',
+        footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Abrir reportes', kind: 'primary', icon: 'arrow-right', onClick: function () { location.href = 'reportes.html'; } }] });
+      UI.chart.line($('#dOtif', d.body), { labels: A.kpis.serie.map(function (x) { return x.fecha.slice(5); }), datasets: [{ label: 'OTIF', data: A.kpis.serie.map(function (x) { return x.otifPct; }), fill: true, color: '#15915A' }], unit: '%', dec: 1, min: 80, max: 100, beginAtZero: false, target: { value: 95, label: 'Meta' } });
+    }
+  }
+
+  /* ---------- mapa operativo (HU-166) ---------- */
+  var mp = UI.map($('#opsMap'), { center: [4.68, -74.12], zoom: 10 });
+  function drawMap() {
+    mp.clear(); var show = hoyDsp.filter(function (d) { return d.estado === 'En ruta' && (state.route === 'all' || d.despachoId === state.route); }), all = [], vpts = [];
+    mp.pin({ lat: A.sedes[0].lat, lng: A.sedes[0].lng, state: 'origin', n: 'C', title: 'CEDI Bogotá', popup: '<strong>CEDI Bogotá</strong><br>Punto de salida' });
+    show.forEach(function (d) {
+      var col = routeColors[d.despachoId], poly = A.polilineas[d.despachoId]; mp.route(poly, { color: col, weight: 4, opacity: .8 }); all = all.concat(poly);
+      A.paradas.filter(function (x) { return x.despachoId === d.despachoId; }).forEach(function (x) {
+        var st = x.estado === 'Entregada' ? 'done' : x.estado === 'Fallida' ? 'failed' : x.estado === 'Parcial' ? 'partial' : (x.estado === 'En camino' || x.estado === 'En sitio') ? 'current' : 'pending', c = A.idx.clientes[x.clienteId];
+        mp.pin({ lat: x.latitud, lng: x.longitud, n: x.secuencia, state: st, title: x.cliente, popup: '<strong>' + esc(x.cliente) + '</strong><br><span class="mono">' + x.pedidoId + '</span> · ' + UI.chip(x.estado, { small: true }) + '<br>' + (x.horaEvento && st !== 'current' ? 'Evento ' + F.hora(x.horaEvento) : 'ETA ' + F.hora(x.eta)) + ' · ventana ' + x.ventana });
+      });
+      var ps = A.posiciones.filter(function (p) { return p.despachoId === d.despachoId; })[0], v = A.idx.vehiculos[d.vehiculoId], cd = A.idx.conductores[d.conductorId], nx = A.idx.paradas[ps.proximaParadaId];
+      mp.vehicle({ lat: ps.lat, lng: ps.lng, placa: ps.placa, state: ps.velocidadKmh ? 'moving' : 'stopped', popup: '<div class="row gap-2">' + UI.plate(ps.placa) + UI.chip(ps.estado, { small: true, tone: ps.velocidadKmh ? 'info' : 'warning' }) + '</div><div class="mt-2"><strong>' + esc(A.idx.rutas[d.rutaId].nombre) + '</strong><br>' + esc(cd.nombre) + ' · ' + v.tipo + '<br>Próxima: ' + esc(nx.cliente) + ' (ETA ' + F.hora(nx.eta) + ')<br>' + ps.velocidadKmh + ' km/h · señal ' + F.relativo(ps.ultimaSenal) + '</div>' });
+      all.push([ps.lat, ps.lng]); vpts.push([ps.lat, ps.lng]);
+    });
+    mp.fit(state.route === 'all' ? vpts.concat([[A.sedes[0].lat, A.sedes[0].lng]]) : all, { padding: 40, maxZoom: 13 });
+    $('#mapSub').textContent = show.length + ' vehículo' + (show.length === 1 ? '' : 's') + ' en curso · ' + A.paradas.filter(function (x) { return show.some(function (d) { return d.despachoId === x.despachoId; }) && x.estado === 'Entregada'; }).length + ' paradas entregadas';
+  }
+  function drawChips() {
+    var runs = hoyDsp.filter(function (d) { return d.estado === 'En ruta'; });
+    $('#routeChips').innerHTML = '<button type="button" class="filter-chip" data-r="all" aria-pressed="' + (state.route === 'all') + '">Todas las rutas <span class="n">' + runs.length + '</span></button>' + runs.map(function (d) { return '<button type="button" class="filter-chip" data-r="' + d.despachoId + '" aria-pressed="' + (state.route === d.despachoId) + '"><i class="rc-sw" style="background:' + routeColors[d.despachoId] + '"></i>' + esc(A.idx.rutas[d.rutaId].nombre) + '</button>'; }).join('');
+  }
+  $('#routeChips').addEventListener('click', function (e) { var b = e.target.closest('[data-r]'); if (!b) return; state.route = b.dataset.r; drawChips(); drawMap(); });
+  drawChips(); drawMap();
+  var lg = document.createElement('div'); lg.className = 'map-legend'; lg.innerHTML = '<span><i class="dot ok"></i> Entregada</span><span><i class="dot bad"></i> Fallida</span><span><i class="dot warn"></i> Parcial</span><span><i class="dot info"></i> Próxima</span>'; $('#opsMap').appendChild(lg);
+
+  /* ---------- alertas operativas ---------- */
+  (function () {
+    var bloq = A.pedidos.filter(function (p) { return p.estado === 'Bloqueado por stock'; }), pico = A.plan.viajes.filter(function (v) { return A.idx.vehiculos[v.vehiculoId].restricciones.picoPlacaCarga.aplicaHoy; });
+    var prepPend = A.pedidos.filter(function (p) { return p.estado === 'En preparación' || p.estado === 'En firme'; }).length, errs = A.logs.filter(function (l) { return l.estado === 'Error'; }), mant = A.vehiculos.filter(function (v) { return v.estado === 'Mantenimiento'; });
+    var tarde = A.paradas.filter(function (x) { return (x.estado === 'Pendiente' || x.estado === 'En camino') && x.eta.slice(11, 16) > '23:59'; });
+    var sinGeo = A.clientes.filter(function (c) { return c.calidadDireccion === 'Por validar'; }).length, fallida = A.novedades.filter(function (n) { return n.tipo === 'Entrega fallida' && n.estado === 'Abierta'; });
+    var rows = [
+      { t: 'peligro', i: 'alert-circle', title: bloq.length + ' pedidos bloqueados por stock', meta: 'Mayor faltante: ' + bloq[0].bloqueo.faltante + ' ' + bloq[0].lineas[0].unidad.toLowerCase() + 's de ' + bloq[0].bloqueo.descripcion, href: 'pedidos.html' },
+      { t: 'peligro', i: 'alert-circle', title: fallida.length + ' entrega' + (fallida.length === 1 ? ' fallida' : 's fallidas') + ' por reprogramar', meta: fallida[0] ? fallida[0].pedidoId + ' · ' + fallida[0].motivo : '', href: 'novedades.html' },
+      { t: 'alerta', i: 'alert-triangle', title: 'Pico y placa en ' + pico.length + ' viaje' + (pico.length === 1 ? '' : 's') + ' propuesto' + (pico.length === 1 ? '' : 's'), meta: pico.length ? pico.map(function (v) { return v.vehiculoId; }).join(', ') + ' · restricción 16:00–19:00' : '', href: 'planeacion.html' },
+      { t: 'alerta', i: 'clock', title: prepPend + ' pedidos con preparación sin cerrar', meta: 'Corte de despacho a las ' + A.sedes[0].corteHora + ' en ' + UI.sede().nombre, href: 'preparacion.html' },
+      { t: 'alerta', i: 'plug', title: errs.length + ' errores de integración sin resolver', meta: errs[0] ? errs[0].sistemaOrigen + ' · ' + errs[0].error : '', href: 'integraciones.html' },
+      { t: 'info', i: 'wrench', title: mant.length === 1 ? '1 vehículo en mantenimiento' : mant.length + ' vehículos en mantenimiento', meta: mant.map(function (v) { return v.placa; }).join(', '), href: 'vehiculos.html' },
+      { t: 'info', i: 'map-pin', title: sinGeo + ' clientes sin georreferencia válida', meta: 'Afecta la secuencia de paradas del motor de rutas', href: 'clientes.html' }
+    ].filter(function (r) { return !/^0 /.test(r.title); });
+    $('#alertSub').textContent = rows.filter(function (r) { return r.t !== 'info'; }).length + ' requieren acción hoy';
+    $('#alertList').innerHTML = rows.map(function (r) { return '<a class="alert-row" href="' + r.href + '" style="color:inherit;text-decoration:none"><span class="notif-ico ' + r.t + '">' + UI.icon(r.i, 'icon-sm') + '</span><div class="ar-body"><div class="ar-title">' + esc(r.title) + '</div><div class="ar-meta">' + esc(r.meta) + '</div></div>' + UI.icon('chevron-right', 'icon-sm') + '</a>'; }).join('');
+  })();
+
+  /* ---------- tabla «Viajes de hoy» ---------- */
+  var trips = hoyDsp.map(function (d) { return { id: d.despachoId, estado: d.estado, placa: d.vehiculoId, ruta: A.idx.rutas[d.rutaId].nombre, rutaId: d.rutaId, conductor: A.idx.conductores[d.conductorId].nombre, paradas: d.paradas, entregadas: d.entregadas, util: d.utilizacionPesoPct, kg: d.pesoKg, salida: d.salidaPrevista, d: d }; })
+    .concat(A.plan.viajes.map(function (v) { return { id: v.viajeId, estado: 'Propuesto', placa: v.vehiculoId, ruta: A.idx.rutas[v.rutaId].nombre, rutaId: v.rutaId, conductor: A.idx.conductores[v.conductorId].nombre, paradas: v.paradas, entregadas: 0, util: v.utilizacionPesoPct, kg: v.pesoKg, salida: v.salidaPrevista, v: v }; }));
+  var order = { 'En ruta': 0, 'Cargando': 1, 'Propuesto': 2 }; trips.sort(function (a, b) { return order[a.estado] - order[b.estado] || (a.salida < b.salida ? -1 : 1); });
+  var tbl = UI.table($('#tripsTable'), {
+    rows: trips, pageSize: 8, searchable: { placeholder: 'Buscar por placa, ruta o conductor' }, caption: 'Viajes de hoy', emptyText: 'No hay viajes que coincidan.', rowKey: 'id',
+    filters: [{ key: 'estado', label: 'Estado', all: 'Todos los estados', options: ['En ruta', 'Cargando', 'Propuesto'] }],
+    columns: [
+      { key: 'id', label: 'Viaje', mono: true, render: function (r) { return '<span class="mono">' + r.id + '</span>'; } },
+      { key: 'placa', label: 'Vehículo', title: true, render: function (r) { return UI.plate(r.placa) + '<div class="cell-sub">' + esc(A.idx.vehiculos[r.placa].tipo) + ' · ' + esc(r.conductor) + '</div>'; } },
+      { key: 'ruta', label: 'Ruta' },
+      { key: 'paradas', label: 'Avance', value: function (r) { return r.entregadas / r.paradas; }, render: function (r) { return r.estado === 'En ruta' ? UI.meter(r.entregadas, r.paradas, { level: 'info', text: r.entregadas + ' / ' + r.paradas, label: 'Paradas completadas' }) : '<span class="muted">' + r.paradas + ' paradas</span>'; } },
+      { key: 'util', label: 'Utilización', num: false, render: function (r) { return UI.meter(r.util, 100, { label: 'Utilización de peso' }); } },
+      { key: 'kg', label: 'Carga', num: true, render: function (r) { return F.kg(r.kg); }, hideMobile: true },
+      { key: 'salida', label: 'Salida', render: function (r) { return '<span class="nowrap">' + (r.estado === 'En ruta' ? F.hora(r.salida) : '<span class="muted">prev.</span> ' + F.hora(r.salida)) + '</span>'; } },
+      { key: 'estado', label: 'Estado', render: function (r) { return UI.chip(r.estado); } }
+    ],
+    onRowClick: function (r) { tripDrawer(r); },
+    actions: function (r) { return [{ label: 'Ver detalle', icon: 'eye', onClick: function () { tripDrawer(r); } }, { label: 'Seguir en el mapa', icon: 'navigation', disabled: r.estado !== 'En ruta', onClick: function () { state.route = r.id; drawChips(); drawMap(); document.getElementById('opsMap').scrollIntoView({ behavior: 'smooth', block: 'center' }); } }, { sep: true }, { label: 'Abrir en despachos', icon: 'arrow-up-right', href: 'despachos.html?id=' + encodeURIComponent(r.id) }]; }
+  });
+  function tripDrawer(r) {
+    var v = A.idx.vehiculos[r.placa], ps = A.paradas.filter(function (x) { return x.despachoId === r.id; }), peds = (r.d || r.v).pedidoIds;
+    var tl = r.d ? ps.map(function (x) { var s = x.estado === 'Entregada' || x.estado === 'Parcial' ? 'done' : x.estado === 'Fallida' ? 'error' : x.estado === 'En camino' || x.estado === 'En sitio' ? 'current' : 'pending'; return { state: s, titleHtml: x.secuencia + '. ' + esc(x.cliente) + ' ' + UI.chip(x.estado, { small: true }), meta: x.pedidoId + ' · ' + (x.horaEvento && s !== 'current' ? 'Evento ' + F.hora(x.horaEvento) : 'ETA ' + F.hora(x.eta)) + ' · ventana ' + x.ventana }; }) : peds.map(function (id, i) { var p = A.idx.pedidos[id]; return { state: 'pending', titleHtml: (i + 1) + '. ' + esc(p.cliente), meta: id + ' · ' + F.kg(p.pesoKg) + ' · ' + F.m3(p.volumenM3) }; });
+    UI.drawer({ title: r.id, subtitleHtml: esc(r.ruta) + ' · ' + UI.chip(r.estado, { small: true }), width: 540,
+      body: '<div class="stack-lg"><div class="row gap-3">' + UI.plate(r.placa, { large: true }) + '<div><div class="strong">' + esc(v.marca + ' ' + v.modelo) + '</div><div class="muted t-13">' + esc(v.tipo) + ' · ' + esc(v.carroceria) + ' · ' + esc(r.conductor) + '</div></div></div>' +
+        '<div class="stack-sm"><div class="meter-cap"><span>Peso ' + F.kg(r.kg) + ' de ' + F.kg(v.pesoMaxKg) + '</span></div>' + UI.meter(r.util, 100, { size: 'lg', label: 'Utilización de peso' }) + '<div class="meter-cap mt-2"><span>Volumen ' + F.m3((r.d || r.v).volumenM3) + ' de ' + F.m3(v.volumenMaxM3, 0) + '</span></div>' + UI.meter((r.d || r.v).utilizacionVolPct || Math.round((r.d || r.v).volumenM3 / v.volumenMaxM3 * 100), 100, { size: 'lg', low: 30, label: 'Utilización de volumen' }) + '</div>' +
+        ((r.v && r.v.alertas.length) ? r.v.alertas.map(function (a) { return UI.banner({ tone: a.nivel === 'peligro' ? 'danger' : a.nivel === 'alerta' ? 'warning' : 'info', text: a.texto }); }).join('') : '') +
+        '<section><h3 class="mb-3">Paradas</h3>' + UI.timeline(tl) + '</section></div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: r.estado === 'Propuesto' ? 'Ir a planeación' : 'Ver seguimiento', kind: 'primary', icon: 'arrow-right', onClick: function () { location.href = r.estado === 'Propuesto' ? 'planeacion.html' : 'seguimiento.html'; } }] });
+  }
+
+  /* ---------- tendencia y dona ---------- */
+  var METR = { otifPct: { label: 'OTIF', unit: '%', dec: 1, target: 95, color: '#15915A', min: 80, max: 100 }, utilizacionPesoPct: { label: 'Utilización de peso', unit: '%', dec: 0, target: 80, color: '#2A6BDB', min: 50, max: 100 }, kmPorEntrega: { label: 'Km por entrega', unit: 'km', dec: 1, target: 18, color: '#C98A00', min: 0 } };
+  function drawTrend() {
+    var m = METR[state.metric], s = A.kpis.serie.slice(-Math.max(state.period, 7)); $('#trendSub').textContent = m.label + ' · últimos ' + s.length + ' días · meta ' + F.num(m.target, m.dec) + (m.unit === '%' ? ' %' : ' ' + m.unit);
+    UI.chart.line($('#trendChart'), { labels: s.map(function (x) { return x.fecha.slice(8) + ' ' + ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][+x.fecha.slice(5, 7) - 1]; }), datasets: [{ label: m.label, data: s.map(function (x) { return x[state.metric]; }), color: m.color, fill: true }], unit: m.unit, dec: m.dec, min: m.min, max: m.max, beginAtZero: m.min == null, target: { value: m.target, label: 'Meta' }, maxXTicks: 7 });
+  }
+  function drawDonut() {
+    var g = [['Por validar o bloqueados', ['Recibido', 'Stock validado', 'Bloqueado por stock'], '#C98A00'], ['En firme y preparación', ['En firme', 'En preparación'], '#2A6BDB'], ['Listos y planificados', ['Listo para despacho', 'Planificado'], '#7A4B9A'], ['En ruta', ['En ruta'], '#0E8F9E'], ['Entregados hoy', ['Entregado', 'Entrega parcial', 'Fallido'], '#15915A']];
+    var vals = g.map(function (x) { return A.pedidos.filter(function (p) { return x[1].indexOf(p.estado) > -1 && (x[0] !== 'Entregados hoy' || (p.despachoId && A.idx.despachos[p.despachoId].fecha === A.ymd(0))); }).length; }), tot = vals.reduce(function (a, b) { return a + b; }, 0);
+    UI.chart.donut($('#donut'), { labels: g.map(function (x) { return x[0]; }), data: vals, colors: g.map(function (x) { return x[2]; }), center: { value: tot, label: 'pedidos' }, legend: false, unit: 'pedidos' });
+    $('#donutLegend').innerHTML = g.map(function (x, i) { return '<div class="li"><i class="sw" style="background:' + x[2] + '"></i>' + esc(x[0]) + '<b>' + vals[i] + '</b></div>'; }).join('');
+  }
+
+  /* ---------- eventos de filtros ---------- */
+  function segBind(id, cb) { $(id).addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; UI.$$('button', $(id)).forEach(function (x) { x.setAttribute('aria-pressed', x === b); }); cb(b); }); }
+  segBind('#periodSeg', function (b) { state.period = +b.dataset.p; renderKpis(); drawTrend(); });
+  segBind('#metricSeg', function (b) { state.metric = b.dataset.m; drawTrend(); });
+  $('#sedeSel').addEventListener('change', function (e) { var n = e.target.options[e.target.selectedIndex].text; UI.toast('Vista filtrada: ' + n + '. En la demo los datos de ejemplo corresponden al CEDI Bogotá.', 'info'); });
+  $('#refreshBtn').addEventListener('click', function () { var b = this; b.disabled = true; $('#kpiRow').innerHTML = [1, 2, 3, 4, 5].map(function () { return '<div class="card kpi"><span class="skeleton sk-line" style="width:50%"></span><span class="skeleton" style="height:34px;width:60%"></span><span class="skeleton sk-line" style="width:70%"></span></div>'; }).join(''); tbl.setLoading(true); setTimeout(function () { renderKpis(); tbl.setLoading(false); b.disabled = false; UI.toast('Datos actualizados.', 'success'); }, 650); });
+
+  /* arranque con skeleton breve */
+  $('#kpiRow').innerHTML = [1, 2, 3, 4, 5].map(function () { return '<div class="card kpi"><span class="skeleton sk-line" style="width:50%"></span><span class="skeleton" style="height:34px;width:60%"></span><span class="skeleton sk-line" style="width:70%"></span></div>'; }).join('');
+  tbl.setLoading(true);
+  setTimeout(function () { renderKpis(); tbl.setLoading(false); }, 380);
+  drawTrend(); drawDonut();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recepción y preparación · Armetales</title>
+<meta name="description" content="Tareas de preparación de pedidos, terminal de mano con escaneo, certificación del jefe de bodega y recepción de mercancía contra la orden de compra.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de la pantalla (tokens y componentes viven en app.css) */
+  .kpi-row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .kpi .kpi-value { font-size: 28px; } .kpi { padding: 12px; } }
+  .kpi .kpi-note, .kpi .kpi-foot { white-space: normal; min-width: 0; }
+  .tool-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .tool-row .search { flex: 1 1 240px; max-width: 360px; }
+  .tool-row .grow-sp { flex: 1; }
+  .alert-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+  /* Tablero */
+  .board { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: start; }
+  .bcol { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-card); min-width: 0; display: flex; flex-direction: column; max-height: 640px; }
+  .bcol-head { display: flex; align-items: center; gap: 8px; padding: 12px 12px 8px; font-weight: 600; font-size: 13.5px; }
+  .bcol-head .sw { width: 9px; height: 9px; border-radius: 3px; background: var(--steel); flex: none; }
+  .bcol[data-st="En proceso"] .sw { background: var(--amber); } .bcol[data-st="Completa"] .sw { background: var(--green); } .bcol[data-st="Con novedad"] .sw { background: var(--red); }
+  .bcol-head .count { margin-left: auto; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; height: 20px; display: inline-flex; align-items: center; }
+  .bcol-body { padding: 4px 8px 10px; overflow: auto; display: flex; flex-direction: column; gap: 8px; min-height: 80px; }
+  .grp-head { display: flex; align-items: center; gap: 6px; padding: 8px 4px 2px; font-size: 12px; color: var(--text-2); min-width: 0; }
+  .grp-head:first-child { padding-top: 2px; }
+  .grp-head a { flex: none; white-space: nowrap; font-weight: 600; color: var(--text); text-decoration: none; }
+  .grp-head a:hover { text-decoration: underline; }
+  .grp-head .icon { width: 13px; height: 13px; flex: none; }
+  .grp-head .gh-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .grp-head .gh-n { margin-left: auto; flex: none; }
+  .tcard { text-align: left; width: 100%; display: flex; flex-direction: column; gap: 6px; padding: 10px 11px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-ctl); cursor: pointer; font: inherit; color: inherit; box-shadow: var(--shadow-1); transition: border-color .12s, transform .12s; }
+  .tcard:hover { border-color: var(--border-strong); }
+  .tcard:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .tc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .tc-desc { font-size: 13px; font-weight: 500; line-height: 1.3; }
+  .tc-loc { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .tc-loc .loc { font-family: var(--font-mono); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; }
+  .tc-loc .loc .icon { width: 13px; height: 13px; color: var(--text-3); }
+  .tc-foot { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); min-height: 24px; }
+  .tc-foot .err { margin-left: auto; color: var(--red-fg); display: inline-flex; gap: 4px; align-items: center; font-weight: 600; }
+  .tcard .meter { min-width: 0; } .tcard .meter-val { font-size: 12px; }
+  .tc-nov { font-size: 12px; color: var(--red-fg); background: var(--red-bg); border-radius: 6px; padding: 4px 8px; }
+  .board-tabs { display: none; }
+  @media (max-width: 1199px) { .board { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bcol { max-height: 520px; } }
+  @media (max-width: 699px) {
+    .board { grid-template-columns: minmax(0, 1fr); }
+    .board-tabs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 10px; padding-bottom: 2px; }
+    .board-tabs .filter-chip { flex: none; }
+    .board .bcol { display: none; max-height: none; } .board[data-m="Pendiente"] .bcol[data-st="Pendiente"], .board[data-m="En proceso"] .bcol[data-st="En proceso"], .board[data-m="Completa"] .bcol[data-st="Completa"], .board[data-m="Con novedad"] .bcol[data-st="Con novedad"] { display: flex; }
+  }
+
+  /* Terminal de mano */
+  .hh { max-width: 400px; margin: 0 auto; border: 1px solid var(--border-strong); border-radius: 22px; background: var(--surface-2); padding: 14px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow-1); }
+  .hh, .hh > * { min-width: 0; } .hh-actions .btn-row .btn { padding-inline: 8px; }
+  .hh-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+  .hh-bar .select { width: auto; flex: 1; min-width: 0; height: 32px; font-size: 13px; }
+  .hh-bar .live { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .hh-loc { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+  .hh-loc .eb { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); font-weight: 600; }
+  .hh-loc .code { font-family: var(--font-mono); font-weight: 500; font-size: 38px; line-height: 1.1; letter-spacing: -.02em; margin: 4px 0 2px; }
+  .hh-loc .where { font-size: 12.5px; color: var(--text-2); }
+  .hh-sku { display: grid; gap: 2px; padding: 0 4px; }
+  .hh-sku .mono { font-size: 13px; color: var(--text-2); }
+  .hh-sku .d { font-weight: 600; font-size: 15px; line-height: 1.3; }
+  .hh-qty { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 0 4px; }
+  .stepper-q { display: inline-flex; align-items: center; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); overflow: hidden; }
+  .stepper-q button { width: 48px; height: 48px; font-size: 22px; color: var(--text); display: grid; place-items: center; }
+  .stepper-q button:hover { background: var(--surface-3); } .stepper-q button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+  .stepper-q input { width: 64px; height: 48px; text-align: center; border: 0; border-inline: 1px solid var(--border); background: transparent; font: 600 20px var(--font-display); color: var(--text); font-variant-numeric: tabular-nums; }
+  .stepper-q input:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+  .scan-zone { position: relative; border: 1.5px dashed var(--border-strong); border-radius: 14px; height: 92px; display: grid; place-items: center; color: var(--text-2); font-size: 13px; overflow: hidden; background: var(--surface); }
+  .scan-zone .sz-in { display: grid; place-items: center; gap: 4px; text-align: center; padding: 0 12px; }
+  .scan-zone .icon { width: 26px; height: 26px; }
+  .scan-zone.is-scanning { border-color: var(--blue); color: var(--blue-fg); }
+  .scan-zone.is-scanning::after { content: ""; position: absolute; left: 8px; right: 8px; height: 2px; background: var(--red); box-shadow: 0 0 10px var(--red); animation: scanline .9s ease-in-out infinite alternate; }
+  .scan-zone.is-error { border-color: var(--red); animation: shake .32s; }
+  .scan-zone.is-ok { border-color: var(--green); border-style: solid; }
+  @keyframes scanline { from { top: 12px; } to { top: calc(100% - 14px); } }
+  @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+  @media (prefers-reduced-motion: reduce) { .scan-zone.is-scanning::after { animation: none; top: 50%; } .scan-zone.is-error { animation: none; } }
+  .hh-actions { display: grid; gap: 8px; }
+  .hh-actions .btn { height: 48px; font-size: 15px; justify-content: center; }
+  .hh-actions .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .hh-actions .btn-row .btn { height: 40px; font-size: 13px; }
+  .hh-queue { display: grid; gap: 4px; }
+  .hh-queue button { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 8px; align-items: center; text-align: left; padding: 7px 8px; border-radius: 8px; font-size: 13px; color: var(--text); }
+  .hh-queue button:hover { background: var(--surface-3); }
+  .hh-queue button[aria-current="true"] { background: var(--surface); border: 1px solid var(--border-strong); }
+  .hh-queue .mono { font-size: 12px; color: var(--text-2); }
+  .hh-log { font-size: 12px; display: grid; gap: 4px; color: var(--text-2); }
+  .hh-log div { display: flex; gap: 6px; align-items: flex-start; } .hh-log .icon { width: 13px; height: 13px; flex: none; margin-top: 2px; }
+  .hh-log .ok .icon { color: var(--green); } .hh-log .bad .icon { color: var(--red); }
+
+  /* Certificación / recepción */
+  .sig-box { border: 1px solid var(--border-strong); border-radius: var(--r-ctl); background: var(--surface); position: relative; }
+  .sig-box canvas { display: block; width: 100%; height: 130px; touch-action: none; cursor: crosshair; border-radius: inherit; }
+  .sig-box .sig-hint { position: absolute; left: 14px; right: 14px; bottom: 30px; border-bottom: 1px dashed var(--border-strong); pointer-events: none; }
+  .sig-box .sig-lbl { position: absolute; left: 14px; bottom: 8px; font-size: 11.5px; color: var(--text-3); pointer-events: none; }
+  .sig-box[data-invalid="true"] { border-color: var(--red); }
+  .chk-list { display: grid; gap: 8px; }
+  .chk-list .ci { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface); font-size: 13.5px; }
+  .chk-list .ci .ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; flex: none; margin-top: 1px; background: var(--green-bg); color: var(--green-fg); }
+  .chk-list .ci .ic.bad { background: var(--red-bg); color: var(--red-fg); } .chk-list .ci .ic .icon { width: 12px; height: 12px; }
+  .chk-list .ci .sub { font-size: 12px; color: var(--text-2); }
+  .lock-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--red-fg); background: var(--red-bg); border-radius: 999px; padding: 0 9px; height: 22px; white-space: nowrap; }
+  .lock-tag .icon { width: 12px; height: 12px; }
+  .lock-tag.ok { color: var(--green-fg); background: var(--green-bg); }
+  .doc-list { display: grid; gap: 8px; }
+  .doc-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface); flex-wrap: wrap; }
+  .doc-item .di-main { flex: 1 1 220px; min-width: 0; }
+  .rx-steps { margin-bottom: 16px; }
+  .diff-neg { color: var(--red-fg); font-weight: 600; } .diff-pos { color: var(--amber-fg); font-weight: 600; } .diff-ok { color: var(--green-fg); font-weight: 600; }
+  .num-in { width: 100px; text-align: right; }
+  .loc-pick { display: grid; gap: 6px; min-width: 0; flex: 0 1 300px; } .loc-pick .select { width: 100%; text-overflow: ellipsis; }
+  .mini-stat { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .mini-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; } .mini-stat .l { font-size: 12px; color: var(--text-2); }
+  .kv-sm { font-size: 13px; }
+</style>
+</head>
+<body data-page="preparacion">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Bodega</div>
+      <h1 class="page-title">Recepción y preparación</h1>
+      <p class="page-desc">Tareas de preparación por pedido, escaneo en terminal de mano y certificación del jefe de bodega antes de facturar. Recepción contra la orden de compra.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-secondary" id="btnTerminal"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>Abrir terminal de mano</button>
+      <button type="button" class="btn btn-primary" id="btnRecibir"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Registrar recepción</button>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist" id="mainTabs" aria-label="Secciones">
+    <button class="tab" role="tab" aria-controls="preparacion" aria-selected="true" id="tabPrep">Preparación <span class="count" id="cntPrep">0</span></button>
+    <button class="tab" role="tab" aria-controls="recepcion" aria-selected="false" id="tabRec">Recepción <span class="count" id="cntRec">0</span></button>
+  </div>
+
+  <!-- ================= PREPARACIÓN ================= -->
+  <div id="preparacion" role="tabpanel" aria-labelledby="tabPrep" class="tab-panel">
+    <section class="section" aria-label="Resumen de preparación"><div class="kpi-row" id="kpiRow"></div></section>
+
+    <section class="section" id="cutAlert" aria-live="polite"></section>
+
+    <section class="section" aria-label="Tablero de tareas">
+      <div class="section-head"><h2 class="section-title">Tablero de tareas</h2></div>
+      <div class="tool-row" style="margin-bottom:12px">
+        <div class="row" style="gap:10px;flex:1 1 auto">
+          <div class="search is-sm"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="input" type="search" id="q" placeholder="Pedido, cliente, SKU o ubicación" aria-label="Buscar tareas"></div>
+          <select class="select input-sm" id="opSel" aria-label="Operario" style="width:auto;min-width:160px"></select>
+          <div class="segmented" role="group" aria-label="Agrupar por" id="grpSeg"><button type="button" data-g="pedido" aria-pressed="true">Por pedido</button><button type="button" data-g="zona" aria-pressed="false">Por zona</button></div>
+          <label class="switch"><input type="checkbox" id="showCert"> Incluir certificadas</label>
+        </div>
+      </div>
+      <div class="board-tabs" id="boardTabs" role="group" aria-label="Estado de las tareas"></div>
+      <div class="board" id="board" data-m="Pendiente"></div>
+    </section>
+
+    <section class="section" aria-label="Certificación por pedido">
+      <div class="section-head"><div><h2 class="section-title">Certificación por pedido</h2><p class="muted t-13" style="margin-top:2px">Un pedido no se puede facturar ni despachar hasta que el jefe de bodega certifique la preparación.</p></div></div>
+      <div id="ordTable"></div>
+    </section>
+  </div>
+
+  <!-- ================= RECEPCIÓN ================= -->
+  <div id="recepcion" role="tabpanel" aria-labelledby="tabRec" class="tab-panel" hidden>
+    <section class="section" aria-label="Documentos por recibir">
+      <div class="section-head"><div><h2 class="section-title">Documentos por recibir</h2><p class="muted t-13" style="margin-top:2px">Órdenes de compra y traslados anunciados para el CEDI Bogotá.</p></div></div>
+      <div class="doc-list" id="docList"></div>
+    </section>
+    <section class="section" aria-label="Recepciones registradas">
+      <div class="section-head"><h2 class="section-title">Recepciones registradas</h2></div>
+      <div id="recTable"></div>
+    </section>
+  </div>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$, I = UI.icon;
+  var ZN = { A: 'Largos y varilla', B: 'Mallas y láminas', C: 'Perfiles y tubería', D: 'Alambre y cubiertas', E: 'Cemento y morteros' };
+  var ESTS = ['Pendiente', 'En proceso', 'Completa', 'Con novedad'];
+  var PRIO = { Alta: 0, Media: 1, Baja: 2 };
+  var MOTIVOS = ['Faltante en la ubicación', 'Producto con daño visible', 'Etiqueta ilegible o sin código', 'Ubicación ocupada por otro SKU', 'Otro motivo'];
+  var jefe = A.idx.usuarios['USR-005'], opById = {}; A.operarios.forEach(function (o) { opById[o.operarioId] = o; });
+  var st = { grp: 'pedido', q: '', op: '', showCert: false, mob: 'Pendiente' };
+
+  /* ---------- datos locales de tareas (copia en memoria; ARM no se muta) ---------- */
+  var T = A.tareas.map(function (t) {
+    return { id: t.tareaId, pedidoId: t.pedidoId, sku: t.sku, desc: t.descripcion, req: t.cantidadSolicitada, tom: t.cantidadTomada, und: t.unidad, ub: t.ubicacion, op: t.operarioId,
+      est: t.estado === 'Pendiente' ? 'Pendiente' : t.estado === 'En curso' ? 'En proceso' : 'Completa', cert: t.estado === 'Certificada', certFecha: t.certificacion && t.certificacion.fecha, prio: t.prioridad, muelle: t.muelle, zona: (t.ubicacion || 'A')[0], err: 0, nov: null };
+  });
+  var tById = {}; T.forEach(function (t) { tById[t.id] = t; });
+  (function seedNov() {
+    var motiv = [['Faltante en la ubicación', 'El conteo físico no alcanza para la cantidad pedida.'], ['Producto con daño visible', 'Atado con zunchos rotos y óxido superficial.']], n = 0;
+    T.forEach(function (t) { if (n < 2 && !t.cert && t.est === 'Pendiente' && t.zona !== 'E') { t.est = 'Con novedad'; t.op = 'OP-00' + (n + 2); t.nov = { motivo: motiv[n][0], obs: motiv[n][1], por: opById[t.op].nombre, fecha: new Date(Date.now() - (35 + n * 50) * 60000) }; n++; } });
+  })();
+  (function seedReady() { /* un pedido con preparación completa y sin certificar para demostrar HU-210 */
+    var by = {}; T.forEach(function (t) { (by[t.pedidoId] = by[t.pedidoId] || []).push(t); });
+    var id = Object.keys(by).filter(function (k) { var l = by[k]; return l.length <= 2 && l.every(function (t) { return !t.cert && t.est !== 'Con novedad'; }); })[0];
+    if (id) by[id].forEach(function (t) { t.tom = t.req; t.est = 'Completa'; t.op = t.op || 'OP-001'; });
+  })();
+  var certs = {}; T.forEach(function (t) { if (t.cert && !certs[t.pedidoId]) certs[t.pedidoId] = { por: jefe.nombre, fecha: t.certFecha }; });
+
+  function ped(id) { return A.idx.pedidos[id]; }
+  function orders() {
+    var m = {}, out = [];
+    T.forEach(function (t) { (m[t.pedidoId] = m[t.pedidoId] || { id: t.pedidoId, tasks: [] }).tasks.push(t); });
+    Object.keys(m).forEach(function (k) { var o = m[k]; o.p = ped(k); o.n = o.tasks.length; o.done = o.tasks.filter(function (t) { return t.est === 'Completa'; }).length; o.nov = o.tasks.filter(function (t) { return t.est === 'Con novedad'; }).length; o.cert = o.tasks.every(function (t) { return t.cert; }); o.ready = o.done === o.n; o.cliente = o.p.cliente; o.muelle = o.tasks[0].muelle; o.prio = o.p.prioridad; out.push(o); });
+    return out;
+  }
+  function openTasks() { return T.filter(function (t) { return !t.cert && t.est !== 'Completa'; }); }
+  function opName(id) { return id && opById[id] ? opById[id].nombre : null; }
+  function shortName(n) { var p = n.split(' '); return p[0] + ' ' + (p[p.length - 1] || ''); }
+  function unitsLbl(u, n) { return u === 'Unidad' ? (n === 1 ? 'unidad' : 'unidades') : u === 'Barra' ? (n === 1 ? 'barra' : 'barras') : u === 'Bolsa' ? (n === 1 ? 'bolsa' : 'bolsas') : u === 'Rollo' ? (n === 1 ? 'rollo' : 'rollos') : u === 'Caja' ? (n === 1 ? 'caja' : 'cajas') : u.toLowerCase(); }
+  function locDesc(ub) { var p = ub.split('-'); return 'Zona ' + p[0] + ' · ' + (ZN[p[0]] || '') + ' · Pasillo ' + p[1] + ' · Nivel ' + p[2] + ' · Posición ' + p[3]; }
+
+  /* ---------- corte de despacho (HU-209) ---------- */
+  function corte() { var hh = A.sedes[0].corteHora.split(':'), c = new Date(); c.setHours(+hh[0], +hh[1], 0, 0); return Math.round((c - Date.now()) / 60000); }
+  function fmtMin(m) { m = Math.abs(m); return m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '') : m + ' min'; }
+  function renderAlert() {
+    var ab = openTasks(), os = orders().filter(function (o) { return !o.cert && o.tasks.some(function (t) { return t.est !== 'Completa'; }); });
+    os.sort(function (a, b) { return PRIO[a.prio] - PRIO[b.prio]; });
+    var m = corte(), hora = A.sedes[0].corteHora, tone, title, txt;
+    if (!ab.length) { $('#cutAlert').innerHTML = UI.banner({ tone: 'success', title: 'Sin tareas abiertas', text: 'Toda la preparación del día está completa antes del corte de las ' + hora + '.' }); return; }
+    if (m <= 0) { tone = 'danger'; title = 'Corte de despacho superado hace ' + fmtMin(m); txt = ab.length + ' tareas de ' + os.length + ' pedidos siguen abiertas; saldrán en el siguiente despacho si no se priorizan.'; }
+    else if (m <= 60) { tone = 'danger'; title = 'Quedan ' + fmtMin(m) + ' para el corte de las ' + hora; txt = ab.length + ' tareas abiertas en ' + os.length + ' pedidos. Reasigna operarios para no perder el despacho.'; }
+    else if (m <= 180) { tone = 'warning'; title = 'Quedan ' + fmtMin(m) + ' para el corte de las ' + hora; txt = ab.length + ' tareas abiertas en ' + os.length + ' pedidos; ' + os.filter(function (o) { return o.prio === 'Alta'; }).length + ' son de prioridad alta.'; }
+    else { tone = 'info'; title = 'Corte de despacho a las ' + hora + ' (en ' + fmtMin(m) + ')'; txt = ab.length + ' tareas abiertas en ' + os.length + ' pedidos.'; }
+    $('#cutAlert').innerHTML = UI.banner({ tone: tone, title: title, html: esc(txt) + '<div class="alert-links">' + os.slice(0, 4).map(function (o) { return '<button type="button" class="filter-chip" data-find="' + o.id + '"><span class="mono">' + o.id + '</span> ' + UI.chip(o.prio, { small: true, noDot: true }) + '</button>'; }).join('') + '<button type="button" class="btn btn-ghost btn-sm" data-find="">Ver todas las abiertas</button></div>' });
+  }
+  $('#cutAlert').addEventListener('click', function (e) { var b = e.target.closest('[data-find]'); if (!b) return; $('#q').value = b.dataset.find; st.q = b.dataset.find; $('#showCert').checked = false; st.showCert = false; drawBoard(); $('#board').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+
+  /* ---------- KPIs ---------- */
+  function renderKpis() {
+    var os = orders(), open = openTasks(), pend = T.filter(function (t) { return t.est === 'Pendiente'; }).length, proc = T.filter(function (t) { return t.est === 'En proceso'; }).length, nov = T.filter(function (t) { return t.est === 'Con novedad'; }).length;
+    var sinCert = os.filter(function (o) { return !o.cert; }).length, listos = os.filter(function (o) { return !o.cert && o.ready; }).length;
+    $('#kpiRow').innerHTML =
+      UI.kpi({ label: 'Tareas abiertas', icon: 'clipboard-list', value: open.length, note: pend + ' pendientes · ' + proc + ' en proceso' }) +
+      UI.kpi({ label: 'Con novedad', icon: 'alert-triangle', value: nov, note: nov ? 'Requieren decisión del jefe de bodega' : 'Sin novedades abiertas' }) +
+      UI.kpi({ label: 'Pedidos por certificar', icon: 'shield-check', valueHtml: sinCert + '<small>de ' + os.length + '</small>', note: listos + ' con preparación completa' }) +
+      UI.kpi({ label: 'Pedidos certificados', icon: 'check-circle', value: os.length - sinCert, note: 'Habilitados para facturar y despachar' });
+    $('#cntPrep').textContent = open.length;
+  }
+
+  /* ---------- tablero (HU-205, HU-206) ---------- */
+  function visibleTasks() {
+    var q = UI.norm(st.q);
+    return T.filter(function (t) {
+      if (!st.showCert && t.cert) return false;
+      if (st.op && t.op !== st.op) return false;
+      if (q) { var hay = UI.norm([t.id, t.pedidoId, ped(t.pedidoId).cliente, t.sku, t.desc, t.ub].join(' ')); if (hay.indexOf(q) < 0) return false; }
+      return true;
+    }).sort(function (a, b) { return PRIO[a.prio] - PRIO[b.prio] || (a.pedidoId < b.pedidoId ? -1 : a.pedidoId > b.pedidoId ? 1 : 0) || (a.ub < b.ub ? -1 : 1); });
+  }
+  function cardHtml(t) {
+    var nm = opName(t.op), lvl = t.est === 'Completa' ? 'ok' : t.est === 'Con novedad' ? 'crit' : 'info';
+    return '<button type="button" class="tcard" data-t="' + t.id + '" aria-label="Tarea ' + t.id + ', ' + esc(t.desc) + ', ' + t.est + '. Abrir en terminal">' +
+      '<div class="tc-top"><span class="mono t-12 muted">' + t.id + '</span>' + UI.chip(t.prio, { small: true, noDot: true }) + '</div>' +
+      '<div class="tc-desc">' + esc(t.desc) + '</div>' +
+      '<div class="tc-loc"><span class="loc">' + I('map-pin') + t.ub + '</span><span class="tag">' + t.muelle + '</span>' + (t.cert ? '<span class="lock-tag ok">' + I('shield-check') + 'Certificada</span>' : '') + '</div>' +
+      UI.meter(t.tom, t.req, { level: lvl, text: t.tom + ' / ' + t.req + ' ' + unitsLbl(t.und, t.req), label: 'Avance de extracción' }) +
+      (t.nov ? '<div class="tc-nov">' + esc(t.nov.motivo) + '</div>' : '') +
+      '<div class="tc-foot">' + (nm ? UI.avatar(nm, { size: 'sm' }) + '<span class="truncate">' + esc(shortName(nm)) + '</span>' : '<span class="muted">Sin asignar</span>') + (t.err ? '<span class="err" title="Lecturas de SKU incorrectas">' + I('alert-circle', 'icon-sm') + t.err + '</span>' : '') + '</div></button>';
+  }
+  function drawBoard() {
+    var vis = visibleTasks(), os = {}; orders().forEach(function (o) { os[o.id] = o; });
+    $('#boardTabs').innerHTML = ESTS.map(function (s) { return '<button type="button" class="filter-chip" data-m="' + s + '" aria-pressed="' + (st.mob === s) + '">' + s + ' <span class="n">' + vis.filter(function (t) { return t.est === s; }).length + '</span></button>'; }).join('');
+    $('#board').setAttribute('data-m', st.mob);
+    $('#board').innerHTML = ESTS.map(function (s) {
+      var col = vis.filter(function (t) { return t.est === s; }), body = '';
+      if (!col.length) body = '<div class="muted t-13" style="padding:14px 6px;text-align:center">' + (s === 'Con novedad' ? 'Sin novedades. Todo fluye.' : s === 'Completa' ? 'Aún no hay tareas completas.' : 'Sin tareas en este estado.') + '</div>';
+      else {
+        var keyOf = st.grp === 'pedido' ? function (t) { return t.pedidoId; } : function (t) { return t.zona; }, last = null;
+        col.slice().sort(function (a, b) { return st.grp === 'zona' ? (a.zona < b.zona ? -1 : a.zona > b.zona ? 1 : PRIO[a.prio] - PRIO[b.prio]) : 0; }).forEach(function (t) {
+          var k = keyOf(t);
+          if (k !== last) {
+            last = k; var n = col.filter(function (x) { return keyOf(x) === k; }).length;
+            if (st.grp === 'pedido') { var o = os[k]; body += '<div class="grp-head"><a href="pedidos.html?id=' + k + '" class="mono">' + k + '</a><span class="gh-t">' + esc(o.cliente) + '</span>' + (o.cert ? '' : '<span data-tip="No se puede facturar: preparación sin certificar" style="display:inline-flex">' + I('lock') + '</span>') + '<span class="gh-n">' + n + '</span></div>'; }
+            else body += '<div class="grp-head"><strong style="color:var(--text)">Zona ' + k + '</strong><span class="gh-t">' + ZN[k] + '</span><span class="gh-n">' + n + '</span></div>';
+          }
+          body += cardHtml(t);
+        });
+      }
+      return '<section class="bcol" data-st="' + s + '" aria-label="' + s + '"><div class="bcol-head"><i class="sw"></i><h3 style="font-size:13.5px;font-family:var(--font-ui)">' + s + '</h3><span class="count">' + col.length + '</span></div><div class="bcol-body">' + body + '</div></section>';
+    }).join('');
+  }
+  $('#board').addEventListener('click', function (e) { var c = e.target.closest('[data-t]'); if (c) openTerminal(c.dataset.t); });
+  $('#boardTabs').addEventListener('click', function (e) { var b = e.target.closest('[data-m]'); if (!b) return; st.mob = b.dataset.m; drawBoard(); });
+  $('#q').addEventListener('input', function () { st.q = this.value; drawBoard(); });
+  $('#showCert').addEventListener('change', function () { st.showCert = this.checked; drawBoard(); });
+  $('#opSel').innerHTML = '<option value="">Todos los operarios</option>' + A.operarios.map(function (o) { return '<option value="' + o.operarioId + '">' + esc(shortName(o.nombre)) + ' · ' + o.turno + '</option>'; }).join('');
+  $('#opSel').addEventListener('change', function () { st.op = this.value; drawBoard(); });
+  $('#grpSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; $$('button', this).forEach(function (x) { x.setAttribute('aria-pressed', x === b); }); st.grp = b.dataset.g; drawBoard(); });
+
+  /* ---------- terminal de mano (HU-207, HU-208) ---------- */
+  var term = null;
+  function pending(pid) { return T.filter(function (t) { return t.pedidoId === pid && !t.cert && (t.est === 'Pendiente' || t.est === 'En proceso'); }); }
+  function termHtml() {
+    var t = tById[term.id], p = ped(t.pedidoId), rest = t.req - t.tom, q = T.filter(function (x) { return x.pedidoId === t.pedidoId; }).sort(function (a, b) { return a.ub < b.ub ? -1 : 1; });
+    var h = '<div class="hh"><div class="hh-bar"><span class="live"><i class="dot ok"></i>TM-07 · en línea</span><select class="select" id="tOp" aria-label="Operario que escanea">' + A.operarios.map(function (o) { return '<option value="' + o.operarioId + '"' + (o.operarioId === term.op ? ' selected' : '') + '>' + esc(shortName(o.nombre)) + '</option>'; }).join('') + '</select></div>';
+    h += '<div class="hh-loc"><div class="eb">' + (t.est === 'Completa' ? 'Ubicación de extracción' : 'Ve a la ubicación') + '</div><div class="code">' + t.ub + '</div><div class="where">' + esc(locDesc(t.ub)) + '</div></div>';
+    h += '<div class="hh-sku"><span class="mono">SKU ' + t.sku + ' · ' + t.id + '</span><span class="d">' + esc(t.desc) + '</span><span class="muted t-13">Pedido <a class="mono" href="pedidos.html?id=' + t.pedidoId + '">' + t.pedidoId + '</a> · ' + esc(p.cliente) + ' · Muelle ' + t.muelle + '</span></div>';
+    if (t.cert) h += UI.banner({ tone: 'success', title: 'Tarea certificada', text: 'Preparación firmada por el jefe de bodega. No admite cambios.' });
+    else if (t.est === 'Completa') h += UI.banner({ tone: 'success', title: 'Extracción confirmada', text: t.tom + ' ' + unitsLbl(t.und, t.tom) + ' tomadas de ' + t.ub + '.' });
+    else if (t.est === 'Con novedad') h += UI.banner({ tone: 'danger', title: t.nov.motivo, text: t.nov.obs + ' Reportado por ' + shortName(t.nov.por) + '.' });
+    else {
+      h += '<div class="hh-qty"><div><div class="t-13 muted">Cantidad a tomar</div><div class="t-13"><strong>' + t.tom + '</strong> tomadas de <strong>' + t.req + '</strong> · faltan <strong>' + rest + '</strong></div></div><div class="stepper-q"><button type="button" data-q="-1" aria-label="Disminuir cantidad">−</button><input id="tQty" type="text" inputmode="numeric" value="' + term.qty + '" aria-label="Cantidad a tomar"><button type="button" data-q="1" aria-label="Aumentar cantidad">+</button></div></div>';
+      if (term.qtyErr) h += '<span class="error-text" style="padding:0 4px">' + I('alert-circle', 'icon-sm') + esc(term.qtyErr) + '</span>';
+      h += '<div class="scan-zone' + (term.scan === 'run' ? ' is-scanning' : term.scan === 'bad' ? ' is-error' : term.scan === 'ok' ? ' is-ok' : '') + '" id="tZone"><div class="sz-in">' + I('scan') + '<span>' + (term.scan === 'run' ? 'Leyendo etiqueta…' : 'Apunta al código de barras de la etiqueta') + '</span></div></div>';
+    }
+    if (term.msg) h += '<div role="alert">' + UI.banner({ tone: term.msg.tone, title: term.msg.title, html: term.msg.html }) + '</div>';
+    if (!t.cert && (t.est === 'Pendiente' || t.est === 'En proceso')) {
+      h += '<div class="hh-actions"><button type="button" class="btn btn-primary btn-block" data-a="scan"' + (term.scan === 'run' ? ' disabled' : '') + '>' + (term.scan === 'run' ? '<span class="spin"></span>' : I('scan')) + 'Escanear SKU</button><div class="btn-row"><button type="button" class="btn btn-secondary" data-a="wrong"' + (term.scan === 'run' ? ' disabled' : '') + '>Simular SKU equivocado</button><button type="button" class="btn btn-secondary" data-a="nov">' + I('alert-triangle') + 'Reportar novedad</button></div></div>';
+    } else if (t.est === 'Con novedad' && !t.cert) {
+      h += '<div class="hh-actions"><button type="button" class="btn btn-secondary btn-block" data-a="resume">Reanudar tarea</button></div>';
+    } else if (t.est === 'Completa' && !t.cert) {
+      var nx = pending(t.pedidoId)[0];
+      h += '<div class="hh-actions">' + (nx ? '<button type="button" class="btn btn-primary btn-block" data-a="next">Siguiente tarea · ' + nx.ub + I('arrow-right') + '</button>' : '<button type="button" class="btn btn-primary btn-block" data-a="cert">' + I('shield-check') + 'Certificar este pedido</button>') + '</div>';
+    }
+    h += '<div><div class="t-12 muted mb-2" style="font-weight:600;margin-bottom:6px">Líneas del pedido</div><div class="hh-queue">' + q.map(function (x) { var ic = x.cert || x.est === 'Completa' ? I('check-circle', 'icon-sm') : x.est === 'Con novedad' ? I('alert-triangle', 'icon-sm') : x.est === 'En proceso' ? I('clock', 'icon-sm') : '<i class="dot" style="margin:0 6px"></i>'; return '<button type="button" data-t="' + x.id + '" aria-current="' + (x.id === t.id) + '"><span>' + ic + '</span><span class="truncate">' + esc(x.desc) + '</span><span class="mono">' + x.ub + '</span></button>'; }).join('') + '</div></div>';
+    if (term.log.length) h += '<div class="hh-log" aria-label="Lecturas recientes"><div class="t-12" style="font-weight:600;color:var(--text-2)">Lecturas recientes</div>' + term.log.slice(0, 4).map(function (l) { return '<div class="' + (l.ok ? 'ok' : 'bad') + '">' + I(l.ok ? 'check' : 'x-circle') + '<span>' + esc(l.t) + '</span></div>'; }).join('') + '</div>';
+    return h + '</div>';
+  }
+  function setTerm() { if (!term || !term.api) return; var b = term.api.body, y = b.scrollTop; b.innerHTML = termHtml(); b.scrollTop = y; var ti = $('.ov-title', term.api.el); if (ti) ti.textContent = 'Terminal de mano'; }
+  function openTerminal(id) {
+    if (!id) { var all = T.filter(function (t) { return !t.cert && (t.est === 'En proceso' || t.est === 'Pendiente'); }).sort(function (a, b) { return PRIO[a.prio] - PRIO[b.prio] || (a.est === 'En proceso' ? -1 : 1); }); id = (all[0] || T[0]).id; }
+    var t = tById[id];
+    if (term && term.api && document.body.contains(term.api.el)) { term.id = id; term.qty = Math.max(1, t.req - t.tom); term.msg = null; term.qtyErr = null; term.scan = null; setTerm(); return; }
+    term = { id: id, op: t.op || (term && term.op) || 'OP-001', qty: Math.max(1, t.req - t.tom), msg: null, log: [], scan: null, qtyErr: null };
+    var api = UI.drawer({ title: 'Terminal de mano', subtitle: 'Prototipo del flujo del operario: ubicación, escaneo y confirmación', width: 480, body: termHtml(), onClose: function () { term.api = null; } });
+    term.api = api; bindTerm(api.body);
+  }
+  function bindTerm(body) {
+    body.addEventListener('change', function (e) { if (e.target.id === 'tOp') term.op = e.target.value; });
+    body.addEventListener('input', function (e) { if (e.target.id === 'tQty') { var v = e.target.value.replace(/\D/g, ''); e.target.value = v; term.qty = v === '' ? '' : +v; } });
+    body.addEventListener('click', function (e) {
+      var q = e.target.closest('[data-q]'), tt = e.target.closest('[data-t]'), a = e.target.closest('[data-a]'), t = tById[term.id];
+      if (q) { var cur = +term.qty || 0; term.qty = Math.max(1, cur + (+q.dataset.q)); term.qtyErr = null; setTerm(); return; }
+      if (tt) { openTerminal(tt.dataset.t); return; }
+      if (!a) return;
+      var act = a.dataset.a;
+      if (act === 'scan') doScan(false);
+      else if (act === 'wrong') doScan(true);
+      else if (act === 'nov') novModal(t);
+      else if (act === 'resume') { t.nov = null; t.est = t.tom > 0 ? 'En proceso' : 'Pendiente'; term.msg = { tone: 'info', title: 'Tarea reanudada', html: 'La novedad quedó cerrada y la tarea volvió al tablero.' }; term.qty = Math.max(1, t.req - t.tom); refreshAll(); }
+      else if (act === 'next') { var nx = pending(t.pedidoId)[0]; if (nx) openTerminal(nx.id); }
+      else if (act === 'cert') { term.api.close(); certModal(t.pedidoId); }
+    });
+  }
+  function doScan(wrong) {
+    var t = tById[term.id], rest = t.req - t.tom, qn = +term.qty;
+    term.msg = null; term.qtyErr = null;
+    if (!wrong) {
+      if (!qn || qn < 1) { term.qtyErr = 'Ingresa una cantidad mayor a cero.'; setTerm(); return; }
+      if (qn > rest) { term.qtyErr = 'No puedes tomar más de lo pendiente: faltan ' + rest + ' ' + unitsLbl(t.und, rest) + '.'; setTerm(); return; }
+    }
+    term.scan = 'run'; setTerm();
+    setTimeout(function () {
+      if (!term || !term.api) return;
+      if (wrong) {
+        var pool = A.productos.filter(function (p) { return p.skuSAP !== t.sku; }), sameFam = pool.filter(function (p) { return p.familia === A.idx.productos[t.sku].familia; }), pick = (sameFam.length ? sameFam : pool)[(t.err + t.req) % (sameFam.length || pool.length)];
+        t.err++; term.scan = 'bad';
+        term.log.unshift({ ok: false, t: 'Leído ' + pick.skuSAP + ' en ' + t.ub + '; se esperaba ' + t.sku });
+        term.msg = { tone: 'danger', title: 'SKU equivocado, no se registró la extracción', html: 'Leíste <span class="mono">' + pick.skuSAP + '</span> · ' + esc(pick.descripcion) + '.<br>Se esperaba <span class="mono strong">' + t.sku + '</span> · ' + esc(t.desc) + '. Devuelve el material y escanea de nuevo.' + (t.err >= 3 ? '<br><strong>Van ' + t.err + ' lecturas erradas: reporta una novedad para que el jefe de bodega revise la ubicación.</strong>' : '') };
+        UI.toast('SKU equivocado: se esperaba ' + t.sku + '.', 'error');
+      } else {
+        t.tom += qn; t.op = term.op; t.est = t.tom >= t.req ? 'Completa' : 'En proceso'; term.scan = 'ok';
+        term.log.unshift({ ok: true, t: 'Confirmado ' + qn + ' × ' + t.sku + ' en ' + t.ub });
+        term.msg = null;
+        UI.toast(t.est === 'Completa' ? 'Extracción confirmada: ' + t.desc + '.' : qn + ' ' + unitsLbl(t.und, qn) + ' confirmadas; faltan ' + (t.req - t.tom) + '.', 'success');
+        term.qty = Math.max(1, t.req - t.tom);
+      }
+      refreshAll(); var keep = term.scan; setTimeout(function () { if (term && term.scan === keep) { term.scan = null; setTerm(); } }, 1200);
+    }, 750);
+  }
+  function novModal(t) {
+    var m = UI.modal({ title: 'Reportar novedad en la tarea', subtitle: t.id + ' · ' + t.desc, width: 480,
+      body: '<div class="stack"><div class="field"><label class="label" for="nvM">Motivo</label><select class="select" id="nvM">' + MOTIVOS.map(function (x) { return '<option>' + x + '</option>'; }).join('') + '</select></div><div class="field"><label class="label" for="nvO">Observación <span class="opt" id="nvOpt">(opcional)</span></label><textarea class="textarea" id="nvO" placeholder="Qué viste en la ubicación"></textarea><span class="error-text" id="nvE" hidden>' + I('alert-circle', 'icon-sm') + 'Describe la novedad para que el jefe de bodega pueda actuar.</span></div>' + UI.banner({ tone: 'info', text: 'La tarea pasa a «Con novedad» y se notifica al jefe de bodega. La cantidad ya tomada se conserva.' }) + '</div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Reportar novedad', kind: 'primary', onClick: function () {
+        var mo = $('#nvM', m.el).value, ob = $('#nvO', m.el).value.trim();
+        if (mo === 'Otro motivo' && ob.length < 8) { $('#nvE', m.el).hidden = false; $('#nvO', m.el).setAttribute('aria-invalid', 'true'); $('#nvO', m.el).focus(); return false; }
+        t.est = 'Con novedad'; t.op = term ? term.op : t.op; t.nov = { motivo: mo, obs: ob || 'Sin observaciones adicionales.', por: opName(t.op) || 'Operario', fecha: new Date() };
+        if (term) { term.msg = null; term.log.unshift({ ok: false, t: 'Novedad reportada: ' + mo }); }
+        UI.toast('Novedad reportada. Se notificó al jefe de bodega.', 'warning'); refreshAll();
+      } }] });
+    $('#nvM', m.el).addEventListener('change', function () { $('#nvOpt', m.el).textContent = this.value === 'Otro motivo' ? '(obligatoria)' : '(opcional)'; });
+  }
+  $('#btnTerminal').addEventListener('click', function () { openTerminal(); });
+
+  /* ---------- certificación (HU-210, HU-211) ---------- */
+  var ordT;
+  function ordRows() { return orders().sort(function (a, b) { return (a.cert - b.cert) || ((b.ready ? 1 : 0) - (a.ready ? 1 : 0)) || (PRIO[a.prio] - PRIO[b.prio]) || (a.id < b.id ? -1 : 1); }); }
+  function mountOrders() {
+    ordT = UI.table($('#ordTable'), { rows: ordRows(), pageSize: 8, rowKey: 'id', caption: 'Pedidos en preparación', emptyText: 'No hay pedidos que coincidan.',
+      searchable: { placeholder: 'Buscar por pedido o cliente' }, searchKeys: ['id', 'cliente'],
+      filters: [{ key: 'cert', label: 'Certificación', all: 'Todas', options: [{ value: 'no', label: 'Sin certificar' }, { value: 'si', label: 'Certificados' }], match: function (r, v) { return v === 'si' ? r.cert : !r.cert; } }],
+      columns: [
+        { key: 'id', label: 'Pedido', mono: true, render: function (r) { return '<span class="mono">' + r.id + '</span>'; } },
+        { key: 'cliente', label: 'Cliente', title: true, render: function (r) { return esc(r.cliente) + '<div class="cell-sub">' + esc(r.p.municipio) + ' · ' + F.kg(r.p.pesoKg) + '</div>'; } },
+        { key: 'prio', label: 'Prioridad', render: function (r) { return UI.chip(r.prio); } },
+        { key: 'done', label: 'Avance', value: function (r) { return r.done / r.n; }, render: function (r) { return UI.meter(r.done, r.n, { level: r.cert || r.ready ? 'ok' : r.nov ? 'warn' : 'info', text: r.done + ' / ' + r.n + (r.n === 1 ? ' línea' : ' líneas'), label: 'Líneas preparadas' }); } },
+        { key: 'cert', label: 'Facturación', value: function (r) { return r.cert ? 1 : 0; }, render: function (r) { return r.cert ? '<span class="lock-tag ok">' + I('shield-check') + 'Certificado</span>' : '<span class="lock-tag">' + I('lock') + 'No se puede facturar</span>'; } },
+        { key: 'muelle', label: 'Muelle', hideMobile: true, render: function (r) { return '<span class="tag">' + r.muelle + '</span>'; } }
+      ],
+      onRowClick: function (r) { r.cert ? certDetail(r) : certModal(r.id); },
+      actions: function (r) { return [
+        r.cert ? { label: 'Ver certificación', icon: 'shield-check', onClick: function () { certDetail(r); } } : { label: 'Certificar preparación', icon: 'shield-check', onClick: function () { certModal(r.id); } },
+        { label: 'Intentar facturar', icon: 'file-text', onClick: function () { invoice(r); } }, { sep: true },
+        { label: 'Abrir tareas en el tablero', icon: 'clipboard-list', onClick: function () { $('#q').value = r.id; st.q = r.id; st.showCert = true; $('#showCert').checked = true; drawBoard(); $('#board').scrollIntoView({ behavior: 'smooth' }); } },
+        { label: 'Ver pedido', icon: 'arrow-up-right', href: 'pedidos.html?id=' + r.id },
+        { label: 'Ver despacho', icon: 'truck', href: 'despachos.html' }]; } });
+  }
+  function invoice(r) {
+    if (!r.cert) UI.modal({ title: 'No se puede facturar', width: 460, body: '<div class="stack">' + UI.banner({ tone: 'danger', title: 'Preparación sin certificar', html: 'El pedido <span class="mono">' + r.id + '</span> tiene ' + (r.n - r.done) + ' línea' + (r.n - r.done === 1 ? '' : 's') + ' por preparar y ninguna firma del jefe de bodega. La factura solo se genera con la preparación certificada.' }) + '<p class="muted t-13">Esta regla evita facturar mercancía que todavía no salió de la bodega.</p></div>', footer: [{ label: 'Entendido' }, { label: 'Ir a certificar', kind: 'primary', onClick: function () { setTimeout(function () { certModal(r.id); }, 120); } }] });
+    else UI.toast('Pedido ' + r.id + ' habilitado: la factura puede generarse y el pedido pasa a despacho.', 'success');
+  }
+  function certDetail(r) {
+    var c = certs[r.id] || { por: jefe.nombre, fecha: new Date() };
+    UI.modal({ title: 'Preparación certificada', subtitle: r.id + ' · ' + r.cliente, width: 480, body: '<div class="stack">' + UI.banner({ tone: 'success', title: 'Habilitado para facturar y despachar', text: 'Las ' + r.n + ' líneas fueron extraídas y verificadas.' }) + UI.kv([['Firmó', esc(c.por) + ' · Jefe de bodega'], ['Fecha', F.fechaHora(c.fecha)], ['Líneas', r.n], ['Muelle', r.muelle]]) + '</div>', footer: [{ label: 'Cerrar' }, { label: 'Ver pedido', kind: 'primary', icon: 'arrow-right', onClick: function () { location.href = 'pedidos.html?id=' + r.id; } }] });
+  }
+  function signPad(canvas) {
+    var ctx = canvas.getContext('2d'), drawing = false, dirty = false, last = null;
+    function fit() { var r = canvas.getBoundingClientRect(), d = window.devicePixelRatio || 1; canvas.width = r.width * d; canvas.height = r.height * d; ctx.scale(d, d); ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#12161B'; }
+    fit();
+    function pt(e) { var r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+    canvas.addEventListener('pointerdown', function (e) { drawing = true; last = pt(e); canvas.setPointerCapture(e.pointerId); ctx.beginPath(); ctx.moveTo(last[0], last[1]); ctx.lineTo(last[0] + .1, last[1] + .1); ctx.stroke(); dirty = true; canvas.parentNode.removeAttribute('data-invalid'); });
+    canvas.addEventListener('pointermove', function (e) { if (!drawing) return; var p = pt(e); ctx.beginPath(); ctx.moveTo(last[0], last[1]); ctx.lineTo(p[0], p[1]); ctx.stroke(); last = p; });
+    ['pointerup', 'pointercancel'].forEach(function (n) { canvas.addEventListener(n, function () { drawing = false; }); });
+    return { empty: function () { return !dirty; }, clear: function () { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.restore(); dirty = false; } };
+  }
+  function certModal(pid) {
+    var o = orders().filter(function (x) { return x.id === pid; })[0]; if (!o) return;
+    if (o.cert) { certDetail(o); return; }
+    var faltan = o.tasks.filter(function (t) { return t.est !== 'Completa'; }), exact = o.tasks.every(function (t) { return t.tom === t.req; }), sinNov = !o.nov;
+    var body = '<div class="stack">';
+    if (faltan.length) body += UI.banner({ tone: 'danger', title: 'No se puede certificar todavía', html: 'Faltan ' + faltan.length + ' línea' + (faltan.length === 1 ? '' : 's') + ' por completar:<ul style="margin:6px 0 0 18px;padding:0">' + faltan.map(function (t) { return '<li><span class="mono">' + t.ub + '</span> · ' + esc(t.desc) + ' (' + t.tom + ' / ' + t.req + ') · ' + t.est + '</li>'; }).join('') + '</ul>' });
+    body += '<div class="chk-list" role="group" aria-label="Lista de verificación"><div class="ci"><span class="ic' + (exact ? '' : ' bad') + '">' + I(exact ? 'check' : 'x') + '</span><div><div>Las cantidades tomadas coinciden con el pedido</div><div class="sub">' + o.done + ' de ' + o.n + (o.n === 1 ? ' línea completa' : ' líneas completas') + ' · ' + F.kg(o.p.pesoKg) + '</div></div></div>' +
+      '<div class="ci"><span class="ic' + (sinNov ? '' : ' bad') + '">' + I(sinNov ? 'check' : 'x') + '</span><div><div>Todos los SKU se extrajeron con escaneo y sin novedades abiertas</div><div class="sub">' + (sinNov ? 'Sin lecturas pendientes' : o.nov + ' línea con novedad por resolver') + '</div></div></div>' +
+      '<label class="ci"><input type="checkbox" class="cv" style="margin-top:3px"><div><div>Zunchado, embalaje y protección contra humedad verificados</div><div class="sub">Obligatorio en varilla, perfiles, láminas y cemento</div></div></label>' +
+      '<label class="ci"><input type="checkbox" class="cv" style="margin-top:3px"><div><div>Pedido etiquetado y ubicado en el muelle ' + o.muelle + '</div></div></label></div>' +
+      '<span class="error-text" id="cvE" hidden>' + I('alert-circle', 'icon-sm') + 'Marca las dos verificaciones manuales para certificar.</span>' +
+      '<div class="field"><label class="label">Firma de ' + esc(jefe.nombre) + ' <span class="opt">(Jefe de bodega)</span></label><div class="sig-box" id="sgBox"><canvas id="sgCv" aria-label="Área para firmar con el dedo o el mouse"></canvas><div class="sig-hint"></div><div class="sig-lbl">Firma aquí</div></div><div class="row between"><span class="error-text" id="sgE" hidden>' + I('alert-circle', 'icon-sm') + 'La firma es obligatoria para certificar.</span><button type="button" class="btn btn-ghost btn-sm" id="sgClr" style="margin-left:auto">Borrar firma</button></div></div></div>';
+    var m = UI.modal({ title: 'Certificar preparación', subtitle: pid + ' · ' + o.cliente, width: 560, body: body,
+      footer: [{ label: 'Cancelar' }, { label: 'Certificar y firmar', kind: 'primary', icon: 'shield-check', onClick: function () {
+        if (faltan.length || !exact || !sinNov) { UI.toast('Completa todas las líneas antes de certificar.', 'error'); return false; }
+        var ok = true, cvs = $$('.cv', m.el); if (!cvs.every(function (c) { return c.checked; })) { $('#cvE', m.el).hidden = false; ok = false; } else $('#cvE', m.el).hidden = true;
+        if (pad.empty()) { $('#sgE', m.el).hidden = false; $('#sgBox', m.el).setAttribute('data-invalid', 'true'); ok = false; } else $('#sgE', m.el).hidden = true;
+        if (!ok) return false;
+        o.tasks.forEach(function (t) { t.cert = true; }); certs[pid] = { por: jefe.nombre, fecha: new Date() }; o.p.estado = 'Listo para despacho';
+        UI.toast('Pedido ' + pid + ' certificado. Ya se puede facturar y despachar.', 'success'); refreshAll();
+      } }] });
+    var pad = signPad($('#sgCv', m.el)); $('#sgClr', m.el).addEventListener('click', function () { pad.clear(); });
+    if (faltan.length) { var b = $$('.ov-foot .btn-primary', m.el)[0]; if (b) b.setAttribute('aria-disabled', 'true'); }
+  }
+
+  /* ================= RECEPCIÓN ================= */
+  var ESPERADOS = [
+    { doc: 'OC-4500187234', tipo: 'Orden de compra', origen: 'Acería nacional · planta Boyacá', eta: 'Hoy, 10:30', lineas: [['1000235', 600], ['1000236', 400], ['1000237', 300]], pre: [0, -24, 0] },
+    { doc: 'OC-4500187301', tipo: 'Orden de compra', origen: 'Distribuidora de láminas del Caribe S.A.S.', eta: 'Hoy, 14:00', lineas: [['1004402', 120], ['1004403', 200]], pre: [0, 0] },
+    { doc: 'TR-3321', tipo: 'Traslado entre bodegas', origen: 'Bodega Funza', eta: 'Mañana, 07:00', lineas: [['1007700', 800], ['1007702', 400]], pre: [0, 0] }
+  ];
+  var RECS = [
+    { id: 'REC-2611-003', doc: 'TR-3320', rem: 'TRF-9981', origen: 'Bodega Funza', fecha: new Date(Date.now() - 85 * 60000), estado: 'En validación', resp: 'USR-012', muelle: 'M-01', lineas: [{ sku: '1002200', esp: 200, rec: 200, ub: null }, { sku: '1002201', esp: 150, rec: 150, ub: null }] },
+    { id: 'REC-2611-002', doc: 'OC-4500187010', rem: 'RM-22841', origen: 'Acería nacional · planta Boyacá', fecha: new Date(Date.now() - 26 * 3600000), estado: 'Con diferencias', resp: 'USR-012', muelle: 'M-02', lineas: [{ sku: '1000234', esp: 1000, rec: 976, ub: null }, { sku: '1000240', esp: 500, rec: 500, ub: null }] },
+    { id: 'REC-2611-001', doc: 'OC-4500186990', rem: 'RM-22790', origen: 'Importadora de perfiles Andina S.A.S.', fecha: new Date(Date.now() - 52 * 3600000), estado: 'Ubicada', resp: 'USR-005', muelle: 'M-03', lineas: [{ sku: '1002210', esp: 240, rec: 240, ub: 'C-01-2-01' }, { sku: '1002211', esp: 120, rec: 120, ub: 'C-01-3-02' }, { sku: '1002220', esp: 250, rec: 250, ub: 'C-02-1-02' }] }
+  ];
+  var recNo = 3;
+  function prod(sku) { return A.idx.productos[sku]; }
+  function vol(sku, q) { return prod(sku).volumenM3 * q; }
+  function recUnits(r) { return r.lineas.reduce(function (s, l) { return s + l.rec; }, 0); }
+  function sumDiff(r) { return r.lineas.reduce(function (s, l) { return s + (l.rec - l.esp); }, 0); }
+  function renderDocs() {
+    $('#docList').innerHTML = ESPERADOS.length ? ESPERADOS.map(function (d, i) { var kg = d.lineas.reduce(function (s, l) { return s + l[1] * prod(l[0]).pesoKg; }, 0);
+      return '<div class="doc-item"><span class="notif-ico info">' + I('package', 'icon-sm') + '</span><div class="di-main"><div class="strong"><span class="mono">' + d.doc + '</span> · ' + esc(d.tipo) + '</div><div class="muted t-13">' + esc(d.origen) + ' · ' + d.lineas.length + ' líneas · ' + F.ton(kg, 1) + ' · llega ' + d.eta.toLowerCase() + '</div></div><button type="button" class="btn btn-secondary btn-sm" data-rx="' + i + '">Recibir mercancía</button></div>'; }).join('')
+      : UI.empty({ icon: 'inbox', title: 'No hay documentos por recibir', text: 'Cuando SAP anuncie una orden de compra o un traslado aparecerá aquí.' });
+    $('#cntRec').textContent = ESPERADOS.length + RECS.filter(function (r) { return r.estado !== 'Ubicada'; }).length;
+  }
+  $('#docList').addEventListener('click', function (e) { var b = e.target.closest('[data-rx]'); if (b) recModal(+b.dataset.rx); });
+  var recT;
+  function recChip(e) { return UI.chip(e, { tone: e === 'Ubicada' ? 'success' : e === 'Con diferencias' ? 'warning' : 'info' }); }
+  function mountRecs() {
+    recT = UI.table($('#recTable'), { rows: RECS, pageSize: 8, rowKey: 'id', caption: 'Recepciones', emptyText: 'Aún no hay recepciones.', searchable: { placeholder: 'Buscar recepción, documento u origen' }, searchKeys: ['doc', 'rem'],
+      filters: [{ key: 'estado', label: 'Estado', all: 'Todos los estados', options: 'auto' }],
+      columns: [
+        { key: 'id', label: 'Recepción', mono: true },
+        { key: 'doc', label: 'Documento', title: true, render: function (r) { return '<span class="mono">' + r.doc + '</span><div class="cell-sub">Remisión ' + esc(r.rem) + '</div>'; } },
+        { key: 'origen', label: 'Origen', render: function (r) { return esc(r.origen); } },
+        { key: 'fecha', label: 'Fecha', value: function (r) { return +r.fecha; }, render: function (r) { return F.fechaHora(r.fecha); } },
+        { key: 'lineas', label: 'Líneas', num: true, value: function (r) { return r.lineas.length; }, render: function (r) { return r.lineas.length; } },
+        { key: 'dif', label: 'Diferencia', num: true, value: function (r) { return sumDiff(r); }, render: function (r) { var d = sumDiff(r); return d === 0 ? '<span class="diff-ok">Coincide</span>' : '<span class="' + (d < 0 ? 'diff-neg' : 'diff-pos') + '">' + (d > 0 ? '+' : '−') + F.num(Math.abs(d)) + ' un.</span>'; } },
+        { key: 'estado', label: 'Estado', render: function (r) { return recChip(r.estado); } }
+      ], onRowClick: recDetail });
+  }
+  function suggest(sku, q) {
+    var v = vol(sku, q), fam = prod(sku).familia, zona = (function () { var z = 'A'; Object.keys(ZN).forEach(function (k) { if (['A:Varilla', 'B:Malla', 'B:Lámina', 'C:Perfil', 'C:Tubería', 'D:Alambre', 'D:Teja', 'E:Cemento'].indexOf(k + ':' + fam) > -1) z = k; }); return z; })();
+    var mismas = A.ubicaciones.filter(function (u) { return u.bodegaId === A.sedeActual && u.sku === sku && u.estado !== 'Bloqueada'; }), libres = A.ubicaciones.filter(function (u) { return u.bodegaId === A.sedeActual && u.zona === zona && !u.sku && u.estado === 'Disponible'; });
+    var opts = mismas.map(function (u) { return { id: u.ubicacionId, libre: u.capacidadM3 - u.ocupacionM3, why: 'Misma ubicación del SKU' }; }).concat(libres.map(function (u) { return { id: u.ubicacionId, libre: u.capacidadM3, why: 'Ubicación vacía de la zona ' + zona }; }));
+    opts.forEach(function (o) { o.cabe = o.libre >= v; });
+    opts.sort(function (a, b) { return (b.cabe - a.cabe) || (a.why.length - b.why.length) || (b.libre - a.libre); });
+    return { opts: opts.slice(0, 6), vol: v, zona: zona };
+  }
+  function recDetail(r) {
+    var pend = r.estado !== 'Ubicada', tbl = '<div class="table-wrap"><table class="table is-dense"><thead><tr><th>SKU</th><th class="num">Esperado</th><th class="num">Recibido</th><th class="num">Dif.</th><th>Ubicación</th></tr></thead><tbody>' + r.lineas.map(function (l) { var d = l.rec - l.esp; return '<tr><td><span class="mono">' + l.sku + '</span><div class="cell-sub">' + esc(prod(l.sku).descripcion) + '</div></td><td class="num">' + F.num(l.esp) + '</td><td class="num">' + F.num(l.rec) + '</td><td class="num ' + (d < 0 ? 'diff-neg' : d > 0 ? 'diff-pos' : 'diff-ok') + '">' + (d === 0 ? '0' : (d > 0 ? '+' : '−') + F.num(Math.abs(d))) + '</td><td>' + (l.ub ? '<span class="mono">' + l.ub + '</span>' : '<span class="muted">Sin asignar</span>') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    var d = UI.drawer({ title: r.id, subtitleHtml: '<span class="mono">' + r.doc + '</span> · ' + esc(r.origen) + ' · ' + recChip(r.estado), width: 600,
+      body: '<div class="stack-lg">' + (r.estado === 'Con diferencias' ? UI.banner({ tone: 'warning', title: 'Recepción con faltante', text: 'Llegaron ' + F.num(-sumDiff(r)) + ' unidades menos que lo anunciado en la orden. Acepta la diferencia con motivo o abre una reclamación al proveedor.' }) : '') + '<div class="grid c3 gap-3"><div class="mini-stat"><div class="v">' + r.lineas.length + '</div><div class="l">Líneas</div></div><div class="mini-stat"><div class="v">' + F.num(recUnits(r)) + '</div><div class="l">Unidades recibidas</div></div><div class="mini-stat"><div class="v">' + r.muelle + '</div><div class="l">Muelle de descargue</div></div></div><section><h3 class="mb-2">Líneas validadas contra la referencia</h3>' + tbl + '</section>' + UI.kv([['Recibió', esc(A.idx.usuarios[r.resp].nombre)], ['Fecha', F.fechaHora(r.fecha)], ['Remisión del proveedor', '<span class="mono">' + esc(r.rem) + '</span>']]) + '</div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }].concat(r.estado === 'Con diferencias' ? [{ label: 'Abrir reclamación', onClick: function () { UI.toast('Reclamación al proveedor registrada para ' + r.doc + '.', 'info'); } }, { label: 'Aceptar diferencia', kind: 'primary', onClick: function () { r.estado = 'En validación'; UI.toast('Diferencia aceptada. La recepción pasa a asignación de ubicación.', 'success'); recT.setRows(RECS); renderDocs(); } }] : pend ? [{ label: 'Asignar ubicaciones sugeridas', kind: 'primary', icon: 'map-pin', onClick: function () { r.lineas.forEach(function (l) { if (!l.ub) { var s = suggest(l.sku, l.rec).opts.filter(function (o) { return o.cabe; })[0]; l.ub = s ? s.id : null; } }); var ok = r.lineas.every(function (l) { return l.ub; }); if (ok) r.estado = 'Ubicada'; UI.toast(ok ? 'Mercancía ubicada. Ya cuenta en el inventario disponible.' : 'Algunas líneas no tienen ubicación con capacidad. Revisa el plano de bodegas.', ok ? 'success' : 'warning'); recT.setRows(RECS); renderDocs(); } }] : [{ label: 'Ver ubicaciones en bodega', kind: 'primary', icon: 'arrow-right', onClick: function () { location.href = 'bodegas.html'; } }]) });
+  }
+  function recModal(idx) {
+    var rx = { step: 1, d: idx != null ? ESPERADOS[idx] : ESPERADOS[0], lines: [], loc: {}, rem: '', muelle: 'M-01', err: {} };
+    if (!rx.d) { UI.toast('No hay documentos por recibir.', 'info'); return; }
+    function load() { rx.lines = rx.d.lineas.map(function (l, i) { return { sku: l[0], esp: l[1], rec: l[1] + (rx.d.pre[i] || 0) }; }); rx.loc = {}; }
+    load();
+    var m = UI.modal({ title: 'Registrar recepción', width: 760, body: '', footer: '' });
+    var foot = document.createElement('footer'); foot.className = 'ov-foot'; m.el.appendChild(foot);
+    function steps() { return UI.stepper([{ label: 'Documento y cantidades', state: rx.step > 1 ? 'done' : 'current' }, { label: 'Validación', state: rx.step > 2 ? 'done' : rx.step === 2 ? 'current' : 'pending' }, { label: 'Ubicación', state: rx.step === 3 ? 'current' : 'pending' }]); }
+    function dif(l) { return l.rec - l.esp; }
+    function tol(l) { return Math.ceil(l.esp * 0.02); }
+    function chipDif(l) { var d = dif(l); if (d === 0) return '<span class="diff-ok">Coincide</span>'; if (d < 0) return '<span class="diff-neg">Faltante ' + F.num(-d) + '</span>'; return d <= tol(l) ? '<span class="diff-pos">Sobrante ' + F.num(d) + ' · en tolerancia</span>' : '<span class="diff-neg">Sobrante ' + F.num(d) + ' · excede la orden</span>'; }
+    function bloqueos() { return rx.lines.filter(function (l) { return dif(l) > tol(l); }); }
+    function draw() {
+      var b = '<div class="rx-steps">' + steps() + '</div>';
+      if (rx.step === 1) {
+        b += '<div class="stack"><div class="form-grid c2"><div class="field"><label class="label" for="rxD">Documento de referencia</label><select class="select" id="rxD">' + ESPERADOS.map(function (d, i) { return '<option value="' + i + '"' + (d === rx.d ? ' selected' : '') + '>' + d.doc + ' · ' + esc(d.origen) + '</option>'; }).join('') + '</select><span class="hint">' + esc(rx.d.tipo) + ' · llega ' + rx.d.eta.toLowerCase() + '</span></div>' +
+          '<div class="field"><label class="label" for="rxR">Remisión del proveedor</label><input class="input" id="rxR" value="' + esc(rx.rem) + '" placeholder="Ej. RM-22910"' + (rx.err.rem ? ' aria-invalid="true"' : '') + '>' + (rx.err.rem ? '<span class="error-text">' + I('alert-circle', 'icon-sm') + esc(rx.err.rem) + '</span>' : '<span class="hint">Número impreso en el documento que trae el conductor.</span>') + '</div>' +
+          '<div class="field"><label class="label" for="rxM">Muelle de descargue</label><select class="select" id="rxM">' + ['M-01', 'M-02', 'M-03', 'M-04'].map(function (x) { return '<option' + (x === rx.muelle ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></div></div>' +
+          '<div class="table-wrap"><table class="table is-dense"><thead><tr><th>SKU</th><th class="num">Esperado</th><th class="num">Recibido</th></tr></thead><tbody>' + rx.lines.map(function (l, i) { return '<tr><td><span class="mono">' + l.sku + '</span><div class="cell-sub">' + esc(prod(l.sku).descripcion) + ' · ' + prod(l.sku).unidadBase.toLowerCase() + 's</div></td><td class="num">' + F.num(l.esp) + '</td><td class="num"><input class="input input-sm num-in" data-i="' + i + '" value="' + l.rec + '" inputmode="numeric" aria-label="Cantidad recibida de ' + l.sku + '"' + (rx.err['l' + i] ? ' aria-invalid="true"' : '') + '>' + (rx.err['l' + i] ? '<div class="error-text" style="justify-content:flex-end">' + esc(rx.err['l' + i]) + '</div>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div><p class="muted t-13">Ajusta las cantidades que no coincidan con lo que descargaste. La validación contra la orden es el siguiente paso.</p></div>';
+      } else if (rx.step === 2) {
+        var blk = bloqueos(), dd = rx.lines.filter(function (l) { return dif(l) !== 0; });
+        b += '<div class="stack">' + (blk.length ? UI.banner({ tone: 'danger', title: 'Hay un sobrante que excede la orden', text: 'No se puede recibir más de lo comprado (tolerancia 2 %). Devuelve el excedente al conductor o corrige la cantidad.' }) : dd.length ? UI.banner({ tone: 'warning', title: dd.length + ' línea' + (dd.length === 1 ? '' : 's') + ' con diferencias', text: 'La recepción quedará «Con diferencias» y se avisará al comprador.' }) : UI.banner({ tone: 'success', title: 'Todo coincide con la orden', text: 'Las cantidades recibidas son iguales a las anunciadas.' })) +
+          '<div class="table-wrap"><table class="table is-dense"><thead><tr><th>SKU</th><th class="num">Esperado</th><th class="num">Recibido</th><th>Resultado</th></tr></thead><tbody>' + rx.lines.map(function (l) { return '<tr><td><span class="mono">' + l.sku + '</span><div class="cell-sub">' + esc(prod(l.sku).descripcion) + '</div></td><td class="num">' + F.num(l.esp) + '</td><td class="num">' + F.num(l.rec) + '</td><td>' + chipDif(l) + '</td></tr>'; }).join('') + '</tbody></table></div><p class="muted t-13">Tolerancia de recepción: 2 % sobre la cantidad ordenada (valor por confirmar con el negocio).</p></div>';
+      } else {
+        b += '<div class="stack">' + UI.banner({ tone: 'info', text: 'Sugerimos la ubicación según el SKU, la zona de la familia y el volumen libre. Puedes elegir otra.' }) + rx.lines.map(function (l, i) {
+          var s = suggest(l.sku, l.rec), cur = rx.loc[l.sku] || (s.opts.filter(function (o) { return o.cabe; })[0] || {}).id || '', o = s.opts.filter(function (x) { return x.id === cur; })[0], cabe = o ? o.cabe : false;
+          rx.loc[l.sku] = cur;
+          return '<div class="card card-pad"><div class="row between nowrap" style="align-items:flex-start;gap:12px"><div style="min-width:0"><div class="strong">' + esc(prod(l.sku).descripcion) + '</div><div class="muted t-13"><span class="mono">' + l.sku + '</span> · ' + F.num(l.rec) + ' un. · ocupan ' + F.m3(s.vol, 1) + '</div></div><div class="loc-pick"><select class="select input-sm" data-loc="' + l.sku + '" aria-label="Ubicación para ' + l.sku + '"' + (cur && !cabe ? ' aria-invalid="true"' : '') + '>' + (s.opts.length ? s.opts.map(function (x, k) { return '<option value="' + x.id + '"' + (x.id === cur ? ' selected' : '') + '>' + x.id + ' · ' + F.m3(x.libre, 1) + ' libres' + (k === 0 && x.cabe ? ' · sugerida' : '') + '</option>'; }).join('') : '<option value="">Sin ubicaciones disponibles</option>') + '</select>' + (o ? (cabe ? '<span class="hint">' + esc(o.why) + '</span>' : '<span class="error-text">' + I('alert-circle', 'icon-sm') + 'No cabe: requiere ' + F.m3(s.vol, 1) + ' y hay ' + F.m3(o.libre, 1) + ' libres.</span>') : '<span class="error-text">' + I('alert-circle', 'icon-sm') + 'No hay ubicación con capacidad.</span>') + '</div></div></div>';
+        }).join('') + '</div>';
+      }
+      m.body.innerHTML = b;
+      m.setTitle(rx.step === 1 ? 'Registrar recepción' : rx.step === 2 ? 'Validar contra la referencia' : 'Asignar ubicación');
+      var f = '<button type="button" class="btn btn-ghost" data-n="cancel">Cancelar</button><span class="grow"></span>';
+      if (rx.step > 1) f += '<button type="button" class="btn btn-secondary" data-n="back">Atrás</button>';
+      f += rx.step < 3 ? '<button type="button" class="btn btn-primary" data-n="next"' + (rx.step === 2 && bloqueos().length ? ' disabled' : '') + '>' + (rx.step === 1 ? 'Validar recepción' : 'Asignar ubicaciones') + '</button>' : '<button type="button" class="btn btn-primary" data-n="save">Registrar recepción</button>';
+      foot.innerHTML = f;
+    }
+    m.body.addEventListener('change', function (e) {
+      if (e.target.id === 'rxD') { rx.d = ESPERADOS[+e.target.value]; load(); rx.err = {}; draw(); }
+      else if (e.target.id === 'rxR') rx.rem = e.target.value.trim(); else if (e.target.id === 'rxM') rx.muelle = e.target.value;
+      else if (e.target.dataset.loc) { rx.loc[e.target.dataset.loc] = e.target.value; draw(); }
+      else if (e.target.dataset.i != null) { var v = e.target.value.replace(/\./g, '').trim(), i = +e.target.dataset.i; if (v === '' || isNaN(+v) || +v < 0 || String(+v) !== String(parseInt(v, 10))) { rx.err['l' + i] = 'Ingresa un número entero.'; } else { delete rx.err['l' + i]; rx.lines[i].rec = +v; } draw(); }
+    });
+    foot.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-n]'); if (!b) return; var n = b.dataset.n;
+      if (n === 'cancel') m.close();
+      else if (n === 'back') { rx.step--; draw(); }
+      else if (n === 'next') {
+        if (rx.step === 1) { rx.err = {}; var rem = $('#rxR', m.body); rx.rem = rem.value.trim(); if (rx.rem.length < 4) rx.err.rem = 'Ingresa la remisión del proveedor (mínimo 4 caracteres).'; if (Object.keys(rx.err).length) { draw(); var f1 = $('#rxR', m.body); if (f1) f1.focus(); return; } }
+        rx.step++; draw();
+      } else if (n === 'save') {
+        var bad = rx.lines.filter(function (l) { var u = suggest(l.sku, l.rec).opts.filter(function (o) { return o.id === rx.loc[l.sku]; })[0]; return !u || !u.cabe; });
+        if (bad.length) { UI.toast('Hay ' + bad.length + ' línea' + (bad.length === 1 ? '' : 's') + ' sin ubicación con capacidad suficiente.', 'error'); return; }
+        var con = rx.lines.some(function (l) { return dif(l) !== 0; }), id = 'REC-2611-' + String(++recNo).padStart(3, '0');
+        RECS.unshift({ id: id, doc: rx.d.doc, rem: rx.rem, origen: rx.d.origen, fecha: new Date(), estado: con ? 'Con diferencias' : 'Ubicada', resp: 'USR-005', muelle: rx.muelle, lineas: rx.lines.map(function (l) { return { sku: l.sku, esp: l.esp, rec: l.rec, ub: rx.loc[l.sku] }; }) });
+        ESPERADOS.splice(ESPERADOS.indexOf(rx.d), 1); recT.setRows(RECS); renderDocs(); m.close();
+        UI.toast(con ? 'Recepción ' + id + ' registrada con diferencias. Se avisó al comprador.' : 'Recepción ' + id + ' registrada. La mercancía ya cuenta como inventario disponible.', con ? 'warning' : 'success');
+      }
+    });
+    draw();
+  }
+  $('#btnRecibir').addEventListener('click', function () { tabs.select('recepcion'); if (ESPERADOS.length) recModal(0); else UI.toast('No hay documentos por recibir.', 'info'); });
+
+  /* ---------- refresco general y arranque ---------- */
+  function refreshAll() { renderKpis(); renderAlert(); drawBoard(); if (ordT) ordT.setRows(ordRows()); setTerm(); }
+  var tabs = UI.tabs($('#mainTabs'), { hash: true });
+  mountOrders(); mountRecs(); renderDocs(); refreshAll();
+  var qp = UI.param('pedido') || UI.param('id'); if (qp) { $('#q').value = qp; st.q = qp; drawBoard(); }
+  setInterval(renderAlert, 60000);
+});
+</script>
+</body>
+</html>

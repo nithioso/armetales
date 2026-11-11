@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parametrización de vehículos · Armetales</title>
+<meta name="description" content="Flota de Armetales: capacidades, dimensiones, carrocería, conductor, cobertura, restricciones de circulación y compatibilidad de carga por vehículo.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de vehículos (tokens y componentes viven en app.css) */
+  .kpi-row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .kpi-row > :last-child:nth-child(odd) { grid-column: span 2; } .kpi .kpi-value { font-size: 28px; } .kpi { padding: 12px; } }
+  .fleet-tools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 14px; }
+  .fleet-tools .search { flex: 1 1 240px; max-width: 360px; }
+  .fleet-tools .select { width: auto; min-width: 150px; }
+  .fleet-tools .push { margin-left: auto; }
+  .chip-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+  .veh-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+  .veh-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; text-align: left; position: relative; }
+  .veh-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .veh-card .vc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .veh-card .vc-type { font-weight: 600; font-size: 14px; line-height: 1.3; }
+  .veh-card .vc-model { font-size: 12.5px; color: var(--text-2); }
+  .vc-caps { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .vc-caps .c { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); min-width: 0; }
+  .vc-caps .v { font-family: var(--font-display); font-weight: 600; font-size: 19px; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .vc-caps .v small { font-size: 12px; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+  .vc-caps .l { font-size: 11.5px; color: var(--text-2); }
+  .vc-drv { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .vc-drv .n { font-weight: 500; font-size: 13.5px; line-height: 1.25; }
+  .vc-drv .s { font-size: 12px; color: var(--text-2); }
+  .vc-foot { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-top: 10px; border-top: 1px solid var(--border); margin-top: auto; }
+  .veh-card[data-estado="Mantenimiento"], .veh-card[data-estado="Inactivo"] { background: color-mix(in srgb, var(--surface-2) 70%, var(--surface)); }
+  /* matriz */
+  .mx-card { overflow: hidden; }
+  .mx-wrap { overflow: auto; max-height: 640px; max-width: 100%; }
+  .mx { width: max-content; min-width: 100%; font-size: 13px; border-collapse: separate; border-spacing: 0; }
+  .mx th, .mx td { padding: 0 10px; height: 44px; border-bottom: 1px solid var(--border); white-space: nowrap; text-align: center; background: var(--surface); }
+  .mx thead th { position: sticky; top: 0; z-index: 3; background: var(--surface-2); height: 34px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+  .mx thead tr.grp th { top: 0; height: 30px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); border-bottom: 1px solid var(--border); border-left: 1px solid var(--border); }
+  .mx thead tr.cols th { top: 30px; }
+  .mx .first { position: sticky; left: 0; z-index: 2; text-align: left; min-width: 170px; border-right: 1px solid var(--border); }
+  .mx thead .first { z-index: 4; background: var(--surface-2); }
+  .mx td.sep, .mx th.sep { border-left: 1px solid var(--border); }
+  .mx tbody tr { cursor: pointer; }
+  .mx tbody tr:hover td { background: var(--surface-2); }
+  .mx tbody tr:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .mx td.n { font-variant-numeric: tabular-nums; }
+  .mx .mk { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; }
+  .mx .mk.ok { background: var(--green-bg); color: var(--green-fg); }
+  .mx .mk.ok .icon { width: 14px; height: 14px; stroke-width: 2.4; }
+  .mx .mk.no { color: var(--text-3); }
+  .mx .mk.cond { background: var(--amber-bg); color: var(--amber-fg); font-size: 11px; font-weight: 700; }
+  .mx .rt-h { font-family: var(--font-mono); font-size: 11.5px; }
+  .mx .dim-row td { background: var(--surface-3); }
+  .mx-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 10px 14px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-2); }
+  .mx-legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .mx-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .mx-tools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .mx-tools .search { flex: 1 1 220px; max-width: 300px; }
+  .mx-tools .select { width: auto; min-width: 140px; }
+  .mx-tools .lbl { font-size: 12.5px; color: var(--text-2); font-weight: 500; }
+  .mx-tools .minkg { width: 130px; }
+  /* drawer de vehículo */
+  .vd-head { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .vd-links { display: flex; gap: 6px; flex-wrap: wrap; }
+  .vd-tabs { margin: 14px -20px 0; padding: 0 16px; position: sticky; top: -20px; background: var(--surface); z-index: 5; }
+  .vd-sec + .vd-sec { margin-top: 22px; }
+  .vd-sec > h3 { margin-bottom: 10px; }
+  .vd-dirty { display: none; }
+  .vd-dirty.on { display: inline-flex; }
+  .vsvg { width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface-2); }
+  .vsvg text { fill: var(--text-2); font: 500 11px var(--font-mono); }
+  .vsvg .body { fill: var(--surface-3); stroke: var(--steel); stroke-width: 1.5; }
+  .vsvg .cab { fill: var(--surface); stroke: var(--steel); stroke-width: 1.5; }
+  .vsvg .wheel { fill: var(--ink); } :root[data-theme="dark"] .vsvg .wheel { fill: var(--text-3); }
+  .vsvg .dim { stroke: var(--red); stroke-width: 1.2; fill: none; }
+  .vsvg .dimt { fill: var(--red-fg); }
+  .vsvg .cap { fill: var(--steel); opacity: .9; }
+  .geo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .geo .c { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .geo .v { font-family: var(--font-display); font-weight: 600; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .geo .l { font-size: 11.5px; color: var(--text-2); }
+  .toggle-line { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .toggle-line:last-child { border-bottom: 0; }
+  .toggle-line .tl-t { font-weight: 500; font-size: 13.5px; }
+  .toggle-line .tl-d { font-size: 12.5px; color: var(--text-2); }
+  .prod-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
+  .prod-grid .p { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .prod-grid .pn { font-weight: 500; font-size: 13px; line-height: 1.25; }
+  .prod-grid .pd { font-size: 11.5px; color: var(--text-2); }
+  .doc-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .doc-row:last-child { border-bottom: 0; }
+  .doc-row .di { width: 36px; height: 36px; border-radius: 9px; background: var(--surface-3); display: grid; place-items: center; color: var(--text-2); flex: none; }
+  .doc-row .dm { flex: 1; min-width: 160px; }
+  .cov-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .week { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .week .d { padding: 8px 4px; text-align: center; border: 1px solid var(--border); border-radius: var(--r-ctl); font-size: 12px; color: var(--text-2); }
+  .week .d b { display: block; font-size: 13px; color: var(--text); }
+  .week .d.on { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber-fg); }
+  .week .d.on b { color: var(--amber-fg); }
+  .week .d.today { box-shadow: 0 0 0 2px var(--focus); }
+  .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  @media (max-width: 479px) { .vc-caps .v { font-size: 17px; } .geo { grid-template-columns: 1fr 1fr; } .vd-tabs { margin-left: -16px; margin-right: -16px; } }
+  .kpi, .kpi .kpi-foot, .kpi .kpi-note { white-space: normal; }
+  :root[data-theme="dark"] a.btn { color: var(--b-fg); } /* el color de enlace del tema oscuro pisaba el de los botones-enlace */
+</style>
+</head>
+<body data-page="vehiculos">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Maestros</div>
+      <h1 class="page-title">Parametrización de vehículos</h1>
+      <p class="page-desc">Capacidades, dimensiones, restricciones y compatibilidad de la flota. El planificador y el motor de cargue usan estos datos para decidir qué vehículo puede llevar cada pedido.</p>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-secondary" href="planeacion.html"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h12"/></svg>Planeación</a>
+      <button type="button" class="btn btn-primary" id="addBtn"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Registrar vehículo</button>
+    </div>
+  </header>
+
+  <section aria-label="Resumen de la flota"><div class="kpi-row" id="kpiRow"></div></section>
+
+  <section class="section" aria-label="Flota">
+    <div class="tabs" role="tablist" id="mainTabs" aria-label="Vistas de vehículos">
+      <button class="tab" role="tab" id="tabFleet" aria-controls="pFleet" aria-selected="true">Flota <span class="count" id="cFleet"></span></button>
+      <button class="tab" role="tab" id="tabMx" aria-controls="pMx" aria-selected="false">Matriz vehículo × restricción × capacidad</button>
+    </div>
+
+    <div class="tab-panel" id="pFleet" role="tabpanel" aria-labelledby="tabFleet">
+      <div class="fleet-tools">
+        <div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input class="input" type="search" id="q" placeholder="Placa, marca o conductor" aria-label="Buscar por placa, marca o conductor"></div>
+        <select class="select" id="fTipo" aria-label="Tipo de vehículo"></select>
+        <div class="chip-filters" id="fEstado" role="group" aria-label="Filtrar por estado"></div>
+        <div class="segmented push" role="group" aria-label="Tipo de vista" id="viewSeg">
+          <button type="button" data-v="cards" aria-pressed="true"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Tarjetas</button>
+          <button type="button" data-v="table" aria-pressed="false"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Tabla</button>
+        </div>
+      </div>
+      <div id="fleetCards"></div>
+      <div id="fleetTable" hidden></div>
+    </div>
+
+    <div class="tab-panel" id="pMx" role="tabpanel" aria-labelledby="tabMx" hidden>
+      <div class="card mx-card">
+        <div class="mx-tools" id="mxTools"></div>
+        <div class="mx-wrap" id="mxWrap" tabindex="0" role="region" aria-label="Matriz de vehículos, desplázate para ver más columnas"></div>
+        <div class="mx-foot"><span id="mxCount"></span>
+          <div class="mx-legend"><span><i class="mk ok" style="display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;background:var(--green-bg);color:var(--green-fg)"><svg class="icon" style="width:13px;height:13px;stroke-width:2.4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></i>Apto / cubre</span><span><b class="subtle">–</b>No apto / no cubre</span><span><i class="dot warn"></i>Restricción hoy</span></div></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$, ic = UI.icon;
+  var TIPOS = ['Camioneta', 'Turbo', 'Sencillo', 'Dobletroque', 'Tractomula'];
+  var CARROC = ['Estacas', 'Furgón', 'Planchón'];
+  var ESTADOS = ['Disponible', 'En ruta', 'Cargando', 'Mantenimiento', 'Inactivo'];
+  var DIAS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes'], DIG = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 0]];
+  var LIC = { C2: 2, C3: 3 };
+  var state = { q: '', tipo: '', estado: '', view: 'cards', mx: { q: '', tipo: '', ruta: '', kg: '', req: {} } };
+  var HOY = new Date(A.hoy); HOY.setHours(0, 0, 0, 0);
+
+  /* ---------- utilidades de dominio ---------- */
+  function vehs() { return A.vehiculos; }
+  function driver(id) { return A.idx.conductores[id] || null; }
+  function initials(n) { return n; }
+  function daysTo(ymd) { if (!ymd) return null; var p = String(ymd).split('-'); return Math.round((new Date(+p[0], +p[1] - 1, +p[2]) - HOY) / 86400000); }
+  function docChip(ymd) { var d = daysTo(ymd); if (d == null) return UI.chip('Sin dato', { tone: 'neutral' }); if (d < 0) return UI.chip('Vencido hace ' + (-d) + ' d', { tone: 'danger' }); if (d <= 60) return UI.chip('Vence en ' + d + ' d', { tone: 'warning' }); return UI.chip('Vigente', { tone: 'success' }); }
+  function docWorst(v) { return Math.min(daysTo(v.soat), daysTo(v.tecnomecanica)); }
+  function digitDia(placa) { var dg = parseInt(String(placa).replace(/\D/g, '').slice(-1), 10), r = -1; DIG.forEach(function (p, k) { if (p.indexOf(dg) > -1) r = k; }); return { dig: dg, idx: r, dia: DIAS[r] }; }
+  function activeDsp(placa) { return A.despachos.filter(function (d) { return d.vehiculoId === placa && (d.estado === 'En ruta' || d.estado === 'Cargando'); })[0] || null; }
+  function planTrip(placa) { return A.plan.viajes.filter(function (v) { return v.vehiculoId === placa; })[0] || null; }
+  function rutaN(id) { return A.idx.rutas[id] ? A.idx.rutas[id].nombre : id; }
+  function ejesNombre(n) { return n + ' ejes'; }
+  function geoVol(v) { return v.largoM * v.anchoM * v.altoM; }
+  function defCompat(o) { var plan = o.carroceria === 'Planchón' || o.tipo === 'Tractomula'; return { largaMas6m: plan, montacargas: o.carroceria !== 'Furgón', protegeHumedad: o.carroceria === 'Furgón' || o.carroceria === 'Estacas', lamina: o.carroceria !== 'Estacas' || o.pesoMaxKg > 3000 }; }
+  function num(s) { if (typeof s === 'number') return s; s = String(s == null ? '' : s).trim().replace(/\s/g, ''); if (!s) return NaN; if (/,/.test(s)) s = s.replace(/\./g, '').replace(',', '.'); return parseFloat(s); }
+  function fnum(n, d) { return F.num(n, d == null ? 1 : d); }
+  function normPlaca(s) { var t = String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return /^[A-Z]{3}\d{3}$/.test(t) ? t.slice(0, 3) + ' ' + t.slice(3) : null; }
+  var ESTADO_TONO = { 'Disponible': 'success', 'En ruta': 'info', 'Cargando': 'warning', 'Mantenimiento': 'warning', 'Inactivo': 'neutral' };
+
+  /* aptitud por familia de producto (HU-029): derivada de las marcas de compatibilidad */
+  var FAMILIAS = [
+    { f: 'Varilla de 6 m', d: 'Barras corrugadas y lisas', t: function (v) { return v.largoM >= 6 ? ['Apto', 'success'] : v.largoM >= 4 ? ['Con condición', 'warning', 'Voladizo máx. 2 m con bandera'] : ['No apto', 'danger', 'Plataforma menor a 4 m']; } },
+    { f: 'Varilla y viga de 12 m', d: 'Longitud mayor a 6 m', t: function (v) { return v.compatibilidad.largaMas6m ? ['Apto', 'success'] : ['No apto', 'danger', 'Exige planchón o tractomula']; } },
+    { f: 'Malla electrosoldada', d: 'Paneles de 2,35 × 6 m', t: function (v) { return v.largoM >= 6 ? ['Apto', 'success'] : v.largoM >= 4 ? ['Con condición', 'warning', 'Voladizo máx. 2 m con bandera'] : ['No apto', 'danger', 'Plataforma menor a 4 m']; } },
+    { f: 'Perfiles y tubería', d: 'Barras de 6 m', t: function (v) { return v.largoM >= 6 ? ['Apto', 'success'] : v.largoM >= 4 ? ['Con condición', 'warning', 'Voladizo máx. 2 m con bandera'] : ['No apto', 'danger', 'Plataforma menor a 4 m']; } },
+    { f: 'Láminas', d: 'Estibas planas, montacargas', t: function (v) { return v.compatibilidad.lamina ? (v.compatibilidad.montacargas ? ['Apto', 'success'] : ['Con condición', 'warning', 'Cargue lateral sin montacargas']) : ['No apto', 'danger', 'Carrocería sin soporte para lámina']; } },
+    { f: 'Teja y cemento', d: 'Sensibles a la humedad', t: function (v) { return v.compatibilidad.protegeHumedad ? (v.carroceria === 'Furgón' ? ['Apto', 'success'] : ['Con condición', 'warning', 'Cubrir con carpa']) : ['No apto', 'danger', 'Sin protección contra la lluvia']; } },
+    { f: 'Alambre y puntilla', d: 'Rollos y cajas', t: function (v) { return v.compatibilidad.protegeHumedad ? ['Apto', 'success'] : ['Con condición', 'warning', 'Cubrir con carpa']; } }
+  ];
+
+  /* ---------- validación (compartida: registro y edición) ---------- */
+  function validate(o, ctx) {
+    var e = {}; ctx = ctx || {};
+    if (ctx.isNew) {
+      var pn = normPlaca(o.placa);
+      if (!String(o.placa || '').trim()) e.placa = 'Escribe la placa del vehículo.';
+      else if (!pn) e.placa = 'Formato inválido. Usa tres letras y tres números, por ejemplo ABC 123.';
+      else if (A.idx.vehiculos[pn]) { var ex = A.idx.vehiculos[pn]; e.placa = 'La placa ' + pn + ' ya está registrada (' + ex.tipo + ' ' + ex.marca + ' ' + ex.modelo + '). No se permiten duplicados.'; }
+    }
+    if (!String(o.marca || '').trim()) e.marca = 'Indica la marca.';
+    if (!String(o.modelo || '').trim()) e.modelo = 'Indica el modelo o línea.';
+    var yr = num(o.anio); if (isNaN(yr) || yr < 1990 || yr > HOY.getFullYear() + 1) e.anio = 'Año entre 1990 y ' + (HOY.getFullYear() + 1) + '.';
+    var kg = num(o.pesoMaxKg); if (isNaN(kg) || kg <= 0) e.pesoMaxKg = 'La capacidad de peso debe ser mayor que cero.'; else if (kg > 60000) e.pesoMaxKg = 'Supera el máximo legal de 60.000 kg para vehículos de carga.';
+    var vm = num(o.volumenMaxM3); if (isNaN(vm) || vm <= 0) e.volumenMaxM3 = 'El volumen debe ser mayor que cero.';
+    var L = num(o.largoM), W = num(o.anchoM), H = num(o.altoM);
+    if (isNaN(L) || L <= 0) e.largoM = 'Largo mayor que cero.'; else if (L > 14) e.largoM = 'Máximo 14 m de plataforma.';
+    if (isNaN(W) || W <= 0) e.anchoM = 'Ancho mayor que cero.'; else if (W > 2.6) e.anchoM = 'El ancho máximo permitido es 2,6 m.';
+    if (isNaN(H) || H <= 0) e.altoM = 'Alto mayor que cero.'; else if (H > 4.4) e.altoM = 'El alto máximo es 4,4 m.';
+    if (!e.largoM && !e.anchoM && !e.altoM && !e.volumenMaxM3) { var gv = L * W * H; if (vm > gv * 1.05) e.volumenMaxM3 = 'El volumen declarado (' + fnum(vm) + ' m³) supera el geométrico L × A × H (' + fnum(gv) + ' m³). Corrige las dimensiones o el volumen.'; }
+    var ej = num(o.ejes); if (isNaN(ej) || ej < 2 || ej > 6 || ej % 1) e.ejes = 'Entre 2 y 6 ejes.';
+    var es = num(o.estibas); if (isNaN(es) || es < 0 || es % 1) e.estibas = 'Número entero de estibas, desde 0.';
+    else if (!e.largoM && !e.anchoM && es > Math.floor(L / 1.2) * Math.max(1, Math.floor(W / 1.0)) + 2) e.estibas = 'Para esa plataforma caben como máximo ' + (Math.floor(L / 1.2) * Math.max(1, Math.floor(W / 1.0))) + ' estibas de 1,2 × 1,0 m.';
+    if (o.conductorId) {
+      var c = driver(o.conductorId), req = o.tipo === 'Tractomula' ? 3 : 2;
+      if (c && (LIC[c.licencia] || 0) < req) e.conductorId = (o.tipo === 'Tractomula' ? 'Una tractomula exige licencia C3' : 'Este vehículo exige licencia C2 o superior') + '; ' + c.nombre.split(' ')[0] + ' tiene ' + c.licencia + '.';
+      else if (c && c.estado === 'Incapacidad') e.conductorId = c.nombre.split(' ')[0] + ' está en incapacidad y no puede asignarse.';
+    }
+    if (!(o.rutas && o.rutas.length)) e.rutas = 'Selecciona al menos una ruta de cobertura.';
+    if (o.compat && o.compat.largaMas6m && !(o.carroceria === 'Planchón' || L >= 8)) e.largaMas6m = 'Para marcar carga mayor a 6 m se requiere carrocería de planchón o plataforma de 8 m o más.';
+    if (ctx.veh && (o.estado === 'Mantenimiento' || o.estado === 'Inactivo') && o.estado !== ctx.veh.estado) {
+      var pt = planTrip(ctx.veh.placa);
+      if (pt) e.estado = ctx.veh.placa + ' está asignado al viaje propuesto ' + pt.viajeId + ' de hoy. Reasígnalo en planeación antes de pasarlo a ' + o.estado.toLowerCase() + '.';
+    }
+    if (o.alturaMaxM != null && o.alturaMaxM !== '') { var am = num(o.alturaMaxM); if (isNaN(am) || am < 2 || am > 4.4) e.alturaMaxM = 'Altura de circulación entre 2,0 y 4,4 m.'; else if (!e.altoM && am < H) e.alturaMaxM = 'No puede ser menor que el alto de la plataforma (' + fnum(H) + ' m).'; }
+    return e;
+  }
+  function errHtml(m) { return ic('alert-circle', 'icon-sm') + esc(m); }
+  function showErrors(root, errs) {
+    $$('[data-f]', root).forEach(function (f) { var k = f.dataset.f, m = errs[k], t = $('.error-text', f); f.classList.toggle('is-invalid', !!m); var inp = $('input,select,textarea', f); if (inp) { if (m) inp.setAttribute('aria-invalid', 'true'); else inp.removeAttribute('aria-invalid'); } if (t) { t.hidden = !m; t.innerHTML = m ? errHtml(m) : ''; } });
+  }
+  function fld(k, label, control, o) { o = o || {}; return '<div class="field' + (o.cls ? ' ' + o.cls : '') + '" data-f="' + k + '"><label class="label" for="' + (o.id || 'f-' + k) + '">' + label + (o.opt ? '<span class="opt">opcional</span>' : '') + '</label>' + control + (o.hint ? '<span class="hint">' + o.hint + '</span>' : '') + '<span class="error-text" hidden></span></div>'; }
+  function inp(k, val, o) { o = o || {}; return '<input class="input' + (o.mono ? ' mono' : '') + '" id="f-' + k + '" data-k="' + k + '" type="' + (o.type || 'text') + '" ' + (o.inputmode ? 'inputmode="' + o.inputmode + '" ' : '') + 'value="' + esc(val == null ? '' : val) + '"' + (o.ph ? ' placeholder="' + esc(o.ph) + '"' : '') + (o.dis ? ' disabled' : '') + (o.max ? ' maxlength="' + o.max + '"' : '') + ' autocomplete="off">'; }
+  function sel(k, opts, val, o) { o = o || {}; return '<select class="select" id="f-' + k + '" data-k="' + k + '"' + (o.dis ? ' disabled' : '') + '>' + opts.map(function (x) { var v = x.v != null ? x.v : x, l = x.l != null ? x.l : x; return '<option value="' + esc(v) + '"' + (String(v) === String(val) ? ' selected' : '') + (x.dis ? ' disabled' : '') + '>' + esc(l) + '</option>'; }).join('') + '</select>'; }
+  function sw(k, label, checked, desc, o) { o = o || {}; return '<div class="toggle-line" data-f="' + k + '"><div><div class="tl-t">' + label + '</div>' + (desc ? '<div class="tl-d">' + desc + '</div>' : '') + '<span class="error-text" hidden></span></div><label class="switch"><input type="checkbox" data-k="' + k + '"' + (checked ? ' checked' : '') + (o.dis ? ' disabled' : '') + ' aria-label="' + esc(label) + '"></label></div>'; }
+  function covChips(sel) { return '<div class="cov-chips" role="group" aria-label="Rutas de cobertura">' + A.rutas.map(function (r) { var on = sel.indexOf(r.rutaId) > -1; return '<button type="button" class="filter-chip" data-ruta="' + r.rutaId + '" aria-pressed="' + on + '"><span class="mono">' + r.rutaId + '</span> ' + esc(r.nombre) + '</button>'; }).join('') + '</div>'; }
+  function bindCov(root, arr, onChange) { root.addEventListener('click', function (e) { var b = e.target.closest('[data-ruta]'); if (!b) return; var id = b.dataset.ruta, i = arr.indexOf(id); if (i > -1) arr.splice(i, 1); else arr.push(id); b.setAttribute('aria-pressed', i === -1); if (onChange) onChange(); }); }
+  function driverOpts(curId, tipo) {
+    return [{ v: '', l: 'Sin conductor asignado' }].concat(A.conductores.map(function (c) { var other = c.vehiculoId && c.vehiculoId !== (A.idx.vehiculos[curId] ? null : null) ? c.vehiculoId : null; return { v: c.conductorId, l: c.nombre + ' · ' + c.licencia + (c.vehiculoId ? ' · ' + c.vehiculoId : ' · libre') + (c.estado !== 'Disponible' && c.estado !== 'En ruta' ? ' · ' + c.estado.toLowerCase() : '') }; }));
+  }
+
+  /* ---------- esquema del vehículo (HU-024) ---------- */
+  function vehSvg(o) {
+    var L = Math.max(0.5, num(o.largoM) || 1), W = Math.max(0.5, num(o.anchoM) || 1), H = Math.max(0.5, num(o.altoM) || 1), ej = Math.round(num(o.ejes)) || 2;
+    var vbW = 560, pad = 28, cabW = 60, bedMax = vbW - pad - cabW - 3 - 64, sc = bedMax / L;
+    var bedW = Math.min(bedMax, L * sc), topH = Math.max(30, Math.min(62, W * 24)), sideH = Math.max(30, Math.min(66, H * 24));
+    var x0 = pad, y0 = 22, s = '';
+    s += '<rect class="cab" x="' + x0 + '" y="' + (y0 + 3) + '" width="' + cabW + '" height="' + (topH - 6) + '" rx="8"/><rect class="body" x="' + (x0 + cabW + 3) + '" y="' + y0 + '" width="' + bedW + '" height="' + topH + '" rx="3"/>';
+    var axs = ej <= 2 ? [0.12, 0.8] : ej === 3 ? [0.12, 0.66, 0.84] : [0.12, 0.3, 0.42, 0.82, 0.92];
+    if (ej > 3) axs = ej === 4 ? [0.12, 0.62, 0.74, 0.9] : ej === 5 ? [0.1, 0.5, 0.62, 0.8, 0.92] : [0.1, 0.4, 0.52, 0.72, 0.84, 0.94];
+    var totalW = cabW + 3 + bedW;
+    axs.forEach(function (f) { var ax = x0 + f * totalW; s += '<rect class="wheel" x="' + (ax - 6) + '" y="' + (y0 - 4) + '" width="12" height="5" rx="2"/><rect class="wheel" x="' + (ax - 6) + '" y="' + (y0 + topH - 1) + '" width="12" height="5" rx="2"/>'; });
+    var bx = x0 + cabW + 3;
+    s += '<path class="dim" d="M' + bx + ' ' + (y0 + topH + 14) + ' h' + bedW + 'M' + bx + ' ' + (y0 + topH + 10) + ' v8M' + (bx + bedW) + ' ' + (y0 + topH + 10) + ' v8"/><text class="dimt" x="' + (bx + bedW / 2) + '" y="' + (y0 + topH + 28) + '" text-anchor="middle">Largo ' + fnum(L) + ' m</text>';
+    s += '<path class="dim" d="M' + (bx + bedW + 10) + ' ' + y0 + ' v' + topH + 'M' + (bx + bedW + 6) + ' ' + y0 + ' h8M' + (bx + bedW + 6) + ' ' + (y0 + topH) + ' h8"/><text class="dimt" x="' + (bx + bedW + 14) + '" y="' + (y0 + topH / 2 + 4) + '">A ' + fnum(W) + '</text>';
+    var ys = y0 + topH + 50;
+    s += '<text x="' + x0 + '" y="' + (y0 - 8) + '">Vista superior</text><text x="' + x0 + '" y="' + (ys - 6) + '">Vista lateral</text>';
+    s += '<rect class="cab" x="' + x0 + '" y="' + (ys + sideH * 0.2) + '" width="' + cabW + '" height="' + (sideH * 0.8) + '" rx="8"/><rect class="body" x="' + bx + '" y="' + ys + '" width="' + bedW + '" height="' + sideH + '" rx="3"/>';
+    axs.forEach(function (f) { var ax = x0 + f * totalW; s += '<circle class="wheel" cx="' + ax + '" cy="' + (ys + sideH + 1) + '" r="6"/>'; });
+    s += '<path class="dim" d="M' + (bx + bedW + 10) + ' ' + ys + ' v' + sideH + 'M' + (bx + bedW + 6) + ' ' + ys + ' h8M' + (bx + bedW + 6) + ' ' + (ys + sideH) + ' h8"/><text class="dimt" x="' + (bx + bedW + 14) + '" y="' + (ys + sideH / 2 + 4) + '">H ' + fnum(H) + '</text>';
+    var vbH = ys + sideH + 22;
+    return '<svg class="vsvg" viewBox="0 0 ' + vbW + ' ' + vbH + '" role="img" aria-label="Esquema del vehículo: largo ' + fnum(L) + ' m, ancho ' + fnum(W) + ' m, alto ' + fnum(H) + ' m, ' + ej + ' ejes">' + s + '</svg>';
+  }
+
+  /* ---------- KPIs ---------- */
+  function renderKpis() {
+    var v = vehs(), disp = v.filter(function (x) { return x.estado === 'Disponible'; }).length, op = v.filter(function (x) { return x.estado === 'En ruta' || x.estado === 'Cargando'; }).length, mant = v.filter(function (x) { return x.estado === 'Mantenimiento'; }), kg = v.filter(function (x) { return x.estado !== 'Inactivo' && x.estado !== 'Mantenimiento'; }).reduce(function (s, x) { return s + x.pesoMaxKg; }, 0);
+    var docs = v.filter(function (x) { return docWorst(x) <= 60; }), venc = v.filter(function (x) { return docWorst(x) < 0; });
+    $('#kpiRow').innerHTML =
+      UI.kpi({ label: 'Vehículos en la flota', icon: 'truck', value: v.length, note: v.filter(function (x) { return x.requiereAyudante; }).length + ' requieren ayudante' }) +
+      UI.kpi({ label: 'Disponibles hoy', icon: 'check-circle', valueHtml: disp + '<small>de ' + v.length + '</small>', note: A.plan.viajes.length + ' viajes propuestos' }) +
+      UI.kpi({ label: 'En operación', icon: 'route', value: op, note: 'En ruta o cargando' }) +
+      UI.kpi({ label: 'Capacidad útil de la flota', icon: 'layers', valueHtml: fnum(kg / 1000, 0) + '<small>t</small>', note: 'Sin mantenimiento ni inactivos' }) +
+      UI.kpi({ label: 'Documentos por vencer', icon: 'file-text', value: docs.length, note: venc.length ? venc.length + ' vencidos' : 'En los próximos 60 días' });
+    $$('.kpi', $('#kpiRow')).forEach(function (k, i) { if (i === 2 && mant.length) { /* nota de mantenimiento */ } });
+  }
+
+  /* ---------- flota: filtros, tarjetas y tabla ---------- */
+  function filtered() {
+    var q = UI.norm(state.q);
+    return vehs().filter(function (v) {
+      if (state.tipo && v.tipo !== state.tipo) return false;
+      if (state.estado && v.estado !== state.estado) return false;
+      if (q) { var c = driver(v.conductorId), hay = UI.norm([v.placa, v.marca, v.modelo, v.tipo, v.carroceria, c ? c.nombre : ''].join(' ')); if (hay.indexOf(q) === -1) return false; }
+      return true;
+    });
+  }
+  function drawFilters() {
+    $('#fTipo').innerHTML = '<option value="">Todos los tipos</option>' + TIPOS.map(function (t) { return '<option' + (state.tipo === t ? ' selected' : '') + '>' + t + '</option>'; }).join('');
+    var all = vehs();
+    $('#fEstado').innerHTML = '<button type="button" class="filter-chip" data-e="" aria-pressed="' + (state.estado === '') + '">Todos <span class="n">' + all.length + '</span></button>' + ESTADOS.map(function (e) { var n = all.filter(function (v) { return v.estado === e; }).length; return n || state.estado === e ? '<button type="button" class="filter-chip" data-e="' + e + '" aria-pressed="' + (state.estado === e) + '">' + e + ' <span class="n">' + n + '</span></button>' : ''; }).join('');
+  }
+  function card(v) {
+    var c = driver(v.conductorId), dsp = activeDsp(v.placa), pt = planTrip(v.placa), w = docWorst(v);
+    var foot = '<span class="tag">' + v.carroceria + '</span><span class="tag">' + v.ejes + ' ejes</span>' + (v.requiereAyudante ? '<span class="tag">Con ayudante</span>' : '') + '<span class="tag">' + v.rutasCobertura.length + ' rutas</span>' + (w <= 60 ? UI.chip(w < 0 ? 'Documento vencido' : 'Documento por vencer', { tone: w < 0 ? 'danger' : 'warning', small: true }) : '');
+    return '<article class="card veh-card is-interactive" tabindex="0" role="button" data-placa="' + esc(v.placa) + '" data-estado="' + v.estado + '" aria-label="Ver ficha del vehículo ' + esc(v.placa) + ', ' + esc(v.tipo) + ', ' + v.estado + '">' +
+      '<div class="vc-top"><div>' + UI.plate(v.placa, { large: true }) + '</div>' + UI.chip(v.estado) + '</div>' +
+      '<div><div class="vc-type">' + esc(v.tipo) + ' · ' + esc(v.marca) + ' ' + esc(v.modelo) + '</div><div class="vc-model">Modelo ' + v.anio + (dsp ? ' · <span class="mono">' + dsp.despachoId + '</span>' : pt ? ' · propuesto en ' + pt.viajeId : '') + '</div></div>' +
+      '<div class="vc-caps"><div class="c"><div class="v">' + fnum(v.pesoMaxKg / 1000, 1) + '<small>t</small></div><div class="l">Peso máx.</div></div><div class="c"><div class="v">' + fnum(v.volumenMaxM3, 0) + '<small>m³</small></div><div class="l">Volumen</div></div><div class="c"><div class="v">' + fnum(v.largoM) + '<small>m</small></div><div class="l">Largo útil</div></div></div>' +
+      '<div class="vc-drv">' + (c ? UI.avatar(c.nombre) + '<div class="min-w-0"><div class="n truncate">' + esc(c.nombre) + '</div><div class="s">Licencia ' + c.licencia + ' · ★ ' + fnum(c.calificacion, 1) + '</div></div>' : '<span class="muted">Sin conductor asignado</span>') + '</div>' +
+      '<div class="vc-foot">' + foot + '</div></article>';
+  }
+  var tbl = null;
+  function drawFleet() {
+    var rows = filtered();
+    $('#cFleet').textContent = vehs().length;
+    if (state.view === 'cards') {
+      $('#fleetCards').hidden = false; $('#fleetTable').hidden = true;
+      $('#fleetCards').innerHTML = rows.length ? '<div class="veh-grid">' + rows.map(card).join('') + '</div><p class="muted t-13 mt-3">' + rows.length + ' de ' + vehs().length + ' vehículos</p>' : '<div class="card">' + UI.empty({ icon: 'truck', title: 'Ningún vehículo coincide', text: 'Prueba con otra placa, cambia el tipo o quita el filtro de estado.', action: { label: 'Limpiar filtros', id: 'clear' } }) + '</div>';
+    } else {
+      $('#fleetCards').hidden = true; $('#fleetTable').hidden = false;
+      if (!tbl) buildTable(); tbl.setRows(rows);
+    }
+  }
+  function buildTable() {
+    tbl = UI.table($('#fleetTable'), {
+      rows: [], pageSize: 10, caption: 'Flota de vehículos', emptyText: 'Ningún vehículo coincide con los filtros.', rowKey: 'placa',
+      columns: [
+        { key: 'placa', label: 'Vehículo', title: true, render: function (v) { return UI.plate(v.placa) + '<div class="cell-sub">' + esc(v.tipo) + ' · ' + esc(v.marca + ' ' + v.modelo) + '</div>'; } },
+        { key: 'carroceria', label: 'Carrocería', render: function (v) { return esc(v.carroceria) + '<div class="cell-sub">' + v.estibas + ' estibas · ' + v.ejes + ' ejes</div>'; } },
+        { key: 'pesoMaxKg', label: 'Peso máx.', num: true, render: function (v) { return F.kg(v.pesoMaxKg); } },
+        { key: 'volumenMaxM3', label: 'Volumen', num: true, render: function (v) { return F.m3(v.volumenMaxM3, 0); } },
+        { key: 'conductorId', label: 'Conductor', value: function (v) { var c = driver(v.conductorId); return c ? c.nombre : ''; }, render: function (v) { var c = driver(v.conductorId); return c ? esc(c.nombre) + '<div class="cell-sub">Licencia ' + c.licencia + '</div>' : '<span class="muted">Sin asignar</span>'; } },
+        { key: 'rutasCobertura', label: 'Cobertura', value: function (v) { return v.rutasCobertura.length; }, render: function (v) { return v.rutasCobertura.length + ' de ' + A.rutas.length + ' rutas'; }, hideMobile: true },
+        { key: 'docs', label: 'Documentos', value: docWorst, render: docChipVeh, hideMobile: true },
+        { key: 'estado', label: 'Estado', render: function (v) { return UI.chip(v.estado); } }
+      ],
+      onRowClick: function (v) { openVehicle(v.placa); },
+      actions: function (v) { return [{ label: 'Ver ficha', icon: 'eye', onClick: function () { openVehicle(v.placa); } }, { label: 'Ver en la matriz', icon: 'list', onClick: function () { mainTabs.select('pMx'); state.mx.q = v.placa; drawMx(); } }, { sep: true }, { label: 'Abrir plano de cargue', icon: 'box', href: 'cargue.html' }]; }
+    });
+  }
+  /* docs chip para tabla: reutiliza la regla real de cada vehículo */
+  function docChipVeh(v) { var w = docWorst(v); return w < 0 ? UI.chip('Vencido', { tone: 'danger' }) : w <= 60 ? UI.chip('Vence en ' + w + ' d', { tone: 'warning' }) : UI.chip('Vigente', { tone: 'success' }); }
+
+  /* ---------- matriz (HU-031) ---------- */
+  var REQS = [['largaMas6m', 'Carga > 6 m'], ['montacargas', 'Montacargas'], ['protegeHumedad', 'Protege humedad'], ['lamina', 'Lámina']];
+  function drawMxTools() {
+    var m = state.mx;
+    $('#mxTools').innerHTML = '<div class="search is-sm"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input class="input input-sm" type="search" id="mxQ" placeholder="Buscar placa o tipo" aria-label="Buscar placa o tipo" value="' + esc(m.q) + '"></div>' +
+      '<select class="select input-sm" id="mxTipo" aria-label="Tipo de vehículo"><option value="">Todos los tipos</option>' + TIPOS.map(function (t) { return '<option' + (m.tipo === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select>' +
+      '<select class="select input-sm" id="mxRuta" aria-label="Cubre la ruta"><option value="">Cualquier ruta</option>' + A.rutas.map(function (r) { return '<option value="' + r.rutaId + '"' + (m.ruta === r.rutaId ? ' selected' : '') + '>Cubre ' + r.rutaId + ' · ' + esc(r.nombre) + '</option>'; }).join('') + '</select>' +
+      '<input class="input input-sm minkg" id="mxKg" type="text" inputmode="numeric" placeholder="Peso mín. (kg)" aria-label="Capacidad mínima en kilogramos" value="' + esc(m.kg) + '">' +
+      '<span class="lbl">Debe ser apto para:</span><div class="chip-filters" id="mxReq" role="group" aria-label="Compatibilidades requeridas">' + REQS.map(function (r) { return '<button type="button" class="filter-chip" data-r="' + r[0] + '" aria-pressed="' + !!m.req[r[0]] + '">' + r[1] + '</button>'; }).join('') + '</div>';
+    $('#mxQ').addEventListener('input', function (e) { m.q = e.target.value; drawMx(); });
+    $('#mxTipo').addEventListener('change', function (e) { m.tipo = e.target.value; drawMx(); });
+    $('#mxRuta').addEventListener('change', function (e) { m.ruta = e.target.value; drawMx(); });
+    $('#mxKg').addEventListener('input', function (e) { m.kg = e.target.value; drawMx(); });
+    $('#mxReq').addEventListener('click', function (e) { var b = e.target.closest('[data-r]'); if (!b) return; var k = b.dataset.r; m.req[k] = !m.req[k]; b.setAttribute('aria-pressed', !!m.req[k]); drawMx(); });
+  }
+  function mk(ok, label) { return ok ? '<span class="mk ok" role="img" aria-label="' + label + ': sí">' + ic('check') + '</span>' : '<span class="mk no" role="img" aria-label="' + label + ': no">–</span>'; }
+  function drawMx() {
+    var m = state.mx, q = UI.norm(m.q), minKg = num(m.kg);
+    var rows = vehs().filter(function (v) {
+      if (m.tipo && v.tipo !== m.tipo) return false;
+      if (m.ruta && v.rutasCobertura.indexOf(m.ruta) === -1) return false;
+      if (!isNaN(minKg) && minKg > 0 && v.pesoMaxKg < minKg) return false;
+      for (var k in m.req) if (m.req[k] && !v.compatibilidad[k]) return false;
+      if (q && UI.norm(v.placa + ' ' + v.tipo + ' ' + v.carroceria + ' ' + v.marca).indexOf(q) === -1) return false;
+      return true;
+    });
+    var th = '<thead><tr class="grp"><th class="first" rowspan="2" scope="col">Vehículo</th><th colspan="3" class="sep">Capacidad</th><th colspan="4" class="sep">Dimensiones</th><th colspan="5" class="sep">Compatibilidad de carga</th><th colspan="3" class="sep">Restricciones de circulación</th><th colspan="' + A.rutas.length + '" class="sep">Cobertura por ruta</th><th class="sep" rowspan="2" scope="col">Estado</th></tr><tr class="cols">' +
+      '<th class="sep" scope="col">Peso máx.</th><th scope="col">Volumen</th><th scope="col">Estibas</th>' +
+      '<th class="sep" scope="col">Largo</th><th scope="col">Ancho</th><th scope="col">Alto</th><th scope="col">Ejes</th>' +
+      '<th class="sep" scope="col">Carga &gt; 6 m</th><th scope="col">Monta-cargas</th><th scope="col">Humedad</th><th scope="col">Lámina</th><th scope="col">Ayudante</th>' +
+      '<th class="sep" scope="col">Pico y placa</th><th scope="col">Centro</th><th scope="col">Altura máx.</th>' +
+      A.rutas.map(function (r, i) { return '<th scope="col" class="rt-h' + (i === 0 ? ' sep' : '') + '" title="' + esc(r.nombre) + '">' + r.rutaId + '</th>'; }).join('') + '</tr></thead>';
+    var body = rows.map(function (v) {
+      var pp = digitDia(v.placa), centroRestr = v.pesoMaxKg > 3500;
+      return '<tr tabindex="0" data-placa="' + esc(v.placa) + '" aria-label="Abrir ficha de ' + esc(v.placa) + '"><td class="first">' + UI.plate(v.placa) + '<div class="cell-sub" style="font-size:12px;color:var(--text-2);margin-top:2px">' + v.tipo + ' · ' + v.carroceria + '</div></td>' +
+        '<td class="n sep">' + F.num(v.pesoMaxKg) + ' kg</td><td class="n">' + F.num(v.volumenMaxM3, 1) + ' m³</td><td class="n">' + v.estibas + '</td>' +
+        '<td class="n sep">' + fnum(v.largoM) + ' m</td><td class="n">' + fnum(v.anchoM) + ' m</td><td class="n">' + fnum(v.altoM) + ' m</td><td class="n">' + v.ejes + '</td>' +
+        '<td class="sep">' + mk(v.compatibilidad.largaMas6m, 'Carga mayor a 6 m') + '</td><td>' + mk(v.compatibilidad.montacargas, 'Montacargas') + '</td><td>' + mk(v.compatibilidad.protegeHumedad, 'Protege de la humedad') + '</td><td>' + mk(v.compatibilidad.lamina, 'Lámina') + '</td><td>' + mk(v.requiereAyudante, 'Requiere ayudante') + '</td>' +
+        '<td class="sep">' + (v.restricciones.picoPlacaCarga.aplicaHoy ? '<span class="chip chip-warning chip-sm no-dot">' + pp.dia + ' · hoy</span>' : '<span class="muted">' + pp.dia + '</span>') + '</td><td>' + (centroRestr ? '<span class="chip chip-warning chip-sm no-dot">&gt; 3,5 t</span>' : '<span class="subtle">Libre</span>') + '</td><td class="n">' + fnum(v.restricciones.alturaMaxM) + ' m</td>' +
+        A.rutas.map(function (r, i) { return '<td' + (i === 0 ? ' class="sep"' : '') + '>' + mk(v.rutasCobertura.indexOf(r.rutaId) > -1, 'Cubre ' + r.nombre) + '</td>'; }).join('') +
+        '<td class="sep">' + UI.chip(v.estado, { small: true }) + '</td></tr>';
+    }).join('');
+    $('#mxWrap').innerHTML = rows.length ? '<table class="mx">' + th + '<tbody>' + body + '</tbody></table>' : UI.empty({ icon: 'search', title: 'Ningún vehículo cumple todos los criterios', text: 'Relaja alguna compatibilidad o baja el peso mínimo para ver más opciones.', action: { label: 'Quitar criterios', id: 'mxclear' } });
+    $('#mxCount').textContent = rows.length + ' de ' + vehs().length + ' vehículos' + (Object.keys(m.req).some(function (k) { return m.req[k]; }) ? ' que cumplen la compatibilidad seleccionada' : '');
+  }
+
+  /* ---------- ficha del vehículo (HU-022…030) ---------- */
+  function openVehicle(placa, tab) {
+    var veh = A.idx.vehiculos[placa]; if (!veh) { UI.toast('No encontramos el vehículo ' + placa + '.', 'error'); return; }
+    var w = {
+      tipo: veh.tipo, marca: veh.marca, modelo: veh.modelo, anio: veh.anio, estado: veh.estado, kmOdometro: veh.kmOdometro, gps: veh.gps, carroceria: veh.carroceria, estibas: veh.estibas, requiereAyudante: veh.requiereAyudante,
+      pesoMaxKg: veh.pesoMaxKg, volumenMaxM3: veh.volumenMaxM3, largoM: veh.largoM, anchoM: veh.anchoM, altoM: veh.altoM, ejes: veh.ejes,
+      conductorId: veh.conductorId || '', rutas: veh.rutasCobertura.slice(), horario: veh.restricciones.picoPlacaCarga.horario, alturaMaxM: veh.restricciones.alturaMaxM, centro: veh.restricciones.centro,
+      compat: JSON.parse(JSON.stringify(veh.compatibilidad))
+    };
+    var dsp = activeDsp(veh.placa), pt = planTrip(veh.placa), lockedEstado = !!dsp, dirty = false;
+    var links = '<div class="vd-links">' + (dsp ? '<a class="btn btn-secondary btn-sm" href="despachos.html?id=' + dsp.despachoId + '">' + ic('truck') + dsp.despachoId + '</a><a class="btn btn-secondary btn-sm" href="cargue.html?id=' + dsp.despachoId + '">' + ic('box') + 'Plano de cargue</a>' + (dsp.estado === 'En ruta' ? '<a class="btn btn-secondary btn-sm" href="seguimiento.html">' + ic('navigation') + 'Seguimiento</a>' : '') : '') +
+      (pt ? '<a class="btn btn-secondary btn-sm" href="planeacion.html">' + ic('route') + 'Viaje ' + pt.viajeId + ' en planeación</a><a class="btn btn-secondary btn-sm" href="cargue.html?id=' + pt.viajeId + '">' + ic('box') + 'Plano de cargue</a>' : '') +
+      (!dsp && !pt ? '<span class="muted t-13">Sin viajes asignados hoy.</span>' : '') + '</div>';
+    var tabsHtml = [['t-ficha', 'Ficha'], ['t-cap', 'Capacidad'], ['t-op', 'Conductor y rutas'], ['t-rest', 'Restricciones'], ['t-doc', 'Documentos']];
+
+    var ficha = '<div class="vd-sec"><h3>Identificación</h3><div class="form-grid c2">' +
+      fld('placa', 'Placa', '<input class="input mono" id="f-placa" value="' + esc(veh.placa) + '" disabled>', { hint: 'La placa no se edita: es la llave del vehículo.' }) +
+      fld('tipo', 'Tipo de vehículo', sel('tipo', TIPOS, w.tipo)) +
+      fld('marca', 'Marca', inp('marca', w.marca)) + fld('modelo', 'Modelo o línea', inp('modelo', w.modelo)) +
+      fld('anio', 'Año del modelo', inp('anio', w.anio, { inputmode: 'numeric', max: 4 })) +
+      fld('estado', 'Estado operativo', sel('estado', lockedEstado ? [veh.estado] : ['Disponible', 'Mantenimiento', 'Inactivo'], lockedEstado ? veh.estado : w.estado, { dis: lockedEstado }), { hint: lockedEstado ? 'Lo gestiona el despacho ' + dsp.despachoId + ' mientras esté ' + dsp.estado.toLowerCase() + '.' : 'Un vehículo asignado a un viaje propuesto no puede pasar a mantenimiento.' }) +
+      '</div></div>' +
+      '<div class="vd-sec"><h3>Carrocería y estibas</h3><div class="form-grid c2">' +
+      fld('carroceria', 'Carrocería', sel('carroceria', CARROC, w.carroceria), { hint: 'Estacas: carga abierta con carpa. Furgón: carga cerrada. Planchón: carga larga.' }) +
+      fld('estibas', 'Estibas que caben', inp('estibas', w.estibas, { inputmode: 'numeric' }), { hint: 'Estibas estándar de 1,2 × 1,0 m en una capa.' }) +
+      '</div><div class="mt-3">' + sw('requiereAyudante', 'Requiere ayudante de cargue y descargue', w.requiereAyudante, 'Suma un auxiliar al costo del viaje y a la tripulación del despacho.') + '</div></div>' +
+      '<div class="vd-sec"><h3>Estado técnico</h3>' + UI.kv([['Odómetro', F.num(veh.kmOdometro) + ' km'], ['Último mantenimiento', F.fecha(veh.ultimoMantenimiento) + ' · hace ' + Math.abs(daysTo(veh.ultimoMantenimiento)) + ' días'], ['GPS', veh.gps ? UI.chip('Instalado', { tone: 'success', small: true }) : UI.chip('Sin GPS', { tone: 'danger', small: true })], ['Sede base', esc(A.idx.sedes[veh.sedeId] ? A.idx.sedes[veh.sedeId].nombre : veh.sedeId)]]) + '</div>';
+
+    var cap = '<div class="vd-sec"><h3>Capacidades</h3><div class="form-grid c2">' +
+      fld('pesoMaxKg', 'Capacidad de peso (kg)', inp('pesoMaxKg', w.pesoMaxKg, { inputmode: 'decimal' })) +
+      fld('volumenMaxM3', 'Capacidad de volumen (m³)', inp('volumenMaxM3', w.volumenMaxM3, { inputmode: 'decimal' }), { hint: 'No puede superar el volumen geométrico de la plataforma.' }) + '</div></div>' +
+      '<div class="vd-sec"><h3>Dimensiones y ejes</h3><div class="form-grid c2">' +
+      fld('largoM', 'Largo de plataforma (m)', inp('largoM', w.largoM, { inputmode: 'decimal' })) + fld('anchoM', 'Ancho (m)', inp('anchoM', w.anchoM, { inputmode: 'decimal' })) +
+      fld('altoM', 'Alto (m)', inp('altoM', w.altoM, { inputmode: 'decimal' })) + fld('ejes', 'Número de ejes', inp('ejes', w.ejes, { inputmode: 'numeric' })) + '</div>' +
+      '<div class="geo mt-3" id="geo"></div><div class="mt-3" id="svgBox"></div></div>';
+
+    var op = '<div class="vd-sec"><h3>Conductor asignado</h3><div id="drvBox" class="mb-3"></div>' +
+      fld('conductorId', 'Cambiar conductor', sel('conductorId', driverOpts(veh.placa, w.tipo), w.conductorId), { hint: 'Si eliges un conductor ya asignado a otro vehículo, ambos intercambian conductor al guardar.' }) + '<div id="drvNote" class="mt-2"></div></div>' +
+      '<div class="vd-sec"><h3>Cobertura geográfica</h3><p class="muted t-13 mb-3">Rutas que este vehículo puede atender. El planificador solo propone vehículos que cubren la ruta del viaje.</p><div data-f="rutas">' + covChips(w.rutas) + '<span class="error-text" hidden></span></div></div>';
+
+    var pp = digitDia(veh.placa), semana = DIAS.map(function (d, i) { var d0 = HOY.getDay(); return '<div class="d' + (i === pp.idx ? ' on' : '') + (d0 - 1 === i ? ' today' : '') + '"><b>' + d.slice(0, 3).charAt(0).toUpperCase() + d.slice(1, 3) + '</b>' + (i === pp.idx ? 'Restringido' : 'Libre') + '</div>'; }).join('');
+    var rest = '<div class="vd-sec"><h3>Pico y placa de carga</h3>' +
+      (veh.restricciones.picoPlacaCarga.aplicaHoy ? UI.banner({ tone: 'warning', title: 'Restricción vigente hoy', text: 'La placa termina en ' + pp.dig + ': no circula en Bogotá hoy ' + w.horario + '. Planeación ajusta la hora de salida.' }) : '') +
+      '<p class="muted t-13 mb-2 mt-2">Placa terminada en <b class="mono">' + pp.dig + '</b>, restringida los ' + pp.dia + ' en Bogotá.</p><div class="week" aria-label="Semana de pico y placa">' + semana + '</div>' +
+      '<div class="form-grid c2 mt-3">' + fld('horario', 'Horario de restricción', inp('horario', w.horario)) + fld('alturaMaxM', 'Altura máxima de circulación (m)', inp('alturaMaxM', w.alturaMaxM, { inputmode: 'decimal' })) + '</div></div>' +
+      '<div class="vd-sec"><h3>Centro y zonas restringidas</h3>' + UI.kv([['Ingreso al centro ampliado', esc(w.centro)], ['Tonelaje', veh.pesoMaxKg > 3500 ? UI.chip('Mayor a 3,5 t', { tone: 'warning', small: true }) : UI.chip('Sin límite', { tone: 'success', small: true })]]) + '</div>' +
+      '<div class="vd-sec"><h3>Compatibilidad de carga</h3>' +
+      sw('largaMas6m', 'Carga de más de 6 m', w.compat.largaMas6m, 'Varilla y vigas de 12 m. Exige planchón o plataforma de 8 m o más.') +
+      sw('montacargas', 'Cargue con montacargas', w.compat.montacargas, 'Permite cargue y descargue vertical o lateral con montacargas o grúa.') +
+      sw('protegeHumedad', 'Protege de la humedad', w.compat.protegeHumedad, 'Furgón cerrado o estacas con carpa. Necesario para teja, cemento y alambre.') +
+      sw('lamina', 'Transporta lámina en estiba', w.compat.lamina, 'Plataforma con soporte para estibas planas de lámina.') + '</div>' +
+      '<div class="vd-sec"><h3>Resultado por familia de producto</h3><p class="muted t-13 mb-3">Lo que el motor de cargue concluye con la configuración actual.</p><div class="prod-grid" id="prodGrid"></div></div>';
+
+    var docs = '<div class="vd-sec"><h3>Documentos del vehículo</h3><div id="docBox"></div></div>';
+
+    var body = '<div class="vd-head"><div class="row gap-3">' + UI.plate(veh.placa, { large: true }) + '<div><div class="strong">' + esc(veh.marca + ' ' + veh.modelo) + '</div><div class="muted t-13">' + esc(veh.tipo + ' · ' + veh.carroceria) + '</div></div></div></div><div class="mt-3">' + links + '</div>' +
+      '<div class="tabs vd-tabs" role="tablist" aria-label="Secciones de la ficha">' + tabsHtml.map(function (t, i) { return '<button class="tab" role="tab" id="vt-' + t[0] + '" aria-controls="' + t[0] + '" aria-selected="' + (i === 0) + '">' + t[1] + '</button>'; }).join('') + '</div>' +
+      [ficha, cap, op, rest, docs].map(function (h, i) { return '<div class="tab-panel" id="' + tabsHtml[i][0] + '" role="tabpanel" aria-labelledby="vt-' + tabsHtml[i][0] + '"' + (i ? ' hidden' : '') + '>' + h + '</div>'; }).join('');
+
+    var d = UI.drawer({ title: 'Ficha del vehículo', titleHtml: 'Vehículo <span class="mono" style="font-size:16px">' + esc(veh.placa) + '</span> <span class="vd-dirty chip chip-warning chip-sm no-dot" id="dirtyChip">Cambios sin guardar</span>', subtitleHtml: UI.chip(veh.estado, { small: true }) + ' · ' + esc(veh.tipo) + ' · ' + esc(veh.carroceria), width: 680, body: body,
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Guardar cambios', kind: 'primary', icon: 'check', onClick: save }] });
+    var root = d.body, tabsApi = UI.tabs($('.vd-tabs', root));
+    if (tab) tabsApi.select(tab);
+
+    function read() {
+      var o = { placa: veh.placa, rutas: w.rutas, compat: w.compat };
+      $$('[data-k]', root).forEach(function (el) { var k = el.dataset.k; if (el.type === 'checkbox') { if (k in w.compat) w.compat[k] = el.checked; else o[k] = el.checked; } else o[k] = el.value; });
+      o.rutas = w.rutas; o.compat = w.compat; if (lockedEstado) o.estado = veh.estado; return o;
+    }
+    function refresh() {
+      var o = read(), L = num(o.largoM), W = num(o.anchoM), H = num(o.altoM), gv = L * W * H, vm = num(o.volumenMaxM3), ok = !isNaN(gv) && !isNaN(vm) && vm <= gv * 1.05;
+      $('#geo', root).innerHTML = '<div class="c"><div class="v">' + (isNaN(gv) ? '—' : fnum(gv) + ' m³') + '</div><div class="l">Volumen geométrico L × A × H</div></div><div class="c"><div class="v">' + (isNaN(vm) ? '—' : fnum(vm) + ' m³') + '</div><div class="l">Volumen declarado</div></div><div class="c"><div class="v">' + (isNaN(gv) || isNaN(vm) ? '—' : fnum(vm / gv * 100, 0) + ' %') + '</div><div class="l">' + (ok ? 'Aprovechamiento' : 'Excede el geométrico') + '</div></div>';
+      $('#svgBox', root).innerHTML = vehSvg(o);
+      var c = driver(o.conductorId);
+      $('#drvBox', root).innerHTML = c ? '<div class="row nowrap gap-3">' + UI.avatar(c.nombre, { size: 'lg' }) + '<div class="min-w-0"><div class="strong">' + esc(c.nombre) + '</div><div class="muted t-13">Cédula ' + c.cedula + ' · ' + c.telefono + '</div><div class="muted t-13">Licencia ' + c.licencia + ' vence ' + F.fecha(c.licenciaVence) + ' · ' + c.experienciaAnios + ' años de experiencia</div></div></div>' : UI.banner({ tone: 'warning', text: 'Este vehículo no tiene conductor. No podrá incluirse en un despacho.' });
+      var oth = c && c.vehiculoId && c.vehiculoId !== veh.placa ? c.vehiculoId : null;
+      $('#drvNote', root).innerHTML = oth ? UI.banner({ tone: 'info', text: c.nombre.split(' ')[0] + ' hoy conduce ' + oth + '. Al guardar, ' + oth + ' quedará con el conductor de este vehículo.' }) : '';
+      $('#prodGrid', root).innerHTML = FAMILIAS.map(function (f) { var r = f.t({ largoM: L || 0, compatibilidad: o.compat, carroceria: o.carroceria }); return '<div class="p"><div class="min-w-0"><div class="pn">' + f.f + '</div><div class="pd">' + (r[2] || f.d) + '</div></div>' + UI.chip(r[0], { tone: r[1], small: true }) + '</div>'; }).join('');
+    }
+    function renderDocs() {
+      var rows = [['SOAT', 'soat', 'Seguro obligatorio'], ['Revisión técnico-mecánica', 'tecnomecanica', 'Certificado de gases y mecánica']];
+      $('#docBox', root).innerHTML = rows.map(function (r) { var dd = daysTo(veh[r[1]]); return '<div class="doc-row"><span class="di">' + ic('file-text') + '</span><div class="dm"><div class="strong">' + r[0] + '</div><div class="muted t-13">' + r[2] + ' · vence ' + F.fecha(veh[r[1]]) + '</div></div>' + docChip(veh[r[1]]) + '<button type="button" class="btn btn-secondary btn-sm" data-renew="' + r[1] + '">Registrar renovación</button></div>'; }).join('') +
+        '<div class="doc-row"><span class="di">' + ic('wrench') + '</span><div class="dm"><div class="strong">Mantenimiento preventivo</div><div class="muted t-13">Último: ' + F.fecha(veh.ultimoMantenimiento) + ' · próximo estimado ' + F.fecha(A.ymd(Math.max(5, 90 - Math.abs(daysTo(veh.ultimoMantenimiento))))) + '</div></div>' + UI.chip(Math.abs(daysTo(veh.ultimoMantenimiento)) > 60 ? 'Programar' : 'Al día', { tone: Math.abs(daysTo(veh.ultimoMantenimiento)) > 60 ? 'warning' : 'success' }) + '</div>';
+    }
+    root.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-renew]'); if (!b) return; renewModal(veh, b.dataset.renew, function () { renderDocs(); renderKpis(); drawFleet(); drawMx(); });
+    });
+    function markDirty() { if (dirty) return; dirty = true; $('#dirtyChip', d.root).classList.add('on'); }
+    root.addEventListener('input', function (e) { if (e.target.matches('[data-k]')) { markDirty(); refresh(); } });
+    root.addEventListener('change', function (e) { if (e.target.matches('[data-k]')) { markDirty(); refresh(); } });
+    bindCov(root, w.rutas, function () { markDirty(); });
+    refresh(); renderDocs();
+
+    function save() {
+      var o = read(); o.alturaMaxM = o.alturaMaxM; var errs = validate(o, { veh: veh });
+      showErrors(root, errs);
+      var keys = Object.keys(errs);
+      if (keys.length) {
+        var map = { ficha: ['marca', 'modelo', 'anio', 'estado', 'estibas'], cap: ['pesoMaxKg', 'volumenMaxM3', 'largoM', 'anchoM', 'altoM', 'ejes'], op: ['conductorId', 'rutas'], rest: ['alturaMaxM', 'largaMas6m'] };
+        var tabId = ['t-ficha', 't-cap', 't-op', 't-rest'][['ficha', 'cap', 'op', 'rest'].findIndex(function (g) { return map[g].some(function (k) { return errs[k]; }); })];
+        if (tabId) tabsApi.select(tabId);
+        var first = $('[data-f].is-invalid input, [data-f].is-invalid select', root); if (first) first.focus();
+        UI.toast('Revisa ' + keys.length + (keys.length === 1 ? ' campo' : ' campos') + ' marcado' + (keys.length === 1 ? '' : 's') + ' antes de guardar.', 'error');
+        return false;
+      }
+      ['tipo', 'marca', 'modelo', 'carroceria'].forEach(function (k) { veh[k] = String(o[k]).trim(); });
+      veh.anio = num(o.anio); veh.estibas = num(o.estibas); veh.requiereAyudante = !!o.requiereAyudante; veh.pesoMaxKg = num(o.pesoMaxKg); veh.volumenMaxM3 = num(o.volumenMaxM3); veh.largoM = num(o.largoM); veh.anchoM = num(o.anchoM); veh.altoM = num(o.altoM); veh.ejes = num(o.ejes);
+      if (!lockedEstado) veh.estado = o.estado;
+      veh.rutasCobertura = A.rutas.map(function (r) { return r.rutaId; }).filter(function (id) { return w.rutas.indexOf(id) > -1; });
+      veh.restricciones.picoPlacaCarga.horario = o.horario; veh.restricciones.alturaMaxM = num(o.alturaMaxM); veh.compatibilidad = w.compat;
+      var nid = o.conductorId || null, oldId = veh.conductorId || null;
+      if (nid !== oldId) {
+        var c = nid ? driver(nid) : null, otherPl = c && c.vehiculoId && c.vehiculoId !== veh.placa ? c.vehiculoId : null;
+        if (otherPl) { var ov = A.idx.vehiculos[otherPl]; ov.conductorId = oldId; if (oldId) driver(oldId).vehiculoId = otherPl; }
+        else if (oldId) driver(oldId).vehiculoId = null;
+        veh.conductorId = nid; if (c) c.vehiculoId = veh.placa;
+        UI.toast(c ? c.nombre + ' quedó asignado a ' + veh.placa + (otherPl ? '; ' + otherPl + ' recibió a ' + (oldId ? driver(oldId).nombre : 'ningún conductor') + '.' : '.') : 'Se retiró el conductor de ' + veh.placa + '.', 'success');
+      } else UI.toast('Cambios guardados en ' + veh.placa + '.', 'success');
+      renderKpis(); drawFilters(); drawFleet(); drawMx();
+    }
+    return d;
+  }
+
+  function renewModal(veh, key, done) {
+    var nombre = key === 'soat' ? 'SOAT' : 'revisión técnico-mecánica';
+    UI.modal({ title: 'Registrar renovación de ' + nombre, subtitle: 'Vehículo ' + veh.placa + ' · vence actualmente ' + F.fecha(veh[key]), width: 460,
+      body: '<div class="stack">' + fld('fecha', 'Nueva fecha de vencimiento', '<input class="input" id="f-fecha" type="date" data-k="fecha">', { hint: 'Debe ser posterior a hoy y no superar un año.' }) + fld('ref', 'Número de póliza o certificado', '<input class="input mono" id="f-ref" data-k="ref" autocomplete="off">', { opt: true }) + '</div>',
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Guardar renovación', kind: 'primary', onClick: function (api) {
+        var v = $('#f-fecha', api.body).value, e = {};
+        if (!v) e.fecha = 'Selecciona la nueva fecha de vencimiento.'; else { var dd = daysTo(v); if (dd <= 0) e.fecha = 'La nueva fecha debe ser posterior a hoy.'; else if (dd > 366) e.fecha = 'El vencimiento no puede superar un año desde hoy.'; else if (dd <= daysTo(veh[key])) e.fecha = 'La fecha debe ser posterior al vencimiento actual (' + F.fecha(veh[key]) + ').'; }
+        showErrors(api.body, e); if (Object.keys(e).length) { $('#f-fecha', api.body).focus(); return false; }
+        veh[key] = v; UI.toast('Renovación registrada: ' + nombre + ' de ' + veh.placa + ' vigente hasta ' + F.fecha(v) + '.', 'success'); done();
+      } }] });
+  }
+
+  /* ---------- registrar vehículo (HU-022) ---------- */
+  function openCreate() {
+    var cov = [], draft = { tipo: 'Turbo' };
+    var body = '<div class="stack-lg"><div class="vd-sec"><h3>Identificación</h3><div class="form-grid c2">' +
+      fld('placa', 'Placa', inp('placa', '', { mono: true, ph: 'ABC 123', max: 7 }), { hint: 'Tres letras y tres números.' }) +
+      fld('tipo', 'Tipo de vehículo', sel('tipo', TIPOS, 'Turbo')) +
+      fld('marca', 'Marca', inp('marca', '', { ph: 'Ej. Chevrolet' })) + fld('modelo', 'Modelo o línea', inp('modelo', '', { ph: 'Ej. NKR Turbo' })) +
+      fld('anio', 'Año del modelo', inp('anio', HOY.getFullYear(), { inputmode: 'numeric', max: 4 })) +
+      fld('carroceria', 'Carrocería', sel('carroceria', CARROC, 'Estacas')) + '</div></div>' +
+      '<div class="vd-sec"><h3>Capacidad y dimensiones</h3><div class="form-grid c2">' +
+      fld('pesoMaxKg', 'Capacidad de peso (kg)', inp('pesoMaxKg', '', { inputmode: 'decimal', ph: '4000' })) + fld('volumenMaxM3', 'Capacidad de volumen (m³)', inp('volumenMaxM3', '', { inputmode: 'decimal', ph: '17' })) +
+      fld('largoM', 'Largo (m)', inp('largoM', '', { inputmode: 'decimal', ph: '4,2' })) + fld('anchoM', 'Ancho (m)', inp('anchoM', '', { inputmode: 'decimal', ph: '2,0' })) +
+      fld('altoM', 'Alto (m)', inp('altoM', '', { inputmode: 'decimal', ph: '2,0' })) + fld('ejes', 'Ejes', inp('ejes', '2', { inputmode: 'numeric' })) +
+      fld('estibas', 'Estibas que caben', inp('estibas', '', { inputmode: 'numeric', ph: '6' })) + '</div></div>' +
+      '<div class="vd-sec"><h3>Operación</h3><div class="stack">' + fld('conductorId', 'Conductor', sel('conductorId', driverOpts('', 'Turbo'), ''), { opt: true }) +
+      '<div data-f="rutas"><div class="label mb-2">Cobertura geográfica</div>' + covChips(cov) + '<span class="error-text" hidden></span></div>' +
+      sw('requiereAyudante', 'Requiere ayudante', false, 'Marca esta opción para tractomulas y dobletroques con cargue manual.') + '</div></div></div>';
+    UI.modal({ title: 'Registrar vehículo', subtitle: 'El vehículo queda disponible para planeación en cuanto lo guardes.', width: 720, body: '', onOpen: function (api) { api.body.innerHTML = body; bindCov(api.body, cov); var f = $('#f-placa', api.body); if (f) f.focus(); },
+      footer: [{ label: 'Cancelar', kind: 'ghost' }, { label: 'Registrar vehículo', kind: 'primary', icon: 'check', onClick: function (api) {
+        var b = api.body, o = { rutas: cov, compat: {} };
+        $$('[data-k]', b).forEach(function (el) { o[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value; });
+        o.compat = defCompat({ carroceria: o.carroceria, tipo: o.tipo, pesoMaxKg: num(o.pesoMaxKg) });
+        var errs = validate(o, { isNew: true }); showErrors(b, errs);
+        if (Object.keys(errs).length) { var f = $('[data-f].is-invalid input,[data-f].is-invalid select', b); if (f) f.focus(); UI.toast('Corrige los campos marcados para registrar el vehículo.', 'error'); return false; }
+        var placa = normPlaca(o.placa), cd = o.conductorId || null, c = cd ? driver(cd) : null;
+        var nv = { placa: placa, tipo: o.tipo, marca: o.marca.trim(), modelo: o.modelo.trim(), anio: num(o.anio), pesoMaxKg: num(o.pesoMaxKg), volumenMaxM3: num(o.volumenMaxM3), largoM: num(o.largoM), anchoM: num(o.anchoM), altoM: num(o.altoM), ejes: num(o.ejes), carroceria: o.carroceria, estibas: num(o.estibas), requiereAyudante: !!o.requiereAyudante, conductorId: cd,
+          rutasCobertura: A.rutas.map(function (r) { return r.rutaId; }).filter(function (id) { return cov.indexOf(id) > -1; }), estado: 'Disponible', restricciones: { picoPlacaCarga: { ciudad: 'Bogotá', diaRestriccion: digitDia(placa).dia, horario: '06:00–09:00 y 16:00–19:00', aplicaHoy: false }, centro: num(o.pesoMaxKg) > 3500 ? 'Sin ingreso al centro ampliado (> 3,5 t)' : 'Sin restricción de tonelaje en el centro', alturaMaxM: o.tipo === 'Tractomula' ? 4.4 : 4.1 }, compatibilidad: o.compat,
+          soat: A.ymd(365), tecnomecanica: A.ymd(365), gps: true, ultimoMantenimiento: A.ymd(0), kmOdometro: 0, sedeId: A.sedeActual };
+        var hoyIdx = HOY.getDay() - 1; nv.restricciones.picoPlacaCarga.aplicaHoy = hoyIdx >= 0 && hoyIdx <= 4 && digitDia(placa).idx === hoyIdx;
+        A.vehiculos.push(nv); A.idx.vehiculos[placa] = nv;
+        if (c) { if (c.vehiculoId && A.idx.vehiculos[c.vehiculoId]) A.idx.vehiculos[c.vehiculoId].conductorId = null; c.vehiculoId = placa; }
+        renderKpis(); drawFilters(); drawFleet(); drawMx();
+        UI.toast('Vehículo ' + placa + ' registrado y disponible para planeación.', 'success');
+        setTimeout(function () { openVehicle(placa, 't-doc'); }, 260);
+      } }] });
+  }
+
+  /* ---------- eventos ---------- */
+  var mainTabs = UI.tabs($('#mainTabs'), { onChange: function (id) { if (id === 'pMx') drawMx(); } });
+  $('#q').addEventListener('input', function (e) { state.q = e.target.value; drawFleet(); });
+  $('#fTipo').addEventListener('change', function (e) { state.tipo = e.target.value; drawFleet(); });
+  $('#fEstado').addEventListener('click', function (e) { var b = e.target.closest('[data-e]'); if (!b) return; state.estado = b.dataset.e; drawFilters(); drawFleet(); });
+  $('#viewSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; state.view = b.dataset.v; $$('button', $('#viewSeg')).forEach(function (x) { x.setAttribute('aria-pressed', x === b); }); drawFleet(); });
+  $('#fleetCards').addEventListener('click', function (e) {
+    if (e.target.closest('[data-empty-action]')) { state.q = ''; state.tipo = ''; state.estado = ''; $('#q').value = ''; drawFilters(); drawFleet(); return; }
+    var c = e.target.closest('[data-placa]'); if (c) openVehicle(c.dataset.placa);
+  });
+  $('#fleetCards').addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-placa]')) { e.preventDefault(); openVehicle(e.target.dataset.placa); } });
+  $('#pMx').addEventListener('click', function (e) {
+    if (e.target.closest('[data-empty-action]')) { state.mx = { q: '', tipo: '', ruta: '', kg: '', req: {} }; drawMxTools(); drawMx(); return; }
+    var r = e.target.closest('tr[data-placa]'); if (r) openVehicle(r.dataset.placa);
+  });
+  $('#pMx').addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr[data-placa]')) { e.preventDefault(); openVehicle(e.target.dataset.placa); } });
+  $('#addBtn').addEventListener('click', openCreate);
+
+  /* arranque con skeleton breve */
+  $('#kpiRow').innerHTML = [1, 2, 3, 4, 5].map(function () { return '<div class="card kpi"><span class="skeleton sk-line" style="width:50%"></span><span class="skeleton" style="height:34px;width:60%"></span><span class="skeleton sk-line" style="width:70%"></span></div>'; }).join('');
+  $('#fleetCards').innerHTML = '<div class="veh-grid">' + [1, 2, 3, 4, 5, 6].map(function () { return '<div class="card veh-card"><span class="skeleton" style="height:34px;width:60%"></span><span class="skeleton sk-line" style="width:80%"></span><span class="skeleton" style="height:50px"></span><span class="skeleton sk-line" style="width:50%"></span></div>'; }).join('') + '</div>';
+  drawMxTools();
+  setTimeout(function () {
+    renderKpis(); drawFilters(); drawFleet(); drawMx();
+    var p = UI.param('placa'); if (p) { var norm = p.toUpperCase().replace(/[^A-Z0-9]/g, ''); var found = vehs().filter(function (v) { return v.placa.replace(/\s/g, '') === norm; })[0]; if (found) openVehicle(found.placa); else UI.toast('No encontramos el vehículo con placa ' + p + '.', 'warning'); }
+  }, 320);
+});
+</script>
+</body>
+</html>

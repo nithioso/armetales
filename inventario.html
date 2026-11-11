@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inventario y conteos · Armetales</title>
+<meta name="description" content="Stock por ubicación, diferencias, conteos cíclicos, ajustes con aprobación y exactitud de inventario de Armetales.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de Inventario y conteos (tokens y componentes viven en app.css) */
+  .kpi-row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .kpi-row > :last-child:nth-child(odd) { grid-column: span 2; } .kpi .kpi-value { font-size: 28px; } .kpi .kpi-spark { display: none; } .kpi { padding: 12px; } }
+  .bod-pick .select { width: auto; min-width: 180px; }
+  .mini-stat { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); }
+  .mini-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 24px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .mini-stat .l { font-size: 12px; color: var(--text-2); }
+  .stat-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-bottom: 16px; }
+  .dif-neg { color: var(--red-fg); font-weight: 600; } .dif-pos { color: var(--amber-fg); font-weight: 600; } .dif-zero { color: var(--green-fg); font-weight: 600; }
+  .cal-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; padding: 2px; }
+  .cal-day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); font: inherit; color: var(--text); cursor: pointer; min-height: 72px; min-width: 0; }
+  .cal-day:hover { border-color: var(--steel); }
+  .cal-day[aria-pressed="true"] { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+  .cal-day .wd { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); }
+  .cal-day .dn { font: 600 18px var(--font-display); line-height: 1.1; }
+  .cal-day .dots { display: flex; gap: 3px; min-height: 8px; margin-top: 2px; }
+  .cal-day .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
+  .cal-day .dots i.late { background: var(--amber); }
+  .cal-day.is-today .dn { color: var(--red); }
+  .crit-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .crit-row:last-child { border-bottom: 0; }
+  .np-display { width: 100%; height: 72px; padding: 0 16px; text-align: right; font: 600 44px var(--font-display); font-variant-numeric: tabular-nums; border: 2px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); }
+  .np-display:focus { outline: none; border-color: var(--text); }
+  .np-display[aria-invalid="true"] { border-color: var(--red); }
+  .np-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .np-grid button { min-height: 56px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: 600 22px var(--font-display); cursor: pointer; transition: background .12s, transform .08s; }
+  .np-grid button:hover { background: var(--surface-2); } .np-grid button:active { transform: scale(.97); background: var(--surface-3); }
+  .np-grid button.fn { font: 500 14px var(--font-ui); color: var(--text-2); }
+  .blind-note { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--text-2); }
+  .actor-bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); margin-bottom: 16px; font-size: 13px; }
+  .actor-bar .who { display: flex; align-items: center; gap: 8px; }
+  .cause-row { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 4px 12px; align-items: center; padding: 8px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .cause-row:last-child { border-bottom: 0; }
+  .cause-row .meter { grid-column: 1 / -1; }
+  .rank-n { width: 26px; height: 26px; border-radius: 7px; background: var(--surface-3); display: grid; place-items: center; font: 600 13px var(--font-display); flex: none; }
+  .score-cell { min-width: 120px; }
+  .two-col { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+  @media (min-width: 1100px) { .two-col { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); } .two-col.even { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .tab-panel .table-card { margin-top: 0; }
+</style>
+</head>
+<body data-page="inventario">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Bodega · WMS</div>
+      <h1 class="page-title">Inventario y conteos</h1>
+      <p class="page-desc" id="phDesc">Stock por ubicación, diferencias contra el sistema, conteos cíclicos y ajustes con aprobación.</p>
+    </div>
+    <div class="page-actions">
+      <div class="bod-pick"><label class="sr-only" for="bodSel">Bodega</label><select class="select" id="bodSel"></select></div>
+      <button type="button" class="btn btn-primary" id="progBtn"></button>
+    </div>
+  </header>
+
+  <section aria-label="Indicadores de inventario"><div class="kpi-row" id="kpiRow"></div></section>
+
+  <section class="section" aria-label="Módulos de inventario">
+    <div class="tabs" role="tablist" id="tabs" aria-label="Vistas de inventario">
+      <button class="tab" role="tab" aria-controls="pnStock" aria-selected="true" id="tbStock">Stock por ubicación</button>
+      <button class="tab" role="tab" aria-controls="pnDif" aria-selected="false" id="tbDif">Diferencias <span class="count" id="cDif"></span></button>
+      <button class="tab" role="tab" aria-controls="pnCnt" aria-selected="false" id="tbCnt">Conteos cíclicos <span class="count" id="cCnt"></span></button>
+      <button class="tab" role="tab" aria-controls="pnAj" aria-selected="false" id="tbAj">Ajustes <span class="count" id="cAj"></span></button>
+      <button class="tab" role="tab" aria-controls="pnEx" aria-selected="false" id="tbEx">Exactitud</button>
+    </div>
+
+    <div class="tab-panel" id="pnStock" role="tabpanel" aria-labelledby="tbStock">
+      <div class="stat-grid" id="stockStats"></div>
+      <div id="stockEmpty"></div>
+      <div id="stockTable"></div>
+    </div>
+
+    <div class="tab-panel" id="pnDif" role="tabpanel" aria-labelledby="tbDif" hidden>
+      <div class="stat-grid" id="difStats"></div>
+      <div id="difTable"></div>
+    </div>
+
+    <div class="tab-panel" id="pnCnt" role="tabpanel" aria-labelledby="tbCnt" hidden>
+      <div class="two-col mb-4">
+        <div class="card">
+          <div class="card-head"><div><h2 class="card-title">Calendario de conteos</h2><p class="card-sub">Próximos 14 días · toca un día para filtrar la lista</p></div><span class="row gap-2"><button type="button" class="filter-chip" id="calLate" aria-pressed="false" hidden>Atrasados <span class="n" id="calLateN"></span></button><button type="button" class="btn btn-ghost btn-sm" id="calAll">Ver todos</button></span></div>
+          <div class="card-body" style="padding-top:8px"><div class="cal-strip" id="calStrip" role="group" aria-label="Días con conteos programados"></div><div class="grid c3 gap-3 mt-3" id="calStats"></div><p class="muted t-12 mt-3">Cada punto azul es un conteo pendiente de ese día. Un conteo en curso deja la ubicación sin movimientos hasta cerrarlo.</p></div>
+        </div>
+        <aside class="card" aria-label="SKU críticos">
+          <div class="card-head"><div><h2 class="card-title">SKU críticos para contar</h2><p class="card-sub">Por notas crédito, diferencias y rotación</p></div></div>
+          <div class="card-body" id="critList" style="padding-top:0"></div>
+        </aside>
+      </div>
+      <div id="cntTable"></div>
+    </div>
+
+    <div class="tab-panel" id="pnAj" role="tabpanel" aria-labelledby="tbAj" hidden>
+      <div class="actor-bar"><div class="who" id="actorWho"></div><div class="segmented" role="group" aria-label="Actuar como" id="actorSeg"></div><span class="muted t-12" id="actorRule"></span></div>
+      <div id="ajTable"></div>
+    </div>
+
+    <div class="tab-panel" id="pnEx" role="tabpanel" aria-labelledby="tbEx" hidden>
+      <div class="kpi-row" id="exKpis"></div>
+      <div class="two-col mt-4">
+        <div class="card"><div class="card-head"><div><h2 class="card-title">Exactitud de inventario</h2><p class="card-sub">Últimos 30 días · meta 98,5 %</p></div></div><div class="card-body"><div class="chart" id="exTrend" style="--h:260px"></div></div></div>
+        <div class="card"><div class="card-head"><div><h2 class="card-title">Exactitud por bodega</h2><p class="card-sub">Por unidades, sobre el último conteo</p></div></div><div class="card-body stack" id="exBod"></div></div>
+      </div>
+      <div class="two-col even mt-4">
+        <div class="card"><div class="card-head"><div><h2 class="card-title">SKU con menor exactitud</h2><p class="card-sub" id="exSkuSub"></p></div></div><div class="card-body"><div id="exSku"></div></div></div>
+        <div class="card"><div class="card-head"><div><h2 class="card-title">Notas crédito por causa</h2><p class="card-sub">Últimos 30 días · valor en COP</p></div></div><div class="card-body" id="exNc"></div></div>
+      </div>
+      <div class="section"><div class="section-head"><div><h2 class="section-title">Prioridad de conteo por SKU</h2><p class="muted t-13">Puntaje de 0 a 100: notas crédito 45 %, diferencias recientes 25 %, rotación 20 % y días sin contar 10 %.</p></div></div><div id="rankTable"></div></div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$, IDX = A.idx;
+  var S = { bod: null, day: null, actor: 0 };
+  var DAY = 86400000, HOY = A.ymd(0);
+  var PRECIO_KG = { Varilla: 3900, Malla: 4600, Perfil: 4200, 'Tubería': 5100, 'Lámina': 4800, Teja: 8500, Alambre: 4700, Cemento: 650 };
+  var CAUSAS = ['Error de picking en preparación', 'Merma por manipulación', 'Diferencia de unidad de medida', 'Ubicación incorrecta', 'Pendiente de recibo no contabilizado', 'Conteo mal registrado', 'Sin causa identificada'];
+  var ACTORS = [{ id: 'USR-001', nombre: 'Laura Restrepo', rol: 'Jefe de logística', limite: Infinity }, { id: 'USR-005', nombre: 'Héctor Mauricio Bernal', rol: 'Jefe de bodega', limite: 500000 }, { id: 'USR-013', nombre: 'Paola Andrea Salcedo', rol: 'Analista de inventarios', limite: 0 }];
+  var LIM = 500000;
+  function actor() { return ACTORS[S.actor]; }
+  function prod(sku) { return IDX.productos[sku]; }
+  function precio(sku) { var p = prod(sku); return p ? Math.round(p.pesoKg * (PRECIO_KG[p.familia] || 4200) / 100) * 100 : 0; }
+  function bods() { return A.sedes; }
+  function bodName(id) { return IDX.sedes[id] ? IDX.sedes[id].nombre : id; }
+  function ubic(id, b) { return A.ubicaciones.filter(function (u) { return u.bodegaId === (b || S.bod) && u.ubicacionId === id; })[0]; }
+  function invOf(id, b) { return A.inventario.filter(function (r) { return r.bodegaId === (b || S.bod) && r.ubicacionId === id; })[0]; }
+  function sgn(n) { return n > 0 ? '+' + F.num(n) : n < 0 ? '−' + F.num(Math.abs(n)) : '0'; }
+  function difHtml(n) { return '<span class="num ' + (n < 0 ? 'dif-neg' : n > 0 ? 'dif-pos' : 'dif-zero') + '">' + sgn(n) + '</span>'; }
+  function setErr(root, id, msg) { var e = $('#' + id + 'E', root), i = $('#' + id, root); if (e) { e.hidden = !msg; e.innerHTML = msg ? UI.icon('alert-circle', 'icon-sm') + esc(msg) : ''; } if (i) i.setAttribute('aria-invalid', !!msg); return !msg; }
+  function toast(m, t, o) { UI.toast(m, t || 'success', o); }
+  function dayDiff(ymd) { return Math.round((new Date(ymd + 'T12:00:00') - new Date(HOY + 'T12:00:00')) / DAY); }
+  function fechaTxt(ymd) { var d = dayDiff(ymd); return d === 0 ? 'Hoy' : d === 1 ? 'Mañana' : d === -1 ? 'Ayer' : F.fecha(ymd); }
+
+  /* ---------- modelo local derivado de ARM ---------- */
+  var CNT = A.conteos.map(function (c) { return Object.assign({}, c, { sistema: c.stockSistema }); });
+  var cntN = CNT.length;
+  var DIFS = [], difN = 0;
+  function mkDif(o) { var p = prod(o.sku); o.id = 'DIF-' + (++difN); o.desc = p ? p.descripcion : o.desc; o.valor = Math.abs(o.dif) * precio(o.sku); o.pct = o.sistema ? Math.abs(o.dif) / o.sistema * 100 : 0; o.mag = (o.pct >= 3 || o.valor >= 500000) ? 'Alta' : (o.pct >= 1 || o.valor >= 100000) ? 'Media' : 'Baja'; DIFS.push(o); return o; }
+  CNT.forEach(function (c) { if (c.diferencia) mkDif({ bodegaId: c.bodegaId, ubicacionId: c.ubicacionId, sku: c.sku, sistema: c.stockSistema, conteo: c.conteo, dif: c.diferencia, fecha: c.fecha, causa: c.causaProbable || 'Sin causa identificada', estado: c.estado === 'Ajustado' ? 'Ajustado' : c.estado === 'Conciliado' ? 'Conciliado' : 'Sin resolver', conteoId: c.conteoId }); });
+  A.inventario.forEach(function (r) { if (r.diferencia && !DIFS.some(function (d) { return d.bodegaId === r.bodegaId && d.ubicacionId === r.ubicacionId; })) mkDif({ bodegaId: r.bodegaId, ubicacionId: r.ubicacionId, sku: r.sku, sistema: r.stockFisico, conteo: r.conteo, dif: r.diferencia, fecha: r.fechaConteo, causa: 'Sin causa identificada', estado: 'Sin resolver', conteoId: null }); });
+
+  /* ajustes semilla */
+  var AJ = [], ajN = 40;
+  function ev(t, who, txt, tone) { return { t: t, who: who, txt: txt, tone: tone || 'done' }; }
+  function mkAj(d, estado, sol, extra) {
+    var o = Object.assign({ id: 'AJ-' + A.ymd(0).slice(2, 4) + A.ymd(0).slice(5, 7) + '-' + String(++ajN).padStart(3, '0'), difId: d.id, bodegaId: d.bodegaId, ubicacionId: d.ubicacionId, sku: d.sku, desc: d.desc, sistema: d.sistema, conteo: d.conteo, dif: d.dif, valor: d.valor, causa: d.causa, just: '', estado: estado, sol: sol, fecha: Date.now() - 3600000, eventos: [] }, extra || {});
+    AJ.push(o); d.ajusteId = o.id; return o;
+  }
+  (function () {
+    var cedi = DIFS.filter(function (d) { return d.bodegaId === 'CEDI-BOG'; }), pool = cedi.filter(function (d) { return d.estado === 'Sin resolver'; }).sort(function (a, b) { return b.valor - a.valor; });
+    var paola = ACTORS[2], hec = ACTORS[1], lau = ACTORS[0], now = A.ahora.getTime();
+    var a1 = pool[0] && mkAj(pool[0], 'Pendiente de aprobación', paola, { fecha: now - 5 * 3600000, just: 'Diferencia confirmada en dos conteos. No hay recibos pendientes ni traslados en tránsito.' });
+    if (a1) { pool[0].estado = 'Ajuste solicitado'; a1.eventos = [ev(a1.fecha, paola.nombre, 'Solicitó el ajuste de ' + sgn(a1.dif) + ' unidades')]; }
+    var a2 = pool[1] && mkAj(pool[1], 'Aprobado', paola, { fecha: now - 26 * 3600000, aprobador: hec, just: 'Faltante por picking de pedido anterior; documentado con la evidencia del operario.' });
+    if (a2) { pool[1].estado = 'Ajuste solicitado'; a2.eventos = [ev(a2.fecha, paola.nombre, 'Solicitó el ajuste de ' + sgn(a2.dif) + ' unidades'), ev(a2.fecha + 3 * 3600000, hec.nombre + ' · ' + hec.rol, 'Aprobó el ajuste')]; }
+    var a3 = pool[2] && mkAj(pool[2], 'Rechazado', paola, { fecha: now - 50 * 3600000, aprobador: hec, motivoRech: 'Requiere reconteo: la diferencia supera lo que explica la causa indicada.', just: 'Posible error de unidad de medida en la recepción.' });
+    if (a3) { pool[2].estado = 'Sin resolver'; a3.eventos = [ev(a3.fecha, paola.nombre, 'Solicitó el ajuste de ' + sgn(a3.dif) + ' unidades'), ev(a3.fecha + 2 * 3600000, hec.nombre + ' · ' + hec.rol, 'Rechazó el ajuste: ' + a3.motivoRech, 'error')]; }
+    var reg = cedi.filter(function (d) { return d.estado === 'Ajustado'; })[0];
+    if (reg) { var a4 = mkAj(reg, 'Registrado', paola, { fecha: now - 72 * 3600000, aprobador: hec, just: 'Sobrante de recepción sin contabilizar.' }); a4.eventos = [ev(a4.fecha, paola.nombre, 'Solicitó el ajuste de ' + sgn(a4.dif) + ' unidades'), ev(a4.fecha + 2 * 3600000, hec.nombre + ' · ' + hec.rol, 'Aprobó el ajuste'), ev(a4.fecha + 4 * 3600000, hec.nombre, 'Registró el ajuste en inventario y lo envió a SAP')]; }
+  })();
+
+  /* prioridad de conteo por SKU (HU-220): notas crédito reales + derivadas */
+  var RANK = [];
+  function buildRank() {
+    var seed = 5; function rnd() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+    var skus = {}; A.inventario.filter(function (r) { return r.bodegaId === 'CEDI-BOG'; }).forEach(function (r) { skus[r.sku] = 1; });
+    var res = {}; A.reservas.filter(function (r) { return r.estado === 'Activa'; }).forEach(function (r) { res[r.sku] = (res[r.sku] || 0) + r.cantidad; });
+    var nc = {}; A.novedades.forEach(function (n) { if (n.sku && n.notaCreditoCOP) { var o = nc[n.sku] || (nc[n.sku] = { n: 0, cop: 0 }); o.n++; o.cop += n.notaCreditoCOP; } });
+    var list = Object.keys(skus).map(function (sku) {
+      var p = prod(sku), o = nc[sku] || { n: 0, cop: 0 }; if (!nc[sku] && rnd() < 0.3) { o = { n: 1 + Math.floor(rnd() * 3), cop: 0 }; o.cop = Math.round(o.n * precio(sku) * (2 + rnd() * 18) / 1000) * 1000; }
+      var difs = DIFS.filter(function (d) { return d.sku === sku && d.bodegaId === 'CEDI-BOG'; }).length, rows = A.inventario.filter(function (r) { return r.bodegaId === 'CEDI-BOG' && r.sku === sku; });
+      var last = rows.map(function (r) { return r.fechaConteo; }).filter(Boolean).sort().pop(), dias = last ? -dayDiff(last) : 90;
+      return { sku: sku, desc: p.descripcion, nc: o.n, ncCOP: o.cop, difs: difs, rot: res[sku] || 0, dias: dias };
+    });
+    function mx(k) { return Math.max.apply(null, list.map(function (x) { return x[k]; })) || 1; }
+    var m1 = mx('ncCOP'), m2 = mx('difs'), m3 = mx('rot'), m4 = mx('dias');
+    list.forEach(function (x) { x.score = Math.round((x.ncCOP / m1 * 45 + x.difs / m2 * 25 + x.rot / m3 * 20 + Math.min(x.dias, 60) / Math.min(m4, 60) * 10)); var why = []; if (x.nc) why.push(x.nc + ' nota' + (x.nc > 1 ? 's' : '') + ' crédito'); if (x.difs) why.push(x.difs + ' diferencia' + (x.difs > 1 ? 's' : '')); if (x.dias >= 30) why.push(x.dias >= 90 ? 'sin conteo' : x.dias + ' días sin contar'); x.why = why; });
+    RANK = list.sort(function (a, b) { return b.score - a.score; });
+  }
+  buildRank();
+
+  /* ---------- selector, KPIs ---------- */
+  function fillSel() { $('#bodSel').innerHTML = bods().map(function (b) { return '<option value="' + b.id + '"' + (b.id === S.bod ? ' selected' : '') + '>' + esc(b.nombre) + '</option>'; }).join(''); }
+  $('#progBtn').innerHTML = UI.icon('calendar') + 'Programar conteo';
+  function stockRows() {
+    return A.inventario.filter(function (r) { return r.bodegaId === S.bod; }).map(function (r) {
+      var u = ubic(r.ubicacionId), p = prod(r.sku), st = p && p.stock[S.bod], tot = A.inventario.filter(function (x) { return x.bodegaId === S.bod && x.sku === r.sku; }).reduce(function (s, x) { return s + x.stockDisponible; }, 0);
+      return { key: r.ubicacionId, sku: r.sku, desc: r.descripcion, ub: r.ubicacionId, zona: r.ubicacionId[0], fisico: r.stockFisico, reservado: r.stockReservado, disponible: r.stockDisponible, estadoUb: u ? u.estado : 'Ocupada', bajoMin: !!(st && tot < st.minimo), minimo: st ? st.minimo : 0, unidad: p ? p.unidadBase : 'Unidad', valor: r.stockFisico * precio(r.sku), r: r, u: u };
+    });
+  }
+  function exactitudAvg(n) { var s = A.kpis.serie.slice(-n); return s.reduce(function (a, x) { return a + x.exactitudInvPct; }, 0) / s.length; }
+  function pendingCnt() { return CNT.filter(function (c) { return c.bodegaId === S.bod && (c.estado === 'Programado' || c.estado === 'En conteo'); }); }
+  function isLate(c) { return (c.estado === 'Programado' && c.fecha < HOY) || (c.estado === 'En conteo' && dayDiff(c.fecha) <= -3); }
+  function renderKpis() {
+    var rows = stockRows(), val = rows.reduce(function (s, r) { return s + r.valor; }, 0), skus = {}; rows.forEach(function (r) { skus[r.sku] = 1; });
+    var dif = DIFS.filter(function (d) { return d.bodegaId === S.bod && d.estado === 'Sin resolver'; }), dv = dif.reduce(function (s, d) { return s + d.valor; }, 0);
+    var pc = pendingCnt(), late = pc.filter(isLate).length, aj = AJ.filter(function (a) { return a.bodegaId === S.bod && a.estado === 'Pendiente de aprobación'; });
+    var ser = A.kpis.serie.map(function (x) { return x.exactitudInvPct; }), cur = exactitudAvg(15), prev = A.kpis.serie.slice(0, 15).reduce(function (a, x) { return a + x.exactitudInvPct; }, 0) / 15;
+    $('#kpiRow').innerHTML =
+      UI.kpi({ id: 'exac', label: 'Exactitud · 30 días', icon: 'target', valueHtml: F.num(exactitudAvg(30), 1) + '<small>%</small>', delta: { v: Math.abs(cur - prev) < 0.05 ? 0 : cur - prev, unit: ' pts', better: 'up' }, spark: ser.slice(-14), sparkColor: 'var(--green)', onClick: true }) +
+      UI.kpi({ id: 'valor', label: 'Valor del inventario', icon: 'layers', valueHtml: F.num(val / 1e6, 0) + '<small>M COP</small>', note: Object.keys(skus).length + ' SKU en ' + rows.length + ' ubicaciones', onClick: true }) +
+      UI.kpi({ id: 'dif', label: 'Diferencias sin resolver', icon: 'alert-triangle', value: dif.length, note: F.cop(dv) + ' en juego', onClick: true }) +
+      UI.kpi({ id: 'cnt', label: 'Conteos pendientes', icon: 'scan', value: pc.length, note: late ? late + ' atrasado' + (late > 1 ? 's' : '') : 'Al día', onClick: true }) +
+      UI.kpi({ id: 'aj', label: 'Ajustes por aprobar', icon: 'clipboard-check', value: aj.length, note: aj.length ? F.cop(aj.reduce(function (s, a) { return s + a.valor; }, 0)) : 'Sin pendientes', onClick: true });
+    $('#cDif').textContent = dif.length; $('#cCnt').textContent = pc.length; $('#cAj').textContent = aj.length;
+    $('#phDesc').innerHTML = '<strong>' + esc(bodName(S.bod)) + '</strong> · ' + rows.length + ' ubicaciones con stock. El stock del sistema se compara contra cada conteo físico.';
+  }
+  $('#kpiRow').addEventListener('click', function (e) { var k = e.target.closest('[data-kpi]'); if (!k) return; var m = { exac: 'pnEx', valor: 'pnStock', dif: 'pnDif', cnt: 'pnCnt', aj: 'pnAj' }; tabsApi.select(m[k.dataset.kpi]); });
+
+  /* ---------- Stock por ubicación (HU-212) ---------- */
+  var stockTbl = UI.table($('#stockTable'), {
+    rows: [], pageSize: 12, rowKey: 'key', caption: 'Stock por ubicación', emptyText: 'No hay stock que coincida con los filtros.',
+    searchable: { placeholder: 'Buscar por SKU, descripción o ubicación' }, searchKeys: ['sku', 'desc', 'ub'],
+    filters: [
+      { key: 'zona', label: 'Zona', all: 'Todas las zonas', options: 'auto' },
+      { key: 'cob', label: 'Situación', all: 'Toda situación', options: ['Con reservas', 'Bajo mínimo', 'En conteo', 'Bloqueada'], match: function (r, v) { return v === 'Con reservas' ? r.reservado > 0 : v === 'Bajo mínimo' ? r.bajoMin : v === 'En conteo' ? r.estadoUb === 'En conteo' : r.estadoUb === 'Bloqueada'; } }
+    ],
+    columns: [
+      { key: 'sku', label: 'SKU', title: true, render: function (r) { return '<span class="mono strong">' + r.sku + '</span><div class="cell-sub truncate" style="max-width:300px">' + esc(r.desc) + '</div>'; } },
+      { key: 'ub', label: 'Ubicación', render: function (r) { return '<a class="mono link" href="bodegas.html?bodega=' + r.r.bodegaId + '&ubicacion=' + encodeURIComponent(r.ub) + '" onclick="event.stopPropagation()">' + r.ub + '</a>'; } },
+      { key: 'fisico', label: 'Físico', num: true, render: function (r) { return F.num(r.fisico); } },
+      { key: 'reservado', label: 'Reservado', num: true, render: function (r) { return r.reservado ? F.num(r.reservado) : '<span class="subtle">0</span>'; } },
+      { key: 'disponible', label: 'Disponible', num: true, render: function (r) { return '<strong>' + F.num(r.disponible) + '</strong>'; } },
+      { key: 'cobertura', label: 'Reservado del físico', hideMobile: true, value: function (r) { return r.fisico ? r.reservado / r.fisico : 0; }, render: function (r) { return '<div style="min-width:110px">' + UI.meter(r.reservado, r.fisico, { level: 'info', label: 'Reservado de ' + r.ub }) + '</div>'; } },
+      { key: 'estadoUb', label: 'Situación', render: function (r) { return (r.estadoUb !== 'Ocupada' ? UI.chip(r.estadoUb, { tone: r.estadoUb === 'Bloqueada' ? 'danger' : 'warning' }) + ' ' : '') + (r.bajoMin ? UI.chip('Bajo mínimo', { tone: 'warning', noDot: true }) : (r.estadoUb === 'Ocupada' ? '<span class="subtle">Normal</span>' : '')); } }
+    ],
+    onRowClick: function (r) { stockDrawer(r); },
+    actions: function (r) { return [{ label: 'Ver detalle', icon: 'eye', onClick: function () { stockDrawer(r); } }, { label: 'Programar conteo', icon: 'calendar', onClick: function () { progModal({ sku: r.sku, ub: r.ub }); } }, { label: 'Ver en el plano', icon: 'map-pin', href: 'bodegas.html?bodega=' + r.r.bodegaId + '&ubicacion=' + encodeURIComponent(r.ub) }]; }
+  });
+  function renderStock() {
+    var rows = stockRows(), empty = $('#stockEmpty');
+    $('#stockTable').hidden = !rows.length;
+    if (!rows.length) { $('#stockStats').innerHTML = ''; empty.innerHTML = '<div class="card">' + UI.empty({ icon: 'inbox', title: bodName(S.bod) + ' no tiene inventario por ubicación', text: 'Cuando se reciba mercancía y se asigne a ubicaciones del plano, el stock aparecerá aquí.', action: { label: 'Ir a bodegas', id: 'go-bod' } }) + '</div>'; var b = $('[data-empty-action]', empty); if (b) b.onclick = function () { location.href = 'bodegas.html?bodega=' + S.bod; }; return; }
+    empty.innerHTML = '';
+    var val = rows.reduce(function (s, r) { return s + r.valor; }, 0), rs = rows.filter(function (r) { return r.reservado > 0; }).length, bm = {}; rows.filter(function (r) { return r.bajoMin; }).forEach(function (r) { bm[r.sku] = 1; });
+    $('#stockStats').innerHTML = [[rows.length, 'Ubicaciones con stock'], [Object.keys(bm).length, 'SKU bajo el mínimo'], [rs, 'Ubicaciones con reservas'], [F.num(val / 1e6, 1) + ' M', 'Valor del inventario (COP)']].map(function (x) { return '<div class="mini-stat"><div class="v">' + x[0] + '</div><div class="l">' + x[1] + '</div></div>'; }).join('');
+    stockTbl.setRows(rows);
+  }
+  function stockDrawer(r) {
+    var u = r.u, p = prod(r.sku), d = DIFS.filter(function (x) { return x.bodegaId === S.bod && x.ubicacionId === r.ub && (x.estado === 'Sin resolver' || x.estado === 'Ajuste solicitado'); })[0], pend = CNT.filter(function (c) { return c.bodegaId === S.bod && c.ubicacionId === r.ub && (c.estado === 'Programado' || c.estado === 'En conteo'); })[0];
+    UI.drawer({ title: r.sku, subtitle: r.desc, width: 500,
+      body: '<div class="stack-lg">' + (d ? UI.banner({ tone: 'warning', title: 'Diferencia abierta', text: 'El último conteo difiere del sistema en ' + sgn(d.dif) + ' unidades (' + F.cop(d.valor) + ').' }) : '') +
+        '<div class="grid c2 gap-3"><div class="mini-stat"><div class="v">' + F.num(r.fisico) + '</div><div class="l">Físico en sistema</div></div><div class="mini-stat"><div class="v">' + F.num(r.disponible) + '</div><div class="l">Disponible</div></div></div>' +
+        '<section><h3 class="mb-2">Reservas sobre esta ubicación</h3>' + UI.meter(r.reservado, r.fisico, { level: 'info', size: 'lg', label: 'Reservado', text: F.num(r.reservado) + ' de ' + F.num(r.fisico) }) + '</section>' +
+        UI.kv([['Ubicación', '<a class="mono link" href="bodegas.html?bodega=' + S.bod + '&ubicacion=' + encodeURIComponent(r.ub) + '">' + r.ub + '</a> ' + (u ? UI.chip(u.estado, { tone: u.estado === 'Bloqueada' ? 'danger' : u.estado === 'En conteo' ? 'warning' : 'info' }) : '')], ['Bodega', esc(bodName(S.bod))], ['Familia', esc(p ? p.familia : '')], ['Unidad base', esc(r.unidad)], ['Mínimo de la bodega', F.num(r.minimo) + (r.bajoMin ? ' · ' + UI.chip('Bajo mínimo', { tone: 'warning', small: true }) : '')], ['Valor en inventario', F.cop(r.valor)], ['Último conteo', r.r.fechaConteo ? fechaTxt(r.r.fechaConteo) + (r.r.diferencia ? ' · diferencia ' + sgn(r.r.diferencia) : ' · sin diferencia') : 'Sin conteo reciente'], ['Conteo pendiente', pend ? '<span class="mono">' + pend.conteoId + '</span> · ' + fechaTxt(pend.fecha) : 'No hay']]) + '</div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Programar conteo', kind: 'secondary', onClick: function () { setTimeout(function () { progModal({ sku: r.sku, ub: r.ub }); }, 220); } }, d && !d.ajusteId ? { label: 'Solicitar ajuste', kind: 'primary', onClick: function () { setTimeout(function () { ajModal(d); }, 220); } } : { label: 'Ver en el plano', kind: 'primary', onClick: function () { location.href = 'bodegas.html?bodega=' + S.bod + '&ubicacion=' + encodeURIComponent(r.ub); } }] });
+  }
+
+  /* ---------- Diferencias (HU-213/216) ---------- */
+  var difTbl = UI.table($('#difTable'), {
+    rows: [], pageSize: 10, rowKey: 'id', caption: 'Diferencias físico versus sistema', emptyText: 'No hay diferencias con esos filtros.',
+    searchable: { placeholder: 'Buscar por SKU o ubicación' }, searchKeys: ['sku', 'desc', 'ubicacionId'],
+    filters: [{ key: 'estado', label: 'Estado', all: 'Todos los estados', options: ['Sin resolver', 'Ajuste solicitado', 'Conciliado', 'Ajustado'] }, { key: 'mag', label: 'Magnitud', all: 'Toda magnitud', options: ['Alta', 'Media', 'Baja'] }, { key: 'tipo', label: 'Sentido', all: 'Faltantes y sobrantes', options: ['Faltante', 'Sobrante'], match: function (r, v) { return v === 'Faltante' ? r.dif < 0 : r.dif > 0; } }],
+    sort: { key: 'valor', dir: 'desc' },
+    columns: [
+      { key: 'sku', label: 'SKU', title: true, render: function (r) { return '<span class="mono strong">' + r.sku + '</span><div class="cell-sub truncate" style="max-width:260px">' + esc(r.desc) + '</div>'; } },
+      { key: 'ubicacionId', label: 'Ubicación', mono: true },
+      { key: 'sistema', label: 'Sistema', num: true, render: function (r) { return F.num(r.sistema); } },
+      { key: 'conteo', label: 'Conteo', num: true, render: function (r) { return F.num(r.conteo); } },
+      { key: 'dif', label: 'Diferencia', num: true, render: function (r) { return difHtml(r.dif) + '<div class="cell-sub">' + F.num(r.pct, 1) + ' %</div>'; } },
+      { key: 'valor', label: 'Valor', num: true, render: function (r) { return F.cop(r.valor); } },
+      { key: 'mag', label: 'Magnitud', value: function (r) { return { Alta: 3, Media: 2, Baja: 1 }[r.mag]; }, render: function (r) { return UI.chip(r.mag, { tone: r.mag === 'Alta' ? 'danger' : r.mag === 'Media' ? 'warning' : 'neutral', noDot: true }); } },
+      { key: 'estado', label: 'Estado', render: function (r) { return UI.chip(r.estado, { tone: r.estado === 'Sin resolver' ? 'danger' : r.estado === 'Ajuste solicitado' ? 'warning' : 'success' }); } }
+    ],
+    onRowClick: function (r) { difDrawer(r); },
+    actions: function (r) { return [{ label: 'Ver detalle', icon: 'eye', onClick: function () { difDrawer(r); } }, { label: 'Solicitar reconteo', icon: 'scan', disabled: r.estado === 'Ajustado', onClick: function () { reconteo(r); } }, { label: 'Solicitar ajuste', icon: 'clipboard-check', disabled: r.estado !== 'Sin resolver', onClick: function () { ajModal(r); } }, { sep: true }, { label: 'Ver en el plano', icon: 'map-pin', href: 'bodegas.html?bodega=' + r.bodegaId + '&ubicacion=' + encodeURIComponent(r.ubicacionId) }]; }
+  });
+  function renderDif() {
+    var L = DIFS.filter(function (d) { return d.bodegaId === S.bod; }), open = L.filter(function (d) { return d.estado === 'Sin resolver' || d.estado === 'Ajuste solicitado'; });
+    var falt = open.filter(function (d) { return d.dif < 0; }).reduce(function (s, d) { return s + d.valor; }, 0), sob = open.filter(function (d) { return d.dif > 0; }).reduce(function (s, d) { return s + d.valor; }, 0);
+    $('#difStats').innerHTML = [[open.length, 'Diferencias abiertas'], [F.cop(falt), 'Faltantes en valor'], [F.cop(sob), 'Sobrantes en valor'], [open.filter(function (d) { return d.mag === 'Alta'; }).length, 'De magnitud alta']].map(function (x) { return '<div class="mini-stat"><div class="v">' + x[0] + '</div><div class="l">' + x[1] + '</div></div>'; }).join('');
+    difTbl.setRows(L);
+  }
+  function reconteo(d) {
+    var ex = CNT.filter(function (c) { return c.bodegaId === d.bodegaId && c.ubicacionId === d.ubicacionId && (c.estado === 'Programado' || c.estado === 'En conteo'); })[0];
+    if (ex) { toast('Ya hay un conteo pendiente para ' + d.ubicacionId + ' (' + ex.conteoId + ', ' + fechaTxt(ex.fecha).toLowerCase() + ').', 'warning'); return; }
+    var c = addCnt({ bodegaId: d.bodegaId, ubicacionId: d.ubicacionId, sku: d.sku, fecha: HOY, tipo: 'Reconteo', operarioId: pickOp(d.bodegaId).operarioId });
+    toast('Reconteo ' + c.conteoId + ' programado para hoy en ' + d.ubicacionId + '.', 'success'); refreshAll();
+  }
+  function difDrawer(d) {
+    var aj = AJ.filter(function (a) { return a.id === d.ajusteId; })[0], cn = CNT.filter(function (c) { return c.conteoId === d.conteoId; })[0], u = ubic(d.ubicacionId, d.bodegaId);
+    var m = UI.drawer({ title: 'Diferencia en ' + d.ubicacionId, subtitleHtml: '<span class="mono">' + d.sku + '</span> · ' + esc(d.desc), width: 500,
+      body: '<div class="stack-lg"><div class="grid c3 gap-3"><div class="mini-stat"><div class="v">' + F.num(d.sistema) + '</div><div class="l">Sistema</div></div><div class="mini-stat"><div class="v">' + F.num(d.conteo) + '</div><div class="l">Conteo físico</div></div><div class="mini-stat"><div class="v ' + (d.dif < 0 ? 'dif-neg' : 'dif-pos') + '">' + sgn(d.dif) + '</div><div class="l">Diferencia</div></div></div>' +
+        UI.kv([['Magnitud', UI.chip(d.mag, { tone: d.mag === 'Alta' ? 'danger' : d.mag === 'Media' ? 'warning' : 'neutral', noDot: true }) + ' · ' + F.num(d.pct, 1) + ' % del stock'], ['Valor de la diferencia', F.cop(d.valor)], ['Causa probable', esc(d.causa)], ['Fecha del conteo', d.fecha ? F.fecha(d.fecha) : '—'], ['Conteo de origen', d.conteoId ? '<span class="mono">' + d.conteoId + '</span>' : 'Conteo histórico'], ['Estado', UI.chip(d.estado, { tone: d.estado === 'Sin resolver' ? 'danger' : d.estado === 'Ajuste solicitado' ? 'warning' : 'success' })], ['Ajuste', aj ? '<span class="mono">' + aj.id + '</span> · ' + esc(aj.estado) : 'Sin solicitar']]) +
+        (d.estado === 'Sin resolver' ? UI.banner({ tone: d.valor > LIM ? 'warning' : 'info', title: d.valor > LIM ? 'Requiere aprobación de Jefe de logística' : 'Puede aprobarlo el Jefe de bodega', text: 'Los ajustes de más de ' + F.cop(LIM) + ' los aprueba el Jefe de logística. Antes de ajustar, confirma con un reconteo.' }) : '') + '</div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Solicitar reconteo', kind: 'secondary', onClick: function () { reconteo(d); } }, d.estado === 'Sin resolver' ? { label: 'Solicitar ajuste', kind: 'primary', onClick: function () { setTimeout(function () { ajModal(d); }, 220); } } : { label: 'Ver ajustes', kind: 'primary', onClick: function () { tabsApi.select('pnAj'); } }] });
+  }
+
+  /* ---------- Conteos cíclicos (HU-214/215) ---------- */
+  function pickOp(b) { var o = A.operarios.filter(function (x) { return x.bodegaId === b; }); return o[CNT.length % o.length] || A.operarios[0]; }
+  function addCnt(o) {
+    var r = invOf(o.ubicacionId, o.bodegaId), p = prod(o.sku), c = Object.assign({ conteoId: 'CNT-' + A.ymd(0).slice(2, 4) + A.ymd(0).slice(5, 7) + '-' + String(++cntN).padStart(3, '0'), descripcion: p.descripcion, stockSistema: r ? r.stockFisico : 0, sistema: r ? r.stockFisico : 0, conteo: null, diferencia: null, estado: 'Programado', causaProbable: null }, o); CNT.unshift(c); return c;
+  }
+  var cntTbl = UI.table($('#cntTable'), {
+    rows: [], pageSize: 8, rowKey: 'conteoId', caption: 'Conteos cíclicos', emptyText: 'No hay conteos para ese día o filtro.',
+    searchable: { placeholder: 'Buscar por conteo, SKU o ubicación' }, searchKeys: ['conteoId', 'sku', 'descripcion', 'ubicacionId'],
+    filters: [{ key: 'estado', label: 'Estado', all: 'Todos los estados', options: ['Programado', 'En conteo', 'Con diferencia', 'Conciliado', 'Ajustado'] }, { key: 'tipo', label: 'Tipo', all: 'Todos los tipos', options: ['Cíclico ABC', 'Cíclico por ubicación', 'Reconteo'] }],
+    sort: { key: 'fecha', dir: 'desc' },
+    columns: [
+      { key: 'conteoId', label: 'Conteo', mono: true, title: true, render: function (c) { return '<span class="mono strong">' + c.conteoId + '</span><div class="cell-sub">' + esc(c.tipo) + '</div>'; } },
+      { key: 'sku', label: 'SKU', render: function (c) { return '<span class="mono">' + c.sku + '</span><div class="cell-sub truncate" style="max-width:220px">' + esc(c.descripcion) + '</div>'; } },
+      { key: 'ubicacionId', label: 'Ubicación', mono: true },
+      { key: 'fecha', label: 'Fecha', render: function (c) { return '<span class="nowrap">' + fechaTxt(c.fecha) + '</span>' + (isLate(c) ? ' ' + UI.chip('Atrasado', { tone: 'warning', small: true, noDot: true }) : ''); } },
+      { key: 'operarioId', label: 'Operario', hideMobile: true, render: function (c) { var o = A.operarios.filter(function (x) { return x.operarioId === c.operarioId; })[0]; return esc(o ? o.nombre : '—'); } },
+      { key: 'diferencia', label: 'Resultado', num: true, render: function (c) { return c.conteo == null ? '<span class="subtle">A ciegas</span>' : F.num(c.conteo) + ' · ' + difHtml(c.diferencia || 0); } },
+      { key: 'estado', label: 'Estado', render: function (c) { return UI.chip(c.estado); } }
+    ],
+    onRowClick: function (c) { cntDrawer(c); },
+    actions: function (c) { var open = c.estado === 'Programado' || c.estado === 'En conteo'; return [{ label: 'Registrar conteo', icon: 'scan', disabled: !open, onClick: function () { countModal(c); } }, { label: 'Iniciar conteo', icon: 'play', disabled: c.estado !== 'Programado', onClick: function () { startCount(c); } }, { label: 'Ver detalle', icon: 'eye', onClick: function () { cntDrawer(c); } }]; }
+  });
+  function startCount(c) { var u = ubic(c.ubicacionId, c.bodegaId); c.estado = 'En conteo'; if (u && u.estado !== 'Bloqueada') u.estado = 'En conteo'; toast('Conteo ' + c.conteoId + ' iniciado. ' + c.ubicacionId + ' queda sin movimientos hasta cerrarlo.', 'info'); refreshAll(); }
+  function renderCnt() {
+    var rows = CNT.filter(function (c) { return c.bodegaId === S.bod; }); cntTbl.setRows(S.day ? rows.filter(function (c) { return c.fecha === S.day; }) : rows);
+    var days = []; for (var i = 0; i < 14; i++) { var d = new Date(A.hoy.getTime() + i * DAY), y = A.ymd(i); days.push({ y: y, wd: d.toLocaleDateString('es-CO', { weekday: 'short' }).replace('.', ''), n: d.getDate(), items: rows.filter(function (c) { return c.fecha === y && (c.estado === 'Programado' || c.estado === 'En conteo'); }) }); }
+    var late = rows.filter(isLate).length;
+    var pend = rows.filter(function (c) { return c.estado === 'Programado' || c.estado === 'En conteo'; }); $('#calStats').innerHTML = [[pend.filter(function (c) { return c.fecha === HOY; }).length, 'Para hoy'], [pend.filter(function (c) { return c.fecha > HOY && c.fecha <= A.ymd(7); }).length, 'Próximos 7 días'], [rows.filter(function (c) { return c.estado === 'Conciliado' || c.estado === 'Ajustado' || c.estado === 'Con diferencia'; }).length, 'Contados recientemente']].map(function (x) { return '<div class="mini-stat"><div class="v">' + x[0] + '</div><div class="l">' + x[1] + '</div></div>'; }).join('');
+    $('#calLate').hidden = !late; $('#calLateN').textContent = late; $('#calLate').setAttribute('aria-pressed', S.day === 'late');
+    $('#calStrip').innerHTML = days.map(function (d) { return '<button type="button" class="cal-day' + (d.y === HOY ? ' is-today' : '') + '" data-d="' + d.y + '" aria-pressed="' + (S.day === d.y) + '" aria-label="' + d.n + ', ' + d.items.length + ' conteos"><span class="wd">' + d.wd + '</span><span class="dn">' + d.n + '</span><span class="dots">' + d.items.map(function () { return '<i></i>'; }).slice(0, 4).join('') + '</span></button>'; }).join('');
+    if (S.day === 'late') cntTbl.setRows(rows.filter(isLate));
+    var crit = RANK.filter(function (x) { return !pendingCnt().some(function (c) { return c.sku === x.sku; }); }).slice(0, 5);
+    $('#critList').innerHTML = crit.map(function (x, i) { return '<div class="crit-row"><div class="row nowrap gap-3" style="min-width:0"><span class="rank-n">' + (i + 1) + '</span><div style="min-width:0"><div class="truncate"><span class="mono strong">' + x.sku + '</span> ' + esc(x.desc) + '</div><div class="muted t-12 truncate">' + (x.why.length ? esc(x.why.join(' · ')) : 'Rotación alta') + ' · puntaje ' + x.score + '</div></div></div><button type="button" class="btn btn-secondary btn-sm" data-prog="' + x.sku + '">Programar</button></div>'; }).join('') || '<p class="muted t-13">Todos los SKU críticos ya tienen conteo pendiente.</p>';
+  }
+  $('#calStrip').addEventListener('click', function (e) { var b = e.target.closest('.cal-day'); if (!b) return; var v = b.dataset.late ? 'late' : b.dataset.d; S.day = S.day === v ? null : v; renderCnt(); });
+  $('#calLate').addEventListener('click', function () { S.day = S.day === 'late' ? null : 'late'; renderCnt(); });
+  $('#calAll').addEventListener('click', function () { S.day = null; renderCnt(); });
+  $('#critList').addEventListener('click', function (e) { var b = e.target.closest('[data-prog]'); if (b) progModal({ sku: b.dataset.prog }); });
+  function cntDrawer(c) {
+    var o = A.operarios.filter(function (x) { return x.operarioId === c.operarioId; })[0], open = c.estado === 'Programado' || c.estado === 'En conteo', fin = c.conteo != null;
+    var steps = [{ state: 'done', title: 'Conteo programado', meta: c.tipo + ' · ' + fechaTxt(c.fecha) }, { state: c.estado === 'Programado' ? 'current' : 'done', title: 'Conteo en bodega', meta: o ? o.nombre : '' }, { state: fin ? 'done' : 'pending', title: fin ? (c.diferencia ? 'Diferencia de ' + sgn(c.diferencia) + ' detectada' : 'Sin diferencia') : 'Resultado pendiente', meta: fin ? 'Conteo ' + F.num(c.conteo) + ' vs. sistema ' + F.num(c.sistema) : 'El stock del sistema se muestra al registrar' }, { state: c.estado === 'Ajustado' || c.estado === 'Conciliado' ? 'done' : 'pending', title: c.estado === 'Ajustado' ? 'Ajuste registrado' : 'Conciliación', meta: c.causaProbable || '' }];
+    UI.drawer({ title: c.conteoId, subtitleHtml: '<span class="mono">' + c.sku + '</span> · ' + esc(c.descripcion), width: 480,
+      body: '<div class="stack-lg"><div class="row gap-2">' + UI.chip(c.estado) + (isLate(c) ? UI.chip('Atrasado', { tone: 'warning', noDot: true }) : '') + '</div>' + UI.kv([['Ubicación', '<a class="mono link" href="bodegas.html?bodega=' + c.bodegaId + '&ubicacion=' + encodeURIComponent(c.ubicacionId) + '">' + c.ubicacionId + '</a>'], ['Fecha', fechaTxt(c.fecha)], ['Operario', esc(o ? o.nombre : '—')], ['Tipo', esc(c.tipo)], ['Stock del sistema', fin || !open ? F.num(c.sistema) : '<span class="muted">Oculto hasta registrar (conteo a ciegas)</span>'], ['Causa probable', c.causaProbable ? esc(c.causaProbable) : '']]) + '<section><h3 class="mb-3">Seguimiento</h3>' + UI.timeline(steps) + '</section></div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, open ? { label: 'Registrar conteo', kind: 'primary', icon: 'scan', onClick: function () { setTimeout(function () { countModal(c); }, 220); } } : { label: 'Ver diferencias', kind: 'primary', onClick: function () { tabsApi.select('pnDif'); } }] });
+  }
+
+  /* programar conteo (HU-214) */
+  function progModal(pre) {
+    pre = pre || {}; var inv = A.inventario.filter(function (r) { return r.bodegaId === S.bod; });
+    if (!inv.length) { toast(bodName(S.bod) + ' no tiene inventario para contar.', 'info'); return; }
+    var crit = RANK.slice(0, 8).filter(function (x) { return inv.some(function (r) { return r.sku === x.sku; }); }), critIds = crit.map(function (x) { return x.sku; });
+    var others = A.productos.filter(function (p) { return critIds.indexOf(p.skuSAP) < 0 && inv.some(function (r) { return r.sku === p.skuSAP; }); });
+    var ops = A.operarios.filter(function (o) { return o.bodegaId === S.bod; });
+    var m = UI.modal({ title: 'Programar conteo cíclico', subtitle: bodName(S.bod), width: 560,
+      body: '<div class="form-grid c2"><div class="field span-2"><label class="label" for="pgS">SKU</label><select class="select" id="pgS"><option value="">Selecciona un SKU</option><optgroup label="SKU críticos sugeridos">' + crit.map(function (x) { return '<option value="' + x.sku + '"' + (pre.sku === x.sku ? ' selected' : '') + '>' + x.sku + ' · ' + esc(x.desc) + ' (puntaje ' + x.score + ')</option>'; }).join('') + '</optgroup><optgroup label="Otros SKU">' + others.map(function (p) { return '<option value="' + p.skuSAP + '"' + (pre.sku === p.skuSAP ? ' selected' : '') + '>' + p.skuSAP + ' · ' + esc(p.descripcion) + '</option>'; }).join('') + '</optgroup></select><span class="hint" id="pgSH"></span><span class="error-text" id="pgSE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="pgU">Ubicación</label><select class="select" id="pgU"></select><span class="error-text" id="pgUE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="pgD">Fecha</label><input class="input" id="pgD" type="date" min="' + HOY + '" value="' + HOY + '"><span class="error-text" id="pgDE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="pgO">Operario</label><select class="select" id="pgO">' + ops.map(function (o) { return '<option value="' + o.operarioId + '">' + esc(o.nombre) + ' · ' + o.turno.toLowerCase() + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label class="label" for="pgT">Tipo</label><select class="select" id="pgT"><option>Cíclico ABC</option><option>Cíclico por ubicación</option><option>Reconteo</option></select></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Programar conteo', kind: 'primary', onClick: function (api) {
+        var B = api.body, ok = true, sku = $('#pgS', B).value, ub = $('#pgU', B).value, dt = $('#pgD', B).value;
+        ok = setErr(B, 'pgS', sku ? '' : 'Selecciona el SKU que se va a contar.') && ok;
+        ok = setErr(B, 'pgU', !sku || ub ? '' : 'Selecciona la ubicación.') && ok;
+        var dup = CNT.filter(function (c) { return c.bodegaId === S.bod && c.ubicacionId === ub && (c.estado === 'Programado' || c.estado === 'En conteo'); })[0];
+        ok = setErr(B, 'pgD', !dt ? 'Elige la fecha del conteo.' : dt < HOY ? 'La fecha no puede ser anterior a hoy.' : dup ? 'Ya hay un conteo pendiente en ' + ub + ' (' + dup.conteoId + ', ' + fechaTxt(dup.fecha).toLowerCase() + ').' : '') && ok;
+        if (!ok) return false;
+        var c = addCnt({ bodegaId: S.bod, ubicacionId: ub, sku: sku, fecha: dt, tipo: $('#pgT', B).value, operarioId: $('#pgO', B).value });
+        toast('Conteo ' + c.conteoId + ' programado para ' + fechaTxt(dt).toLowerCase() + ' en ' + ub + '.', 'success'); refreshAll(); tabsApi.select('pnCnt');
+      } }] });
+    var B = m.body, sSel = $('#pgS', B), uSel = $('#pgU', B);
+    function loadU() { var sku = sSel.value, rows = inv.filter(function (r) { return r.sku === sku; }), x = RANK.filter(function (r) { return r.sku === sku; })[0]; uSel.innerHTML = rows.length ? rows.map(function (r) { return '<option value="' + r.ubicacionId + '"' + (pre.ub === r.ubicacionId ? ' selected' : '') + '>' + r.ubicacionId + '</option>'; }).join('') : '<option value="">—</option>'; $('#pgSH', B).textContent = x && x.why.length ? 'Crítico: ' + x.why.join(', ') + '.' : ''; if (rows.length > 1) $('#pgSH', B).textContent += ' Tiene ' + rows.length + ' ubicaciones; cuenta una por conteo.'; }
+    sSel.addEventListener('change', function () { setErr(B, 'pgS', ''); loadU(); }); uSel.addEventListener('change', function () { setErr(B, 'pgU', ''); }); loadU();
+  }
+  $('#progBtn').addEventListener('click', function () { progModal(); });
+
+  /* registrar conteo con teclado numérico (HU-215) */
+  function countModal(c) {
+    var p = prod(c.sku), r = invOf(c.ubicacionId, c.bodegaId), stage = 0, sist = r ? r.stockFisico : c.sistema;
+    var m = UI.modal({ title: 'Registrar conteo', subtitleHtml: '<span class="mono">' + c.ubicacionId + '</span> · ' + esc(c.descripcion), width: 420,
+      body: '<div class="stack"><div class="blind-note">' + UI.icon('eye', 'icon-sm') + 'Conteo a ciegas: el stock del sistema se muestra al confirmar.</div>' +
+        '<div class="field"><label class="label" for="npIn">Cantidad contada (' + esc(p ? p.unidadBase.toLowerCase() + 's' : 'unidades') + ')</label><input class="np-display" id="npIn" inputmode="numeric" autocomplete="off" placeholder="0" aria-describedby="npInE"><span class="error-text" id="npInE" hidden></span></div>' +
+        '<div class="np-grid" id="npGrid">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(function (n) { return '<button type="button" data-k="' + n + '" aria-label="' + n + '">' + n + '</button>'; }).join('') + '<button type="button" class="fn" data-k="C" aria-label="Borrar todo">Borrar</button><button type="button" data-k="0" aria-label="0">0</button><button type="button" class="fn" data-k="B" aria-label="Retroceso">⌫</button></div>' +
+        '<div id="npRes" hidden></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Confirmar conteo', kind: 'primary', id: 'npOk', onClick: function (api) { return confirmCount(api); } }] });
+    var B = m.body, inp = $('#npIn', B);
+    $('#npGrid', B).addEventListener('click', function (e) { var k = e.target.closest('[data-k]'); if (!k || stage) return; var v = inp.value.replace(/\D/g, ''); if (k.dataset.k === 'C') v = ''; else if (k.dataset.k === 'B') v = v.slice(0, -1); else if (v.length < 7) v += k.dataset.k; inp.value = v; setErr(B, 'npIn', ''); inp.focus(); });
+    inp.addEventListener('input', function () { inp.value = inp.value.replace(/\D/g, '').slice(0, 7); setErr(B, 'npIn', ''); });
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('#npOk').click(); } });
+    function confirmCount(api) {
+      var v = inp.value; if (v === '') { setErr(B, 'npIn', 'Ingresa la cantidad contada; si no hay unidades, escribe 0.'); return false; }
+      var n = +v, dif = n - sist;
+      if (stage === 0) {
+        if (dif === 0) return finish(api, n, dif, null);
+        stage = 1; inp.readOnly = true; $('#npGrid', B).style.display = 'none'; var pc = sist ? Math.abs(dif) / sist * 100 : 0;
+        $('#npRes', B).hidden = false; $('#npRes', B).innerHTML = UI.banner({ tone: 'warning', title: 'Diferencia de ' + sgn(dif) + ' (' + F.num(pc, 1) + ' %)', text: 'El sistema tiene ' + F.num(sist) + '. Equivale a ' + F.cop(Math.abs(dif) * precio(c.sku)) + '. Revisa el conteo o selecciona la causa probable para registrarlo.' }) + '<div class="field mt-3"><label class="label" for="npC">Causa probable</label><select class="select" id="npC"><option value="">Selecciona una causa</option>' + CAUSAS.map(function (x) { return '<option>' + x + '</option>'; }).join('') + '</select><span class="error-text" id="npCE" hidden></span></div>';
+        $('#npOk').textContent = 'Registrar con diferencia'; var again = document.createElement('button'); again.type = 'button'; again.className = 'btn btn-ghost btn-sm'; again.textContent = 'Corregir cantidad'; again.id = 'npBack'; $('#npRes', B).appendChild(again); again.onclick = function () { stage = 0; inp.readOnly = false; $('#npGrid', B).style.display = ''; $('#npRes', B).hidden = true; $('#npRes', B).innerHTML = ''; $('#npOk').textContent = 'Confirmar conteo'; inp.focus(); };
+        return false;
+      }
+      var cs = $('#npC', B).value; if (!cs) { setErr(B, 'npC', 'Selecciona la causa probable para registrar la diferencia.'); return false; }
+      return finish(api, n, dif, cs);
+    }
+    function finish(api, n, dif, causa) {
+      var u = ubic(c.ubicacionId, c.bodegaId); c.conteo = n; c.sistema = sist; c.stockSistema = sist; c.diferencia = dif; c.causaProbable = causa; c.estado = dif ? 'Con diferencia' : 'Conciliado';
+      if (u && u.estado === 'En conteo') u.estado = u.sku ? 'Ocupada' : 'Disponible'; if (r) { r.conteo = n; r.diferencia = dif; r.fechaConteo = HOY; }
+      if (dif) { var d = mkDif({ bodegaId: c.bodegaId, ubicacionId: c.ubicacionId, sku: c.sku, sistema: sist, conteo: n, dif: dif, fecha: HOY, causa: causa, estado: 'Sin resolver', conteoId: c.conteoId }); toast('Conteo registrado con diferencia de ' + sgn(dif) + '. Quedó en Diferencias para resolver.', 'warning'); }
+      else toast('Conteo registrado: ' + F.num(n) + ' unidades, sin diferencia. Exactitud del 100 % en ' + c.ubicacionId + '.', 'success');
+      refreshAll();
+    }
+  }
+
+  /* ---------- Ajustes con aprobación (HU-217/218) ---------- */
+  var ajTbl = UI.table($('#ajTable'), {
+    rows: [], pageSize: 8, rowKey: 'id', caption: 'Solicitudes de ajuste de inventario', emptyText: 'No hay solicitudes de ajuste.', toolbar: '<span class="grow"></span><button type="button" class="btn btn-secondary btn-sm" id="newAj">Solicitar ajuste</button>',
+    searchable: { placeholder: 'Buscar por ajuste, SKU o ubicación' }, searchKeys: ['id', 'sku', 'desc', 'ubicacionId'],
+    filters: [{ key: 'estado', label: 'Estado', all: 'Todos los estados', options: ['Pendiente de aprobación', 'Aprobado', 'Rechazado', 'Registrado'] }], sort: { key: 'fecha', dir: 'desc' },
+    columns: [
+      { key: 'id', label: 'Ajuste', mono: true, title: true, render: function (a) { return '<span class="mono strong">' + a.id + '</span><div class="cell-sub">' + F.relativo(a.fecha) + '</div>'; } },
+      { key: 'sku', label: 'SKU y ubicación', render: function (a) { return '<span class="mono">' + a.sku + '</span> · <span class="mono">' + a.ubicacionId + '</span><div class="cell-sub truncate" style="max-width:260px">' + esc(a.desc) + '</div>'; } },
+      { key: 'dif', label: 'Ajuste', num: true, render: function (a) { return difHtml(a.dif) + '<div class="cell-sub">' + F.cop(a.valor) + '</div>'; } },
+      { key: 'causa', label: 'Causa', hideMobile: true },
+      { key: 'sol', label: 'Solicitó', hideMobile: true, value: function (a) { return a.sol.nombre; }, render: function (a) { return esc(a.sol.nombre) + '<div class="cell-sub">' + esc(a.sol.rol) + '</div>'; } },
+      { key: 'estado', label: 'Estado', render: function (a) { return UI.chip(a.estado, { tone: a.estado === 'Pendiente de aprobación' ? 'warning' : a.estado === 'Rechazado' ? 'danger' : 'success' }); } }
+    ],
+    onRowClick: function (a) { ajDrawer(a); }
+  });
+  function needRole(a) { return a.valor > LIM ? 'Jefe de logística' : 'Jefe de bodega o Jefe de logística'; }
+  function renderAj() {
+    var L = AJ.filter(function (a) { return a.bodegaId === S.bod; }); ajTbl.setRows(L);
+    var ac = actor(); $('#actorWho').innerHTML = UI.avatar(ac.nombre, { size: 'sm' }) + '<span><strong>' + esc(ac.nombre) + '</strong> · ' + esc(ac.rol) + '</span>';
+    $('#actorSeg').innerHTML = ACTORS.map(function (a, i) { return '<button type="button" data-a="' + i + '" aria-pressed="' + (i === S.actor) + '">' + esc(a.rol) + '</button>'; }).join('');
+    $('#actorRule').textContent = ac.limite === Infinity ? 'Puede aprobar ajustes de cualquier valor.' : ac.limite ? 'Puede aprobar ajustes hasta ' + F.cop(ac.limite) + '.' : 'Solicita ajustes; no puede aprobarlos.';
+    var nb = $('#newAj'); if (nb) nb.onclick = function () { ajModal(); };
+  }
+  $('#actorSeg').addEventListener('click', function (e) { var b = e.target.closest('[data-a]'); if (!b) return; S.actor = +b.dataset.a; renderAj(); toast('Ahora actúas como ' + actor().rol + '.', 'info', { duration: 2200 }); });
+  function canApprove(a) { var ac = actor(); if (a.sol.id === ac.id) return 'No puedes aprobar un ajuste que tú mismo solicitaste.'; if (!ac.limite) return 'El rol ' + ac.rol + ' no puede aprobar ajustes.'; if (a.valor > ac.limite) return 'Este ajuste (' + F.cop(a.valor) + ') supera tu límite de ' + F.cop(ac.limite) + '. Requiere Jefe de logística.'; return ''; }
+  function ajDrawer(a) {
+    var refresh = function () { api.setBody(body()); }, api;
+    function body() {
+      var why = a.estado === 'Pendiente de aprobación' ? canApprove(a) : '';
+      return '<div class="stack-lg"><div class="row gap-2">' + UI.chip(a.estado, { tone: a.estado === 'Pendiente de aprobación' ? 'warning' : a.estado === 'Rechazado' ? 'danger' : 'success' }) + '<span class="tag">' + (a.valor > LIM ? 'Aprueba Jefe de logística' : 'Aprueba Jefe de bodega') + '</span></div>' +
+        '<div class="grid c3 gap-3"><div class="mini-stat"><div class="v">' + F.num(a.sistema) + '</div><div class="l">Sistema</div></div><div class="mini-stat"><div class="v">' + F.num(a.conteo) + '</div><div class="l">Conteo físico</div></div><div class="mini-stat"><div class="v ' + (a.dif < 0 ? 'dif-neg' : 'dif-pos') + '">' + sgn(a.dif) + '</div><div class="l">Ajuste</div></div></div>' +
+        UI.kv([['SKU', '<span class="mono">' + a.sku + '</span> · ' + esc(a.desc)], ['Ubicación', '<a class="mono link" href="bodegas.html?bodega=' + a.bodegaId + '&ubicacion=' + encodeURIComponent(a.ubicacionId) + '">' + a.ubicacionId + '</a>'], ['Valor del ajuste', F.cop(a.valor)], ['Causa', esc(a.causa)], ['Solicitó', esc(a.sol.nombre) + ' · ' + esc(a.sol.rol)], ['Justificación', esc(a.just || '—')], ['Quién puede aprobar', needRole(a)]]) +
+        (why ? UI.banner({ tone: 'warning', title: 'No puedes aprobar este ajuste', text: why }) : '') + (a.estado === 'Aprobado' ? UI.banner({ tone: 'info', title: 'Aprobado: falta registrarlo', text: 'Al registrar el ajuste el stock del sistema pasa a ' + F.num(a.conteo) + ' y el movimiento se envía a SAP.' }) : '') + (a.motivoRech ? UI.banner({ tone: 'danger', title: 'Motivo del rechazo', text: a.motivoRech }) : '') +
+        '<section><h3 class="mb-3">Trazabilidad</h3>' + UI.timeline(a.eventos.map(function (e) { return { state: e.tone, title: e.txt, meta: F.fechaHora(e.t) + ' · ' + e.who }; }).concat(a.estado === 'Pendiente de aprobación' ? [{ state: 'current', title: 'Pendiente de aprobación', meta: needRole(a) }] : a.estado === 'Aprobado' ? [{ state: 'current', title: 'Pendiente de registro en inventario', meta: 'Jefe de bodega o analista de inventarios' }] : [])) + '</section>' +
+        '<div class="row">' + (a.estado === 'Pendiente de aprobación' ? '<button type="button" class="btn btn-primary" data-x="ap"' + (why ? ' aria-disabled="true"' : '') + '>Aprobar ajuste</button><button type="button" class="btn btn-danger" data-x="re">Rechazar</button>' : a.estado === 'Aprobado' ? '<button type="button" class="btn btn-primary" data-x="rg">Registrar ajuste</button>' : '') + '</div></div>';
+    }
+    api = UI.drawer({ title: a.id, subtitle: 'Solicitud de ajuste de inventario', width: 520, body: body(), footer: [{ label: 'Cerrar', kind: 'secondary' }] });
+    api.body.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-x]'); if (!b) return; var x = b.dataset.x;
+      if (x === 'ap') { var w = canApprove(a); if (w) { toast(w, 'error'); return; } a.estado = 'Aprobado'; a.aprobador = actor(); a.eventos.push(ev(Date.now(), actor().nombre + ' · ' + actor().rol, 'Aprobó el ajuste')); toast('Ajuste ' + a.id + ' aprobado. Falta registrarlo en inventario.', 'success'); refreshAll(); refresh(); }
+      if (x === 're') rejectModal(a, refresh);
+      if (x === 'rg') { var ac = actor(); if (!ac.limite && ac.rol !== 'Analista de inventarios') return; registrar(a); refreshAll(); refresh(); }
+    });
+  }
+  function rejectModal(a, done) {
+    UI.modal({ title: 'Rechazar ajuste', subtitle: a.id, width: 460,
+      body: '<div class="field"><label class="label" for="rjM">Motivo del rechazo</label><textarea class="textarea" id="rjM" placeholder="Ej. Falta reconteo con segundo operario"></textarea><span class="error-text" id="rjME" hidden></span></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Rechazar ajuste', kind: 'danger', onClick: function (m) {
+        var v = $('#rjM', m.body).value.trim(); if (!setErr(m.body, 'rjM', v.length >= 8 ? '' : 'Explica el motivo (mínimo 8 caracteres) para que el solicitante pueda actuar.')) return false;
+        var ac = actor(); if (!ac.limite) { setErr(m.body, 'rjM', 'El rol ' + ac.rol + ' no puede rechazar ajustes.'); return false; }
+        a.estado = 'Rechazado'; a.motivoRech = v; a.eventos.push(ev(Date.now(), ac.nombre + ' · ' + ac.rol, 'Rechazó el ajuste: ' + v, 'error')); var d = DIFS.filter(function (x) { return x.id === a.difId; })[0]; if (d) d.estado = 'Sin resolver';
+        toast('Ajuste ' + a.id + ' rechazado. El solicitante recibió el motivo.', 'warning'); refreshAll(); if (done) done();
+      } }] });
+  }
+  function registrar(a) {
+    var r = invOf(a.ubicacionId, a.bodegaId), u = ubic(a.ubicacionId, a.bodegaId), p = prod(a.sku), d = DIFS.filter(function (x) { return x.id === a.difId; })[0];
+    if (r) { r.stockFisico = a.conteo; r.stockDisponible = r.stockFisico - r.stockReservado; r.diferencia = 0; r.conteo = a.conteo; r.fechaConteo = HOY; if (u && p) u.ocupacionM3 = Math.round(a.conteo * p.volumenM3 * 100) / 100; }
+    a.estado = 'Registrado'; a.eventos.push(ev(Date.now(), actor().nombre, 'Registró el ajuste en inventario y lo envió a SAP')); if (d) d.estado = 'Ajustado'; var c = CNT.filter(function (x) { return x.conteoId === (d && d.conteoId); })[0]; if (c) c.estado = 'Ajustado';
+    toast('Ajuste ' + a.id + ' registrado: ' + a.ubicacionId + ' queda en ' + F.num(a.conteo) + ' unidades.', 'success');
+  }
+  function ajModal(pre) {
+    var open = DIFS.filter(function (d) { return d.bodegaId === S.bod && d.estado === 'Sin resolver'; });
+    if (!open.length) { toast('No hay diferencias sin resolver en ' + bodName(S.bod) + '.', 'info'); return; }
+    var sel = pre && pre.id ? pre.id : open[0].id;
+    var m = UI.modal({ title: 'Solicitar ajuste de inventario', subtitle: 'Solicita: ' + actor().nombre + ' · ' + actor().rol, width: 540,
+      body: '<div class="form-grid"><div class="field"><label class="label" for="ajD">Diferencia a ajustar</label><select class="select" id="ajD">' + open.map(function (d) { return '<option value="' + d.id + '"' + (d.id === sel ? ' selected' : '') + '>' + d.ubicacionId + ' · ' + d.sku + ' · ' + sgn(d.dif) + ' (' + F.cop(d.valor) + ')</option>'; }).join('') + '</select></div>' +
+        '<div id="ajInfo"></div>' +
+        '<div class="field"><label class="label" for="ajC">Causa</label><select class="select" id="ajC"><option value="">Selecciona una causa</option>' + CAUSAS.map(function (x) { return '<option>' + x + '</option>'; }).join('') + '</select><span class="error-text" id="ajCE" hidden></span></div>' +
+        '<div class="field"><label class="label" for="ajJ">Justificación</label><textarea class="textarea" id="ajJ" placeholder="Qué se verificó antes de pedir el ajuste (reconteo, recibos, traslados)"></textarea><span class="error-text" id="ajJE" hidden></span></div></div>',
+      footer: [{ label: 'Cancelar' }, { label: 'Enviar a aprobación', kind: 'primary', onClick: function (api) {
+        var B = api.body, ok = true, d = DIFS.filter(function (x) { return x.id === $('#ajD', B).value; })[0], cs = $('#ajC', B).value, j = $('#ajJ', B).value.trim();
+        ok = setErr(B, 'ajC', cs ? '' : 'Selecciona la causa del ajuste.') && ok; ok = setErr(B, 'ajJ', j.length >= 10 ? '' : 'Justifica el ajuste con al menos 10 caracteres.') && ok; if (!ok) return false;
+        d.causa = cs; var a = mkAj(d, 'Pendiente de aprobación', actor(), { just: j, fecha: Date.now() }); a.eventos = [ev(a.fecha, actor().nombre, 'Solicitó el ajuste de ' + sgn(a.dif) + ' unidades')]; d.estado = 'Ajuste solicitado';
+        toast('Ajuste ' + a.id + ' enviado a aprobación' + (a.valor > LIM ? ' del Jefe de logística.' : '.'), 'success'); refreshAll(); tabsApi.select('pnAj');
+      } }] });
+    var B = m.body; function info() { var d = DIFS.filter(function (x) { return x.id === $('#ajD', B).value; })[0]; $('#ajInfo', B).innerHTML = UI.banner({ tone: d.valor > LIM ? 'warning' : 'info', text: 'Sistema ' + F.num(d.sistema) + ' → conteo ' + F.num(d.conteo) + '. ' + (d.valor > LIM ? 'Supera ' + F.cop(LIM) + ': lo aprueba el Jefe de logística.' : 'Lo puede aprobar el Jefe de bodega.') }); $('#ajC', B).value = CAUSAS.indexOf(d.causa) > -1 && d.causa !== 'Sin causa identificada' ? d.causa : ''; }
+    $('#ajD', B).addEventListener('change', info); info();
+  }
+
+  /* ---------- Exactitud (HU-219/220) ---------- */
+  function unitAcc(rows) { if (!rows.length) return null; return rows.reduce(function (s, r) { return s + (1 - Math.min(1, Math.abs(r.dif) / (r.sistema || 1))); }, 0) / rows.length * 100; }
+  function skuAcc(bodId) {
+    var m = {}; A.inventario.filter(function (r) { return r.conteo != null && (!bodId || r.bodegaId === bodId); }).forEach(function (r) { (m[r.sku] = m[r.sku] || []).push({ dif: r.diferencia || 0, sistema: r.stockFisico }); });
+    return Object.keys(m).map(function (sku) { return { sku: sku, acc: unitAcc(m[sku]), n: m[sku].length }; });
+  }
+  function renderEx() {
+    var ser = A.kpis.serie, prev = ser.slice(0, 15).reduce(function (a, x) { return a + x.exactitudInvPct; }, 0) / 15, cur = exactitudAvg(15), g = exactitudAvg(30), meta = A.kpis.metas.exactitudInvPct;
+    var counted = A.inventario.filter(function (r) { return r.conteo != null; }).length, ok0 = A.inventario.filter(function (r) { return r.conteo != null && !r.diferencia; }).length;
+    var accB = {}; ['CEDI-BOG', 'BOD-FUN'].forEach(function (b) { accB[b] = unitAcc(A.inventario.filter(function (r) { return r.bodegaId === b && r.conteo != null; }).map(function (r) { return { dif: r.diferencia || 0, sistema: r.stockFisico }; })); });
+    $('#exKpis').innerHTML =
+      UI.kpi({ label: 'Exactitud global · 30 días', icon: 'target', valueHtml: F.num(g, 1) + '<small>%</small>', delta: { v: Math.abs(cur - prev) < 0.05 ? 0 : cur - prev, unit: ' pts', better: 'up' }, note: 'Meta ' + F.num(meta, 1) + ' %', spark: ser.slice(-14).map(function (x) { return x.exactitudInvPct; }), sparkColor: 'var(--green)' }) +
+      UI.kpi({ label: 'Cumplimiento de la meta', icon: 'gauge', valueHtml: (g >= meta ? 'Cumple' : 'Por debajo'), note: g >= meta ? 'Superas la meta por ' + F.num(g - meta, 1) + ' pts' : 'Faltan ' + F.num(meta - g, 1) + ' pts para la meta' }) +
+      UI.kpi({ label: 'Ubicaciones contadas', icon: 'scan', value: counted, note: ok0 + ' sin diferencia · ' + (counted - ok0) + ' con diferencia' }) +
+      UI.kpi({ label: 'Valor de diferencias abiertas', icon: 'alert-triangle', valueHtml: F.num(DIFS.filter(function (d) { return d.estado === 'Sin resolver' || d.estado === 'Ajuste solicitado'; }).reduce(function (s, d) { return s + d.valor; }, 0) / 1000, 0) + '<small>mil COP</small>', note: DIFS.filter(function (d) { return d.estado === 'Sin resolver'; }).length + ' sin resolver' });
+    UI.chart.line($('#exTrend'), { labels: ser.map(function (x) { return x.fecha.slice(8) + '/' + x.fecha.slice(5, 7); }), datasets: [{ label: 'Exactitud', data: ser.map(function (x) { return x.exactitudInvPct; }), color: '#15915A', fill: true }], unit: '%', dec: 1, min: 96, max: 100, target: { value: meta, label: 'Meta' }, maxXTicks: 8 });
+    $('#exBod').innerHTML = ['CEDI-BOG', 'BOD-FUN'].map(function (b) { var v = accB[b]; return '<div><div class="row between"><strong>' + esc(bodName(b)) + '</strong><span class="num strong">' + (v == null ? '—' : F.num(v, 2) + ' %') + '</span></div>' + (v == null ? '' : UI.meter(v, 100, { level: v >= meta ? 'ok' : 'warn', label: 'Exactitud de ' + bodName(b), showValue: false, mark: meta })) + '<div class="muted t-12 mt-1">' + A.inventario.filter(function (r) { return r.bodegaId === b && r.conteo != null; }).length + ' ubicaciones contadas · la marca indica la meta de ' + F.num(meta, 1) + ' %</div></div>'; }).join('') + '<p class="muted t-12">Exactitud por unidades: 1 − |diferencia| ÷ stock del sistema, promediada sobre las ubicaciones contadas.</p>';
+    var sa = skuAcc(null).sort(function (a, b) { return a.acc - b.acc; }).slice(0, 8);
+    $('#exSkuSub').textContent = 'Exactitud por unidades · la barra muestra la desviación contra el sistema';
+    var mxd = Math.max.apply(null, sa.map(function (x) { return 100 - x.acc; })) || 1;
+    $('#exSku').className = ''; $('#exSku').style.removeProperty('--h');
+    $('#exSku').innerHTML = sa.map(function (x) { var dv = 100 - x.acc, p = prod(x.sku); return '<div class="cause-row"><span class="truncate"><span class="mono strong">' + x.sku + '</span> ' + esc(p ? p.descripcion : '') + '</span><span class="num strong" style="text-align:right">' + F.num(x.acc, 1) + ' %</span>' + UI.meter(dv, mxd, { level: dv >= 3 ? 'crit' : dv >= 1 ? 'warn' : 'ok', showValue: false, label: 'Desviación de ' + x.sku }) + '</div>'; }).join('');
+    var nc = A.kpis.notasCreditoPorCausa, mx = Math.max.apply(null, nc.map(function (x) { return x.valorCOP; }));
+    $('#exNc').innerHTML = nc.map(function (x) { return '<div class="cause-row"><span>' + esc(x.causa) + '</span><span class="num strong" style="text-align:right">' + F.cop(x.valorCOP) + '</span>' + UI.meter(x.valorCOP, mx, { level: 'info', showValue: false, label: x.causa }) + '</div>'; }).join('');
+    rankTbl.setRows(RANK);
+  }
+  var rankTbl = UI.table($('#rankTable'), {
+    rows: [], pageSize: 8, rowKey: 'sku', caption: 'Ranking de SKU para priorizar conteo', sort: { key: 'score', dir: 'desc' }, emptyText: 'Sin SKU para priorizar.',
+    searchable: { placeholder: 'Buscar SKU' }, searchKeys: ['sku', 'desc'],
+    columns: [
+      { key: 'rank', label: '#', value: function (r) { return RANK.indexOf(r) + 1; }, render: function (r) { return '<span class="rank-n">' + (RANK.indexOf(r) + 1) + '</span>'; }, hideMobile: true },
+      { key: 'sku', label: 'SKU', title: true, render: function (r) { return '<span class="mono strong">' + r.sku + '</span><div class="cell-sub truncate" style="max-width:260px">' + esc(r.desc) + '</div>'; } },
+      { key: 'ncCOP', label: 'Notas crédito', num: true, render: function (r) { return r.nc ? r.nc + ' · ' + F.cop(r.ncCOP) : '<span class="subtle">—</span>'; } },
+      { key: 'difs', label: 'Diferencias', num: true, render: function (r) { return r.difs || '<span class="subtle">0</span>'; }, hideMobile: true },
+      { key: 'rot', label: 'Reservado activo', num: true, render: function (r) { return F.num(r.rot); }, hideMobile: true },
+      { key: 'dias', label: 'Sin contar', num: true, render: function (r) { return r.dias >= 90 ? 'Nunca' : r.dias + ' d'; }, hideMobile: true },
+      { key: 'score', label: 'Prioridad', render: function (r) { return '<div class="score-cell">' + UI.meter(r.score, 100, { level: r.score >= 60 ? 'crit' : r.score >= 35 ? 'warn' : 'ok', label: 'Puntaje de prioridad', text: String(r.score) }) + '</div>'; } }
+    ],
+    actions: function (r) { return [{ label: 'Programar conteo', icon: 'calendar', onClick: function () { progModal({ sku: r.sku }); } }]; },
+    onRowClick: function (r) { progModal({ sku: r.sku }); }
+  });
+
+  /* ---------- orquestación ---------- */
+  function refreshAll() { renderKpis(); renderStock(); renderDif(); renderCnt(); renderAj(); if (!$('#pnEx').hidden) renderEx(); }
+  function switchBod(id) { S.bod = id; S.day = null; fillSel(); refreshAll(); }
+  $('#bodSel').addEventListener('change', function (e) { switchBod(e.target.value); toast('Mostrando ' + bodName(S.bod) + '.', 'info', { duration: 2200 }); });
+  var tabsApi = UI.tabs($('#tabs'), { onChange: function (id) { if (id === 'pnEx' && rankTbl) renderEx(); } });
+  var pb = UI.param('bodega'); S.bod = A.sedes.some(function (s) { return s.id === pb; }) ? pb : (A.inventario.some(function (r) { return r.bodegaId === UI.sede().id; }) ? UI.sede().id : 'CEDI-BOG');
+  fillSel();
+  $('#kpiRow').innerHTML = [1, 2, 3, 4, 5].map(function () { return '<div class="card kpi"><span class="skeleton sk-line" style="width:50%"></span><span class="skeleton" style="height:34px;width:60%"></span><span class="skeleton sk-line" style="width:70%"></span></div>'; }).join('');
+  stockTbl.setLoading(true);
+  setTimeout(function () {
+    stockTbl.setLoading(false); refreshAll();
+    var ub = UI.param('ubicacion'); if (ub) { stockTbl.search(ub); var inp = $('#stockTable input[type=search]'); if (inp) inp.value = ub; }
+  }, 380);
+});
+</script>
+</body>
+</html>

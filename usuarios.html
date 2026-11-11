@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Usuarios y roles · Armetales</title>
+<meta name="description" content="Administración de usuarios, perfiles y matriz de permisos por módulo y acción de la plataforma logística de Armetales.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de usuarios y roles (tokens y componentes viven en app.css) */
+  .stat-row { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 16px; }
+  @media (max-width: 799px) { .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .mini-stat { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); }
+  .mini-stat .v { font-family: var(--font-display); font-weight: 600; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .mini-stat .l { font-size: 12.5px; color: var(--text-2); }
+  .u-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .u-cell .u-name { font-weight: 600; line-height: 1.3; }
+  .u-cell .u-mail { font-size: 12.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
+  .u-cell > div { min-width: 0; }
+  .sub-line { font-size: 12.5px; color: var(--text-2); }
+  .stk, .stk .sub-line { display: block; } @media (max-width: 639px) { .stk { text-align: right; } .u-mail { font-weight: 400; } }
+  .roles-layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+  @media (min-width: 900px) { .roles-layout { grid-template-columns: 290px minmax(0, 1fr); } }
+  .role-list { display: flex; flex-direction: column; padding: 6px; max-height: 640px; overflow: auto; }
+  .role-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 10px; border: 1px solid transparent; border-radius: var(--r-ctl); background: transparent; color: var(--text); cursor: pointer; font: inherit; }
+  .role-item:hover { background: var(--surface-2); }
+  .role-item[aria-pressed="true"] { background: var(--surface-3); border-color: var(--border-strong); }
+  .role-item[aria-pressed="true"] .ri-name { color: var(--text); }
+  .role-item .ri-name { font-weight: 600; font-size: 13.5px; line-height: 1.3; flex: 1; min-width: 0; }
+  .role-item .ri-n { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--text-2); }
+  @media (max-width: 899px) {
+    .role-list { flex-direction: row; max-height: none; overflow-x: auto; padding: 8px; gap: 6px; scrollbar-width: thin; }
+    .role-item { width: auto; flex: none; white-space: nowrap; border-color: var(--border); border-radius: 999px; padding: 6px 12px; }
+    .role-item .ri-name { flex: none; }
+  }
+  .perm-wrap { max-height: 560px; overflow: auto; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); }
+  .perm { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
+  .perm th, .perm td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: center; background: var(--surface); }
+  .perm thead th { position: sticky; top: 0; z-index: 3; background: var(--surface-2); font-size: 12px; font-weight: 600; color: var(--text-2); border-bottom: 1px solid var(--border-strong); }
+  .perm th:first-child, .perm td:first-child { text-align: left; position: sticky; left: 0; z-index: 2; }
+  .perm thead th:first-child { z-index: 4; }
+  .perm tbody tr:last-child td { border-bottom: 0; }
+  .perm td.is-changed:first-child { box-shadow: inset 3px 0 0 var(--amber); }
+  .perm td.is-changed { background: var(--amber-bg); }
+  .perm .mod-name { font-weight: 500; }
+  .perm .mod-key { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); display: block; }
+  .perm input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--text); cursor: pointer; margin: 0; }
+  .perm input:disabled { cursor: not-allowed; opacity: .45; }
+  .perm td, .perm th { min-width: 78px; } .perm th:first-child, .perm td:first-child { min-width: 150px; }
+  @media (max-width: 639px) { .perm td, .perm th { min-width: 58px; padding: 8px 4px; } .perm th:first-child, .perm td:first-child { min-width: 108px; padding-left: 10px; } .perm .mod-name { font-size: 13px; } }
+  .savebar { position: sticky; bottom: 12px; z-index: 20; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 14px; margin-top: 14px; background: var(--surface); border: 1px solid var(--amber); border-radius: var(--r-card); box-shadow: var(--shadow-pop); }
+  .savebar[hidden] { display: none; }
+  .savebar .sb-msg { display: flex; gap: 8px; align-items: center; font-weight: 600; font-size: 13.5px; }
+  .savebar .sb-msg .icon { color: var(--amber); }
+  .code-box { margin: 0; padding: 12px 14px; background: var(--surface-3); border: 1px solid var(--border); border-radius: var(--r-ctl); font: 12px/1.6 var(--font-mono); overflow: auto; white-space: pre; color: var(--text); }
+  .code-box .k { color: var(--blue); } .code-box .s { color: var(--green); } .code-box .e { color: var(--red); }
+  .scope-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); }
+  .scope-grid .check { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface); }
+  .li-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .li-row:last-child { border-bottom: 0; }
+  .li-row .grow { flex: 1; min-width: 0; }
+  .sess { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .sess:last-child { border-bottom: 0; }
+  .link-box { display: flex; gap: 8px; align-items: center; }
+  .link-box .input { font-family: var(--font-mono); font-size: 12px; }
+  .api-card { display: grid; gap: 12px; } @media (min-width: 900px) { .api-card { grid-template-columns: minmax(0,1fr) minmax(0,1fr); column-gap: 24px; } .api-card > .api-intro { grid-column: 1; } .api-card > .api-out { grid-column: 2; align-self: stretch; } }
+  .scroll-x { overflow-x: auto; }
+  .select.input-sm { padding-right: 30px; }
+  :root[data-theme="dark"] a.btn { color: var(--b-fg); } /* el color de enlace del tema oscuro pisaba el de los botones-enlace */
+</style>
+</head>
+<body data-page="usuarios">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Administración</div>
+      <h1 class="page-title">Usuarios y roles</h1>
+      <p class="page-desc">Quién entra a la plataforma, con qué perfil y hasta dónde llega: sede, bodega, módulo y acción.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-secondary" id="btnNewRole"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>Crear perfil</button>
+      <button type="button" class="btn btn-primary" id="btnNewUser"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Crear usuario</button>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist" id="mainTabs" aria-label="Administración de accesos">
+    <button class="tab" role="tab" id="tabU" aria-controls="pnlUsers" aria-selected="true">Usuarios <span class="count" id="cntUsers"></span></button>
+    <button class="tab" role="tab" id="tabR" aria-controls="pnlRoles" aria-selected="false">Roles y permisos <span class="count" id="cntRoles"></span></button>
+  </div>
+
+  <!-- ============ USUARIOS ============ -->
+  <div class="tab-panel" id="pnlUsers" role="tabpanel" aria-labelledby="tabU">
+    <div class="stat-row" id="userStats"></div>
+    <div id="usersTable"></div>
+  </div>
+
+  <!-- ============ ROLES ============ -->
+  <div class="tab-panel" id="pnlRoles" role="tabpanel" aria-labelledby="tabR" hidden>
+    <div class="roles-layout">
+      <div class="card">
+        <div class="card-head"><div><h2 class="card-title">Perfiles</h2><p class="card-sub" id="roleSub"></p></div></div>
+        <div class="role-list" id="roleList" role="group" aria-label="Perfiles de acceso"></div>
+      </div>
+      <div class="stack-lg" style="min-width:0">
+        <div class="card">
+          <div class="card-head">
+            <div class="min-w-0"><h2 class="card-title" id="rdName">Perfil</h2><p class="card-sub" id="rdDesc"></p></div>
+            <div class="row gap-2" id="rdBadges"></div>
+          </div>
+          <div class="card-body" style="padding-top:0">
+            <div class="tabs" role="tablist" id="roleTabs" aria-label="Detalle del perfil">
+              <button class="tab" role="tab" id="rtP" aria-controls="rpPerm" aria-selected="true">Permisos</button>
+              <button class="tab" role="tab" id="rtU" aria-controls="rpUsers" aria-selected="false">Usuarios <span class="count" id="rtUn"></span></button>
+              <button class="tab" role="tab" id="rtS" aria-controls="rpScope" aria-selected="false">Alcance</button>
+              <button class="tab" role="tab" id="rtH" aria-controls="rpHist" aria-selected="false">Historial</button>
+            </div>
+            <div class="tab-panel" id="rpPerm" role="tabpanel" aria-labelledby="rtP">
+              <div class="stack-lg">
+                <div style="min-width:0">
+                  <div class="row between gap-3 mb-3">
+                    <p class="muted t-13" style="margin:0;max-width:52ch">Cada acción incluye las anteriores: aprobar implica gestionar, y gestionar implica consultar.</p>
+                    <div class="row gap-2">
+                      <button type="button" class="btn btn-ghost btn-sm" id="presetRead">Solo consulta</button>
+                      <button type="button" class="btn btn-ghost btn-sm" id="presetClear">Quitar todo</button>
+                    </div>
+                  </div>
+                  <div class="perm-wrap" tabindex="0" role="region" aria-label="Matriz de permisos por módulo y acción">
+                    <table class="perm" id="permTable"><caption class="sr-only">Permisos por módulo y acción</caption></table>
+                  </div>
+                  <div class="savebar" id="saveBar" hidden role="status">
+                    <div class="sb-msg"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3M12 9v4M12 17h.01"/></svg><span id="sbText"></span></div>
+                    <div class="row gap-2"><button type="button" class="btn btn-secondary btn-sm" id="sbDiscard">Descartar</button><button type="button" class="btn btn-primary btn-sm" id="sbSave">Guardar cambios</button></div>
+                  </div>
+                </div>
+                <div class="stack">
+                  <div class="card card-pad api-card" style="background:var(--surface-2)"><div class="stack-sm api-intro">
+                    <h3 class="mb-0 row gap-2 nowrap" style="align-items:flex-start;white-space:normal"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1zm-11 -1 2 2 4-4"/></svg>Los permisos se validan también en los servicios</h3>
+                    <p class="muted t-13" style="margin:0">Ocultar un botón no basta: cada llamada al servidor verifica perfil, módulo, acción y alcance. Prueba qué respondería hoy con los permisos guardados de este perfil.</p>
+                    <div class="form-grid c2" style="gap:10px">
+                      <div class="field"><label class="label" for="apiMod">Módulo</label><select class="select input-sm" id="apiMod"></select></div>
+                      <div class="field"><label class="label" for="apiAct">Acción</label><select class="select input-sm" id="apiAct"><option value="1">Consultar</option><option value="2" selected>Gestionar</option><option value="3">Aprobar</option></select></div>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="apiTry" style="align-self:flex-start">Probar llamada</button>
+                    </div><pre class="code-box api-out" id="apiOut" aria-live="polite">Elige un módulo y una acción.</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="tab-panel" id="rpUsers" role="tabpanel" aria-labelledby="rtU" hidden>
+              <div class="row between gap-3 mb-2"><p class="muted t-13" style="margin:0">Personas con este perfil. Un usuario tiene un solo perfil activo.</p><button type="button" class="btn btn-secondary btn-sm" id="btnAssign"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Asignar usuario</button></div>
+              <div id="roleUsers"></div>
+            </div>
+            <div class="tab-panel" id="rpScope" role="tabpanel" aria-labelledby="rtS" hidden>
+              <div class="stack">
+                <p class="muted t-13" style="margin:0;max-width:62ch">Limita las consultas de este perfil a las sedes y bodegas indicadas. Fuera del alcance, los datos no se listan ni se pueden abrir por enlace directo.</p>
+                <div class="row gap-5"><label class="radio"><input type="radio" name="scopeMode" value="todas"> Todas las sedes y bodegas</label><label class="radio"><input type="radio" name="scopeMode" value="sel"> Solo las seleccionadas</label></div>
+                <div class="scope-grid" id="scopeGrid"></div>
+                <div class="row gap-2"><button type="button" class="btn btn-primary btn-sm" id="scopeSave">Guardar alcance</button><span class="muted t-13" id="scopeHint"></span></div>
+              </div>
+            </div>
+            <div class="tab-panel" id="rpHist" role="tabpanel" aria-labelledby="rtH" hidden>
+              <div id="histBox"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$, $$ = UI.$$, ico = UI.icon;
+  var ACC = [['Consultar', 1], ['Gestionar', 2], ['Aprobar', 3]];
+  var ME = A.usuarioActual;
+
+  /* ---------- estado local (en memoria) ---------- */
+  var users = A.usuarios;            // se muta en sitio: lo ve toda la demo
+  var roles = A.roles;
+  var mods = A.modulosPermiso;
+  var modName = {}; mods.forEach(function (m) { modName[m.id] = m.nombre; });
+  var sedeName = function (id) { var s = A.idx.sedes[id]; return s ? s.nombre : id; };
+  var bodegasDe = function (sedeId) {
+    var out = [{ id: sedeId, nombre: sedeName(sedeId) + ' (principal)' }];
+    if (sedeId === 'CEDI-BOG') out.push({ id: 'BOD-FUN', nombre: 'Bodega Funza' });
+    return out;
+  };
+  var bodegaName = function (u) { return u.bodegaId === u.sedeId ? 'Bodega principal' : sedeName(u.bodegaId); };
+  var scope = {};                    // alcance por rol
+  roles.forEach(function (r) {
+    var restr = ['Conductor', 'Operario de bodega', 'Jefe de bodega', 'Analista de inventarios', 'Despachador'].indexOf(r.nombre) > -1;
+    scope[r.rolId] = restr ? { mode: 'sel', sedes: ['CEDI-BOG', 'BOD-FUN'] } : { mode: 'todas', sedes: A.sedes.map(function (s) { return s.id; }) };
+  });
+  var nowIso = function () { return new Date().toISOString(); };
+  var histPerm = [
+    { f: A.at(-2, 10, 25), u: 'Marcela Cristina Duarte', rolId: 'ROL-05', cambio: 'Bodegas WMS: Gestionar → Aprobar', motivo: 'El jefe de bodega aprueba ubicaciones bloqueadas.' },
+    { f: A.at(-6, 15, 40), u: 'Marcela Cristina Duarte', rolId: 'ROL-14', cambio: 'Despachos: Consultar → Gestionar', motivo: 'Programa y cierra despachos sin pasar por coordinación.' },
+    { f: A.at(-9, 9, 5), u: 'Gustavo Adolfo Prieto', rolId: 'ROL-15', cambio: 'Auditoría: Sin acceso → Gestionar', motivo: 'Marca eventos revisados durante la auditoría trimestral.' },
+    { f: A.at(-17, 16, 20), u: 'Marcela Cristina Duarte', rolId: 'ROL-08', cambio: 'Integraciones: Gestionar → Aprobar', motivo: 'Autoriza reintentos masivos de mensajes.' },
+    { f: A.at(-26, 11, 50), u: 'Marcela Cristina Duarte', rolId: 'ROL-06', cambio: 'Novedades: Sin acceso → Consultar', motivo: 'El conductor consulta el estado de sus novedades.' }
+  ];
+  var selRole = A.roles.filter(function (r) { return r.nombre === 'Jefe de logística'; })[0].rolId;
+  var draft = null, rolesBuilt = false;
+
+  var adminSeg = function () { return roles.filter(function (r) { return r.nombre === 'Administrador de seguridad'; })[0]; };
+  var roleOf = function (id) { return A.idx.roles[id]; };
+  function refreshRoleCounts() { roles.forEach(function (r) { r.usuarios = users.filter(function (u) { return u.rolId === r.rolId; }).length; }); }
+  function setErr(input, msg) {
+    var f = input.closest('.field'), old = $('.error-text', f); if (old) old.remove();
+    if (msg) { input.setAttribute('aria-invalid', 'true'); var s = document.createElement('span'); s.className = 'error-text'; s.id = input.id + '-err'; s.innerHTML = ico('alert-circle', 'icon-sm') + esc(msg); f.appendChild(s); input.setAttribute('aria-describedby', s.id); }
+    else { input.removeAttribute('aria-invalid'); input.removeAttribute('aria-describedby'); }
+    return !msg;
+  }
+
+  /* ============ USUARIOS ============ */
+  function renderStats() {
+    var c = function (e) { return users.filter(function (u) { return u.estado === e; }).length; };
+    var st = function (v, l) { return '<div class="mini-stat"><div class="v">' + v + '</div><div class="l">' + l + '</div></div>'; };
+    $('#userStats').innerHTML = st(c('Activo'), 'Usuarios activos') + st(c('Inactivo'), 'Inactivos (historial conservado)') + st(c('Bloqueado'), 'Bloqueados por intentos') + st(users.filter(function (u) { return u.estado === 'Activo' && u.ultimoAcceso && (Date.now() - new Date(u.ultimoAcceso)) < 864e5; }).length, 'Con acceso en 24 h');
+    $('#cntUsers').textContent = users.length; $('#cntRoles').textContent = roles.length;
+  }
+  var sedeOpts = A.sedes.map(function (s) { return { value: s.id, label: s.nombre }; });
+  var tbl = UI.table($('#usersTable'), {
+    rows: users, rowKey: 'usuarioId', pageSize: 10, caption: 'Usuarios de la plataforma',
+    searchable: { placeholder: 'Buscar por nombre o correo' }, searchKeys: ['usuarioId', 'telefono'],
+    filters: [
+      { key: 'rolId', label: 'Rol', all: 'Todos los roles', options: roles.map(function (r) { return { value: r.rolId, label: r.nombre }; }) },
+      { key: 'sedeId', label: 'Sede', all: 'Todas las sedes', options: sedeOpts },
+      { key: 'estado', label: 'Estado', all: 'Todos los estados', options: A.estados.usuario }
+    ],
+    columns: [
+      { key: 'nombre', label: 'Usuario', title: true, render: function (u) { return '<div class="u-cell">' + UI.avatar(u.nombre) + '<div><div class="u-name">' + esc(u.nombre) + (u.usuarioId === ME.usuarioId ? ' <span class="tag">Tú</span>' : '') + '</div><div class="u-mail">' + esc(u.correo) + '</div></div></div>'; } },
+      { key: 'rol', label: 'Rol', render: function (u) { return esc(u.rol); } },
+      { key: 'sedeId', label: 'Sede / bodega', hideMobile: false, value: function (u) { return sedeName(u.sedeId); }, render: function (u) { return '<span class="stk">' + esc(sedeName(u.sedeId)) + '<span class="sub-line">' + esc(bodegaName(u)) + '</span></span>'; } },
+      { key: 'estado', label: 'Estado', render: function (u) { return UI.chip(u.estado); } },
+      { key: 'ultimoAcceso', label: 'Último acceso', value: function (u) { return u.ultimoAcceso || ''; }, render: function (u) { return u.ultimoAcceso ? esc(F.fechaHora(u.ultimoAcceso)) : '<span class="subtle">Nunca</span>'; } }
+    ],
+    onRowClick: function (u) { openUser(u.usuarioId); },
+    actions: function (u) {
+      var items = [{ label: 'Ver detalle', icon: 'eye', onClick: function () { openUser(u.usuarioId); } }, { label: 'Editar', icon: 'edit', onClick: function () { userForm(u); } }, { label: 'Restablecer credenciales', icon: 'key', onClick: function () { resetCreds(u); } }, { sep: true }];
+      items.push(u.estado === 'Activo' ? { label: 'Inactivar', icon: 'ban', danger: true, onClick: function () { deactivate(u); } } : { label: u.estado === 'Bloqueado' ? 'Desbloquear y reactivar' : 'Reactivar', icon: 'undo', onClick: function () { reactivate(u); } });
+      return items;
+    }
+  });
+  function refreshUsers() { refreshRoleCounts(); renderStats(); tbl.refresh(); }
+
+  /* ----- crear / editar (HU-008, 009, 012) ----- */
+  function userForm(u) {
+    var edit = !!u, d = u || {};
+    var body = '<form class="form-grid c2" id="uf" novalidate>' +
+      '<div class="field span-2"><label class="label" for="uf-nombre">Nombre completo</label><input class="input" id="uf-nombre" autocomplete="off" value="' + esc(d.nombre || '') + '" placeholder="Ej. Natalia Ospina Vélez"></div>' +
+      '<div class="field span-2"><label class="label" for="uf-correo">Correo corporativo</label><input class="input" id="uf-correo" type="email" autocomplete="off" value="' + esc(d.correo || '') + '" placeholder="nombre.apellido@armetales.com.co"><span class="hint">Es el usuario de ingreso. Debe terminar en @armetales.com.co.</span></div>' +
+      '<div class="field"><label class="label" for="uf-rol">Rol</label><select class="select" id="uf-rol"><option value="">Selecciona un rol</option>' + roles.map(function (r) { return '<option value="' + r.rolId + '"' + (r.rolId === d.rolId ? ' selected' : '') + '>' + esc(r.nombre) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label class="label" for="uf-tel">Celular <span class="opt">(opcional)</span></label><input class="input" id="uf-tel" inputmode="tel" value="' + esc(d.telefono || '') + '" placeholder="310 555 0142"></div>' +
+      '<div class="field"><label class="label" for="uf-sede">Sede</label><select class="select" id="uf-sede"><option value="">Selecciona una sede</option>' + A.sedes.map(function (s) { return '<option value="' + s.id + '"' + (s.id === d.sedeId ? ' selected' : '') + '>' + esc(s.nombre) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label class="label" for="uf-bod">Bodega</label><select class="select" id="uf-bod"></select><span class="hint" id="uf-scope"></span></div></form>';
+    var m = UI.modal({ title: edit ? 'Editar usuario' : 'Crear usuario', subtitle: edit ? d.usuarioId + ' · el cambio queda en auditoría' : 'Recibirá un enlace temporal para definir su contraseña.', body: body, width: 600,
+      footer: [{ label: 'Cancelar', kind: 'secondary' }, { label: edit ? 'Guardar cambios' : 'Crear usuario', kind: 'primary', keepOpen: true, onClick: function () { save(); } }] });
+    var sede = $('#uf-sede', m.el), bod = $('#uf-bod', m.el);
+    function fillBod() {
+      var list = sede.value ? bodegasDe(sede.value) : [];
+      bod.innerHTML = list.length ? list.map(function (b) { return '<option value="' + b.id + '"' + (b.id === d.bodegaId ? ' selected' : '') + '>' + esc(b.nombre) + '</option>'; }).join('') : '<option value="">Elige primero la sede</option>';
+      var r = roleOf($('#uf-rol', m.el).value), sc = r && scope[r.rolId];
+      $('#uf-scope', m.el).textContent = sc ? (sc.mode === 'todas' ? 'El rol consulta todas las sedes.' : 'El rol limita la consulta a: ' + sc.sedes.map(sedeName).join(', ') + '.') : '';
+    }
+    sede.addEventListener('change', fillBod); $('#uf-rol', m.el).addEventListener('change', fillBod); fillBod();
+    $('#uf', m.el).addEventListener('submit', function (e) { e.preventDefault(); save(); });
+    function save() {
+      var nom = $('#uf-nombre', m.el), cor = $('#uf-correo', m.el), rol = $('#uf-rol', m.el), sd = sede, ok = true;
+      var v = cor.value.trim().toLowerCase();
+      ok = setErr(nom, nom.value.trim().split(/\s+/).length < 2 ? 'Escribe nombre y apellido.' : '') && ok;
+      var mailMsg = !v ? 'El correo es obligatorio.' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? 'El formato del correo no es válido.' : !/@armetales\.com\.co$/.test(v) ? 'Usa el correo corporativo @armetales.com.co.' : users.some(function (x) { return x.correo.toLowerCase() === v && x !== d; }) ? 'Ya existe un usuario con este correo (' + users.filter(function (x) { return x.correo.toLowerCase() === v; })[0].nombre + '). Edítalo o usa otro correo.' : '';
+      ok = setErr(cor, mailMsg) && ok;
+      ok = setErr(rol, rol.value ? '' : 'Asigna un rol al usuario.') && ok;
+      ok = setErr(sd, sd.value ? '' : 'Asigna la sede del usuario.') && ok;
+      if (!ok) { var bad = $('[aria-invalid="true"]', m.el); if (bad) bad.focus(); return; }
+      var r = roleOf(rol.value);
+      if (edit) {
+        d.nombre = nom.value.trim(); d.correo = v; d.rolId = r.rolId; d.rol = r.nombre; d.sedeId = sd.value; d.bodegaId = bod.value; d.telefono = $('#uf-tel', m.el).value.trim() || d.telefono; d.fechaModificacion = nowIso();
+        UI.toast('Se actualizaron los datos de ' + d.nombre + '.', 'success');
+      } else {
+        var n = { usuarioId: 'USR-' + String(users.length + 1).padStart(3, '0'), nombre: nom.value.trim(), correo: v, rolId: r.rolId, rol: r.nombre, sedeId: sd.value, bodegaId: bod.value, estado: 'Activo', fechaModificacion: nowIso(), ultimoAcceso: null, telefono: $('#uf-tel', m.el).value.trim() };
+        users.unshift(n); A.idx.usuarios[n.usuarioId] = n;
+        UI.toast('Usuario creado. Se envió el enlace de activación a ' + v + '.', 'success');
+      }
+      m.close(); refreshUsers(); refreshRoleViews();
+    }
+  }
+
+  /* ----- inactivar / reactivar (HU-010, 011) ----- */
+  function deactivate(u) {
+    var self = u.usuarioId === ME.usuarioId, adm = adminSeg(), lastAdm = u.rolId === adm.rolId && users.filter(function (x) { return x.rolId === adm.rolId && x.estado === 'Activo'; }).length <= 1;
+    var blockMsg = self ? 'No puedes inactivar tu propia cuenta mientras tienes la sesión abierta.' : lastAdm ? 'Es el único Administrador de seguridad activo. Asigna ese rol a otra persona antes de inactivarlo.' : '';
+    var body = (blockMsg ? UI.banner({ tone: 'danger', title: 'No se puede inactivar', text: blockMsg }) : '') +
+      '<div class="stack mt-3"><p style="margin:0"><strong>' + esc(u.nombre) + '</strong> dejará de poder ingresar y se cerrarán sus sesiones abiertas.</p>' +
+      UI.banner({ tone: 'info', title: 'El historial se conserva', text: 'No se borra nada: pedidos, despachos y registros de auditoría firmados por este usuario siguen visibles. Puedes reactivarlo cuando lo necesites.' }) +
+      '<div class="field"><label class="label" for="dx-m">Motivo</label><select class="select" id="dx-m"><option value="">Selecciona un motivo</option><option>Retiro de la empresa</option><option>Cambio de cargo</option><option>Licencia o incapacidad prolongada</option><option>Solicitud de seguridad</option></select></div></div>';
+    var m = UI.modal({ title: 'Inactivar usuario', subtitle: u.correo, body: body, width: 500,
+      footer: [{ label: 'Cancelar', kind: 'secondary' }, { label: 'Inactivar usuario', kind: 'danger', keepOpen: true, id: 'dxGo', onClick: function () {
+        if (blockMsg) { UI.toast(blockMsg, 'warning'); return; }
+        if (!setErr($('#dx-m', m.el), $('#dx-m', m.el).value ? '' : 'Indica el motivo de la inactivación.')) { $('#dx-m', m.el).focus(); return; }
+        u.estado = 'Inactivo'; u.fechaModificacion = nowIso(); m.close(); refreshUsers(); UI.toast(u.nombre + ' quedó inactivo. Su historial se conservó.', 'success');
+      } }] });
+    if (blockMsg) $('#dxGo', m.el).setAttribute('aria-disabled', 'true');
+  }
+  function reactivate(u) {
+    var was = u.estado;
+    UI.confirm({ title: was === 'Bloqueado' ? 'Desbloquear y reactivar' : 'Reactivar usuario', tone: 'primary', confirmLabel: 'Reactivar',
+      html: '<strong>' + esc(u.nombre) + '</strong> volverá a ingresar con su rol de <strong>' + esc(u.rol) + '</strong> en ' + esc(sedeName(u.sedeId)) + '. ' + (was === 'Bloqueado' ? 'Se reinicia el contador de intentos fallidos y deberá definir una contraseña nueva.' : 'Conserva todo su historial anterior. La reactivación queda registrada con tu usuario.') }).then(function (ok) {
+      if (!ok) return; u.estado = 'Activo'; u.fechaModificacion = nowIso(); refreshUsers(); UI.toast(u.nombre + ' está activo de nuevo.', 'success');
+    });
+  }
+
+  /* ----- restablecer credenciales (HU-014) ----- */
+  function resetCreds(u) {
+    var token = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 8);
+    var link = 'https://plataforma.armetales.com.co/restablecer/' + token;
+    var exp = new Date(Date.now() + 24 * 36e5);
+    var m = UI.modal({ title: 'Restablecer credenciales', subtitle: u.nombre, width: 520,
+      body: '<div class="stack"><p style="margin:0">Se generó un enlace de un solo uso para que defina una contraseña nueva. La contraseña actual deja de funcionar al abrirlo.</p>' +
+        '<div class="field"><label class="label" for="rc-l">Enlace temporal</label><div class="link-box"><input class="input" id="rc-l" readonly value="' + esc(link) + '"><button type="button" class="btn btn-secondary btn-icon" id="rc-c" aria-label="Copiar enlace">' + ico('copy') + '</button></div><span class="hint">Vence ' + esc(F.fechaHora(exp)) + ' (24 horas) o al primer uso.</span></div>' +
+        UI.banner({ tone: 'info', text: 'Por seguridad, la plataforma nunca muestra ni envía contraseñas: solo este enlace.' }) + '</div>',
+      footer: [{ label: 'Cerrar', kind: 'secondary' }, { label: 'Enviar al correo', kind: 'primary', icon: 'send', onClick: function () { UI.toast('Enlace enviado a ' + u.correo + '.', 'success'); } }] });
+    $('#rc-c', m.el).onclick = function () { var i = $('#rc-l', m.el); i.select(); try { navigator.clipboard.writeText(i.value); } catch (e) {} UI.toast('Enlace copiado.', 'info'); };
+  }
+
+  /* ----- drawer de detalle ----- */
+  function sessionsOf(u) {
+    var n = u.estado === 'Activo' ? 1 + (parseInt(u.usuarioId.slice(-2), 10) % 3) : 0, devs = [['Chrome en Windows 11', 'Bogotá D.C.'], ['App móvil Android', 'Funza'], ['Safari en iPhone', 'Bogotá D.C.']], out = [];
+    for (var i = 0; i < n; i++) out.push({ dev: devs[i][0], lugar: devs[i][1], ip: '190.24.' + (40 + i * 7) + '.' + (11 + parseInt(u.usuarioId.slice(-2), 10) * 3 % 200), desde: new Date(Date.now() - (i * 5 + 1) * 36e5 * 1.7).toISOString(), actual: i === 0 && u.usuarioId === ME.usuarioId });
+    return out;
+  }
+  function openUser(id) {
+    var u = A.idx.usuarios[id]; if (!u) return; var r = roleOf(u.rolId), sc = scope[u.rolId];
+    var act = A.auditoria.filter(function (a) { return a.usuarioId === u.usuarioId; }).slice(0, 6);
+    if (!act.length && u.ultimoAcceso) act = [{ tipo: 'Inicio de sesión', entidad: 'Usuario', entidadId: u.usuarioId, fechaHora: u.ultimoAcceso, referenciaOrigen: 'Consola web', estado: 'Exitoso' }];
+    var ses = sessionsOf(u);
+    var d = UI.drawer({ title: u.nombre, subtitle: u.usuarioId + ' · ' + u.correo, width: 560,
+      onOpen: function (api) {
+        var b = api.body;
+        function draw() {
+          var ss = sessionsOf(u).slice(0, ses.length);
+          b.innerHTML = '<div class="stack-lg">' +
+            '<div class="row gap-3 nowrap">' + UI.avatar(u.nombre, { size: 'lg' }) + '<div class="min-w-0"><div class="row gap-2">' + UI.chip(u.estado) + '<span class="tag">' + esc(u.rol) + '</span></div><div class="sub-line mt-1">Modificado ' + esc(F.fechaHora(u.fechaModificacion)) + '</div></div></div>' +
+            '<section><h3 class="mb-2">Datos y alcance</h3>' + UI.kv([['Correo', esc(u.correo)], ['Celular', esc(u.telefono)], ['Rol', '<a href="#" data-gorole="' + u.rolId + '">' + esc(u.rol) + '</a>'], ['Sede', esc(sedeName(u.sedeId))], ['Bodega', esc(bodegaName(u))], ['Alcance del rol', sc.mode === 'todas' ? 'Todas las sedes y bodegas' : esc(sc.sedes.map(sedeName).join(', '))], ['Último acceso', u.ultimoAcceso ? esc(F.fechaHora(u.ultimoAcceso)) : 'Nunca']]) + '</section>' +
+            '<section><div class="row between mb-1"><h3 class="mb-0">Sesiones abiertas</h3>' + (ss.length ? '<button type="button" class="btn btn-ghost btn-sm" data-closeall>Cerrar todas</button>' : '') + '</div>' +
+            (ss.length ? ss.map(function (s, i) { return '<div class="sess"><span class="notif-ico">' + ico(s.dev.indexOf('App') === 0 || s.dev.indexOf('iPhone') > -1 ? 'smartphone' : 'layout-dashboard') + '</span><div class="grow" style="flex:1;min-width:0"><div style="font-weight:600">' + esc(s.dev) + (s.actual ? ' <span class="chip chip-success chip-sm no-dot">Esta sesión</span>' : '') + '</div><div class="sub-line">' + esc(s.lugar) + ' · <span class="mono">' + esc(s.ip) + '</span> · desde ' + esc(F.relativo(s.desde).replace('hace ', '')) + '</div></div>' + (s.actual ? '' : '<button type="button" class="btn btn-ghost btn-sm" data-close="' + i + '">Cerrar</button>') + '</div>'; }).join('') : '<p class="muted t-13" style="margin:0">' + (u.estado === 'Activo' ? 'Sin sesiones abiertas.' : 'Sin sesiones: el usuario está ' + u.estado.toLowerCase() + '.') + '</p>') + '</section>' +
+            '<section><h3 class="mb-2">Actividad reciente</h3>' + (act.length ? UI.timeline(act.map(function (a) { return { title: a.tipo + ' · ' + a.entidad + ' ' + a.entidadId, meta: F.fechaHora(a.fechaHora) + ' · ' + a.referenciaOrigen + (a.estado === 'Rechazado' ? ' · rechazado' : ''), state: a.estado === 'Rechazado' ? 'error' : 'done' }; })) : UI.empty({ icon: 'clock', title: 'Sin actividad registrada', text: 'Cuando ingrese y opere, sus acciones aparecerán aquí.' })) + '<a class="btn btn-ghost btn-sm mt-2" href="auditoria.html">Ver en auditoría ' + ico('arrow-right') + '</a></section></div>';
+        }
+        draw();
+        b.addEventListener('click', function (e) {
+          var g = e.target.closest('[data-gorole]'); if (g) { e.preventDefault(); d.close(); gotoRole(g.dataset.gorole); return; }
+          var c = e.target.closest('[data-close]'); if (c) { ses.splice(+c.dataset.close, 1); draw(); UI.toast('Sesión cerrada.', 'success'); return; }
+          if (e.target.closest('[data-closeall]')) { var keep = ses.filter(function (s, i) { return i === 0 && u.usuarioId === ME.usuarioId; }); ses.length = 0; keep.forEach(function (k) { ses.push(k); }); draw(); UI.toast('Se cerraron las demás sesiones de ' + u.nombre.split(' ')[0] + '.', 'success'); }
+        });
+      },
+      footer: [{ label: 'Restablecer credenciales', kind: 'ghost', icon: 'key', keepOpen: true, onClick: function () { resetCreds(u); } },
+        { label: 'Editar', kind: 'secondary', icon: 'edit', onClick: function () { setTimeout(function () { userForm(u); }, 220); } },
+        u.estado === 'Activo' ? { label: 'Inactivar', kind: 'danger-outline', onClick: function () { setTimeout(function () { deactivate(u); }, 220); } } : { label: 'Reactivar', kind: 'primary', onClick: function () { setTimeout(function () { reactivate(u); }, 220); } }] });
+    ses = sessionsOf(u);
+  }
+
+  /* ============ ROLES ============ */
+  function gotoRole(rolId) { if (rolId) { if (draft && dirtyCount()) { UI.toast('Guarda o descarta los cambios antes de cambiar de perfil.', 'warning'); } else selRole = rolId; } mainTabs.select('pnlRoles'); renderRoleList(); loadRole(); }
+  function renderRoleList() {
+    $('#roleSub').textContent = roles.length + ' perfiles · ' + users.length + ' usuarios';
+    $('#roleList').innerHTML = roles.map(function (r) { return '<button type="button" class="role-item" data-r="' + r.rolId + '" aria-pressed="' + (r.rolId === selRole) + '"><span class="ri-name">' + esc(r.nombre) + '</span><span class="ri-n" aria-label="' + r.usuarios + ' usuarios">' + r.usuarios + '</span></button>'; }).join('');
+  }
+  $('#roleList').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-r]'); if (!b || b.dataset.r === selRole) return;
+    if (dirtyCount()) { UI.confirm({ title: 'Hay cambios sin guardar', message: 'Si cambias de perfil se perderán las modificaciones de la matriz de ' + roleOf(selRole).nombre + '.', confirmLabel: 'Descartar y cambiar', tone: 'danger' }).then(function (ok) { if (ok) { selRole = b.dataset.r; renderRoleList(); loadRole(); } }); return; }
+    selRole = b.dataset.r; renderRoleList(); loadRole();
+  });
+  function loadRole() {
+    var r = roleOf(selRole); draft = Object.assign({}, r.permisos);
+    $('#rdName').textContent = r.nombre; $('#rdDesc').textContent = r.descripcion;
+    var nGest = mods.filter(function (m) { return r.permisos[m.id] >= 2; }).length, nApr = mods.filter(function (m) { return r.permisos[m.id] >= 3; }).length;
+    $('#rdBadges').innerHTML = '<span class="tag">' + r.usuarios + ' usuario' + (r.usuarios === 1 ? '' : 's') + '</span><span class="tag">' + nGest + ' con gestión</span>' + (nApr ? '<span class="tag">' + nApr + ' con aprobación</span>' : '');
+    $('#rtUn').textContent = r.usuarios;
+    drawMatrix(); drawRoleUsers(); drawScope(); drawHist(); $('#apiOut').textContent = 'Elige un módulo y una acción.';
+  }
+  function dirtyCount() { if (!draft) return 0; var r = roleOf(selRole); return mods.filter(function (m) { return draft[m.id] !== r.permisos[m.id]; }).length; }
+  function drawMatrix() {
+    var r = roleOf(selRole), h = '<thead><tr><th scope="col">Módulo</th>' + ACC.map(function (a) { return '<th scope="col">' + a[0] + '</th>'; }).join('') + '</tr></thead><tbody>';
+    mods.forEach(function (m) {
+      var v = draft[m.id], ch = v !== r.permisos[m.id];
+      h += '<tr><td' + (ch ? ' class="is-changed"' : '') + '><span class="mod-name">' + esc(m.nombre) + '</span></td>' + ACC.map(function (a) { return '<td' + (ch ? ' class="is-changed"' : '') + '><input type="checkbox" data-m="' + m.id + '" data-l="' + a[1] + '" aria-label="' + esc(a[0] + ' en ' + m.nombre) + '"' + (v >= a[1] ? ' checked' : '') + '></td>'; }).join('') + '</tr>';
+    });
+    $('#permTable').innerHTML = $('#permTable caption').outerHTML + h + '</tbody>';
+    var n = dirtyCount(); $('#saveBar').hidden = !n;
+    $('#sbText').textContent = n + (n === 1 ? ' módulo con cambios sin guardar' : ' módulos con cambios sin guardar') + ' en ' + r.nombre;
+    var mm = $('#apiMod'); if (!mm.options.length) mm.innerHTML = mods.map(function (m) { return '<option value="' + m.id + '">' + esc(m.nombre) + '</option>'; }).join('');
+  }
+  $('#permTable').addEventListener('change', function (e) {
+    var c = e.target.closest('input[data-m]'); if (!c) return; var id = c.dataset.m, l = +c.dataset.l;
+    draft[id] = c.checked ? l : l - 1;
+    var wrap = $('.perm-wrap'), st = wrap.scrollTop, sl = wrap.scrollLeft; drawMatrix(); wrap.scrollTop = st; wrap.scrollLeft = sl;
+    var nc = $('input[data-m="' + id + '"][data-l="' + l + '"]'); if (nc) nc.focus();
+  });
+  $('#presetRead').onclick = function () { mods.forEach(function (m) { draft[m.id] = Math.min(draft[m.id], 1) || (roleOf(selRole).permisos[m.id] > 0 ? 1 : 0); }); drawMatrix(); UI.toast('Se redujeron los permisos a solo consulta. Revisa y guarda.', 'info'); };
+  $('#presetClear').onclick = function () { mods.forEach(function (m) { draft[m.id] = 0; }); drawMatrix(); };
+  $('#sbDiscard').onclick = function () { draft = Object.assign({}, roleOf(selRole).permisos); drawMatrix(); UI.toast('Se descartaron los cambios.', 'info'); };
+  $('#sbSave').onclick = function () {
+    var r = roleOf(selRole), ch = mods.filter(function (m) { return draft[m.id] !== r.permisos[m.id]; });
+    var lbl = function (v) { return v ? ACC[v - 1][0] : 'Sin acceso'; };
+    var locks = r.nombre === 'Administrador de seguridad' && draft.usuarios < 3 ? 'El Administrador de seguridad debe conservar «Aprobar» en Usuarios y roles; de lo contrario nadie podría gestionar accesos.' : '';
+    if (locks) { UI.toast(locks, 'error', { title: 'Cambio no permitido' }); return; }
+    var m = UI.modal({ title: 'Guardar cambios de permisos', subtitle: r.nombre + ' · ' + ch.length + (ch.length === 1 ? ' módulo' : ' módulos'), width: 540,
+      body: '<div class="stack"><div class="scroll-x"><table class="table" style="width:100%"><thead><tr><th>Módulo</th><th>Antes</th><th>Después</th></tr></thead><tbody>' + ch.map(function (c) { return '<tr><td>' + esc(modName[c.id]) + '</td><td>' + lbl(r.permisos[c.id]) + '</td><td><strong>' + lbl(draft[c.id]) + '</strong></td></tr>'; }).join('') + '</tbody></table></div>' +
+        (r.usuarios ? UI.banner({ tone: 'warning', text: 'Se aplica de inmediato a ' + r.usuarios + (r.usuarios === 1 ? ' usuario' : ' usuarios') + ' del perfil; quienes tengan sesión abierta recibirán los cambios al siguiente clic.' }) : '') +
+        '<div class="field"><label class="label" for="sv-m">Motivo del cambio</label><textarea class="textarea" id="sv-m" rows="2" placeholder="Ej. El jefe de bodega aprueba ubicaciones bloqueadas."></textarea></div></div>',
+      footer: [{ label: 'Seguir editando', kind: 'secondary' }, { label: 'Guardar y auditar', kind: 'primary', keepOpen: true, onClick: function () {
+        var t = $('#sv-m', m.el); if (!setErr(t, t.value.trim().length < 8 ? 'Explica el motivo (mínimo 8 caracteres): queda en el historial de auditoría.' : '')) { t.focus(); return; }
+        ch.forEach(function (c) { histPerm.unshift({ f: nowIso(), u: ME.nombre, rolId: r.rolId, cambio: modName[c.id] + ': ' + lbl(r.permisos[c.id]) + ' → ' + lbl(draft[c.id]), motivo: t.value.trim() }); });
+        r.permisos = Object.assign({}, draft); m.close(); loadRole(); UI.toast('Permisos de ' + r.nombre + ' guardados y registrados en auditoría.', 'success'); window.onbeforeunload = null;
+      } }] });
+  };
+  window.addEventListener('beforeunload', function (e) { if (dirtyCount()) { e.preventDefault(); e.returnValue = ''; } });
+
+  /* HU-020: validación en servicios */
+  $('#apiTry').onclick = function () {
+    var r = roleOf(selRole), mid = $('#apiMod').value, lv = +$('#apiAct').value, has = r.permisos[mid] >= lv;
+    var verb = ['', 'GET', 'POST', 'POST'][lv], path = '/api/v1/' + mid.replace(/[A-Z]/g, function (c) { return '-' + c.toLowerCase(); }) + (lv === 3 ? '/aprobar' : '');
+    var out = '<span class="k">' + verb + '</span> ' + path + '\nAuthorization: Bearer ••••••••\nX-Perfil: ' + r.rolId + '\n\n';
+    out += has ? 'HTTP/1.1 <span class="s">200 OK</span>\n{ "ok": true, "perfil": "' + esc(r.nombre) + '" }' : 'HTTP/1.1 <span class="e">403 Forbidden</span>\n{\n  "error": "permiso_insuficiente",\n  "modulo": "' + mid + '",\n  "accion": "' + ['', 'consultar', 'gestionar', 'aprobar'][lv] + '",\n  "perfil": "' + esc(r.nombre) + '",\n  "mensaje": "Tu perfil no puede ' + ['', 'consultar', 'gestionar', 'aprobar'][lv] + ' este módulo."\n}';
+    $('#apiOut').innerHTML = out;
+  };
+
+  /* usuarios del rol (HU-017, 018) */
+  function drawRoleUsers() {
+    var r = roleOf(selRole), list = users.filter(function (u) { return u.rolId === r.rolId; });
+    $('#roleUsers').innerHTML = list.length ? list.map(function (u) { return '<div class="li-row">' + UI.avatar(u.nombre) + '<div class="grow"><div style="font-weight:600">' + esc(u.nombre) + '</div><div class="sub-line">' + esc(u.correo) + ' · ' + esc(sedeName(u.sedeId)) + '</div></div>' + UI.chip(u.estado) + '<button type="button" class="btn btn-ghost btn-sm" data-rev="' + u.usuarioId + '">Revocar</button></div>'; }).join('') :
+      UI.empty({ icon: 'users', title: 'Nadie tiene este perfil', text: 'Asigna usuarios existentes para que reciban sus permisos.', action: { label: 'Asignar usuario', id: 'assign' } });
+  }
+  $('#roleUsers').addEventListener('click', function (e) {
+    if (e.target.closest('[data-empty-action]')) { assignUser(); return; }
+    var b = e.target.closest('[data-rev]'); if (b) revoke(A.idx.usuarios[b.dataset.rev]);
+  });
+  $('#btnAssign').onclick = assignUser;
+  function assignUser() {
+    var r = roleOf(selRole), cands = users.filter(function (u) { return u.rolId !== r.rolId; });
+    var m = UI.modal({ title: 'Asignar perfil «' + r.nombre + '»', width: 480,
+      body: '<div class="stack"><div class="field"><label class="label" for="as-u">Usuario</label><select class="select" id="as-u"><option value="">Selecciona un usuario</option>' + cands.map(function (u) { return '<option value="' + u.usuarioId + '">' + esc(u.nombre) + ' — ' + esc(u.rol) + '</option>'; }).join('') + '</select></div><p class="muted t-13" style="margin:0">El usuario deja su perfil actual y recibe de inmediato los permisos y el alcance de este perfil.</p></div>',
+      footer: [{ label: 'Cancelar', kind: 'secondary' }, { label: 'Asignar perfil', kind: 'primary', keepOpen: true, onClick: function () {
+        var s = $('#as-u', m.el); if (!setErr(s, s.value ? '' : 'Selecciona el usuario al que se le asigna el perfil.')) { s.focus(); return; }
+        var u = A.idx.usuarios[s.value], prev = u.rol; u.rolId = r.rolId; u.rol = r.nombre; u.fechaModificacion = nowIso();
+        m.close(); refreshUsers(); loadRole(); renderRoleList(); UI.toast(u.nombre + ' pasó de «' + prev + '» a «' + r.nombre + '».', 'success');
+      } }] });
+  }
+  function revoke(u) {
+    var r = roleOf(u.rolId), isAdm = r.rolId === adminSeg().rolId && users.filter(function (x) { return x.rolId === r.rolId; }).length <= 1, self = u.usuarioId === ME.usuarioId;
+    var block = self ? 'No puedes revocar tu propio perfil: perderías el acceso a esta pantalla.' : isAdm ? 'Es la única persona con el perfil Administrador de seguridad. Asigna el perfil a otra persona primero.' : '';
+    var m = UI.modal({ title: 'Revocar perfil', subtitle: u.nombre + ' · ' + r.nombre, width: 480,
+      body: (block ? UI.banner({ tone: 'danger', title: 'No se puede revocar', text: block }) : '') + '<div class="stack ' + (block ? 'mt-3' : '') + '"><p style="margin:0">Un usuario no puede quedar sin perfil. Elige el perfil que lo reemplaza; perderá los permisos de «' + esc(r.nombre) + '».</p><div class="field"><label class="label" for="rv-r">Nuevo perfil</label><select class="select" id="rv-r"' + (block ? ' disabled' : '') + '><option value="">Selecciona un perfil</option>' + roles.filter(function (x) { return x.rolId !== r.rolId; }).map(function (x) { return '<option value="' + x.rolId + '">' + esc(x.nombre) + '</option>'; }).join('') + '</select></div></div>',
+      footer: [{ label: 'Cancelar', kind: 'secondary' }, { label: 'Revocar perfil', kind: 'danger', keepOpen: true, onClick: function () {
+        if (block) { UI.toast(block, 'warning'); return; }
+        var s = $('#rv-r', m.el); if (!setErr(s, s.value ? '' : 'Elige el perfil de reemplazo para no dejar al usuario sin permisos.')) { s.focus(); return; }
+        var nr = roleOf(s.value); u.rolId = nr.rolId; u.rol = nr.nombre; u.fechaModificacion = nowIso(); m.close(); refreshUsers(); loadRole(); renderRoleList(); UI.toast('Se revocó «' + r.nombre + '» a ' + u.nombre + '; ahora es «' + nr.nombre + '».', 'success');
+      } }] });
+  }
+
+  /* alcance (HU-019) */
+  function drawScope() {
+    var sc = scope[selRole]; $$('input[name=scopeMode]').forEach(function (i) { i.checked = i.value === sc.mode; });
+    $('#scopeGrid').innerHTML = A.sedes.map(function (s) { return '<label class="check"><input type="checkbox" value="' + s.id + '"' + (sc.sedes.indexOf(s.id) > -1 ? ' checked' : '') + (sc.mode === 'todas' ? ' disabled' : '') + '><span><strong>' + esc(s.nombre) + '</strong><br><span class="sub-line">' + (s.id === 'CEDI-BOG' ? 'CEDI y Bodega Funza' : esc(s.ciudad)) + '</span></span></label>'; }).join('');
+    $('#scopeHint').textContent = '';
+  }
+  $$('input[name=scopeMode]').forEach(function (i) { i.addEventListener('change', function () { $$('#scopeGrid input').forEach(function (c) { c.disabled = i.value === 'todas' && i.checked; }); }); });
+  $('#scopeSave').onclick = function () {
+    var mode = $('input[name=scopeMode]:checked').value, sel = $$('#scopeGrid input:checked').map(function (c) { return c.value; });
+    if (mode === 'sel' && !sel.length) { UI.toast('Selecciona al menos una sede o elige «Todas».', 'error', { title: 'Alcance vacío' }); return; }
+    scope[selRole] = { mode: mode, sedes: mode === 'todas' ? A.sedes.map(function (s) { return s.id; }) : sel };
+    histPerm.unshift({ f: nowIso(), u: ME.nombre, rolId: selRole, cambio: 'Alcance: ' + (mode === 'todas' ? 'todas las sedes' : sel.map(sedeName).join(', ')), motivo: 'Ajuste de alcance por sede y bodega.' });
+    drawHist(); UI.toast('Alcance de ' + roleOf(selRole).nombre + ' actualizado.', 'success');
+  };
+
+  /* historial (HU-021) */
+  function drawHist() {
+    var list = histPerm.filter(function (h) { return h.rolId === selRole; }), all = list.length === 0;
+    var rows = all ? histPerm.slice(0, 5) : list;
+    $('#histBox').innerHTML = (all ? UI.banner({ tone: 'info', text: 'Este perfil no registra cambios recientes. Se muestran los últimos cambios de otros perfiles.' }) + '<div class="mt-3"></div>' : '') +
+      UI.timeline(rows.map(function (h) { return { titleHtml: esc(h.cambio) + (all ? ' <span class="tag">' + esc(roleOf(h.rolId).nombre) + '</span>' : ''), meta: F.fechaHora(h.f) + ' · ' + h.u, body: '<span class="muted">' + esc(h.motivo) + '</span>', state: 'done' }; })) +
+      '<a class="btn btn-ghost btn-sm mt-2" href="auditoria.html">Ver en auditoría ' + ico('arrow-right') + '</a>';
+  }
+
+  /* crear perfil (HU-015) */
+  function newRole() {
+    var m = UI.modal({ title: 'Crear perfil de acceso', subtitle: 'Empieza vacío o copia los permisos de otro perfil.', width: 540,
+      body: '<div class="stack"><div class="field"><label class="label" for="nr-n">Nombre del perfil</label><input class="input" id="nr-n" placeholder="Ej. Supervisor de muelle" autocomplete="off"></div>' +
+        '<div class="field"><label class="label" for="nr-d">Descripción</label><textarea class="textarea" id="nr-d" rows="2" placeholder="¿Qué hace esta persona en la operación?"></textarea></div>' +
+        '<div class="field"><label class="label" for="nr-c">Copiar permisos de <span class="opt">(opcional)</span></label><select class="select" id="nr-c"><option value="">Empezar sin permisos</option>' + roles.map(function (r) { return '<option value="' + r.rolId + '">' + esc(r.nombre) + '</option>'; }).join('') + '</select></div></div>',
+      footer: [{ label: 'Cancelar', kind: 'secondary' }, { label: 'Crear perfil', kind: 'primary', keepOpen: true, onClick: function () {
+        var n = $('#nr-n', m.el), d = $('#nr-d', m.el), v = n.value.trim(), ok = true;
+        ok = setErr(n, v.length < 3 ? 'Escribe el nombre del perfil.' : roles.some(function (r) { return UI.norm(r.nombre) === UI.norm(v); }) ? 'Ya existe un perfil con ese nombre.' : '') && ok;
+        ok = setErr(d, d.value.trim().length < 10 ? 'Describe brevemente su función (mínimo 10 caracteres).' : '') && ok;
+        if (!ok) { $('[aria-invalid="true"]', m.el).focus(); return; }
+        var src = roleOf($('#nr-c', m.el).value), p = {}; mods.forEach(function (x) { p[x.id] = src ? src.permisos[x.id] : 0; });
+        var r = { rolId: 'ROL-' + String(roles.length + 1).padStart(2, '0'), nombre: v, descripcion: d.value.trim(), permisos: p, sistema: false, usuarios: 0 };
+        roles.push(r); A.idx.roles[r.rolId] = r; scope[r.rolId] = { mode: 'todas', sedes: A.sedes.map(function (s) { return s.id; }) };
+        histPerm.unshift({ f: nowIso(), u: ME.nombre, rolId: r.rolId, cambio: 'Perfil creado' + (src ? ' copiando ' + src.nombre : ' sin permisos'), motivo: d.value.trim() });
+        m.close(); selRole = r.rolId; mainTabs.select('pnlRoles'); renderRoleList(); loadRole(); renderStats(); tbl.refresh(); UI.toast('Perfil «' + v + '» creado. Ajusta su matriz de permisos y guarda.', 'success');
+        setTimeout(function () { var li = $('.role-item[aria-pressed="true"]'); if (li) li.scrollIntoView({ block: 'nearest' }); }, 50);
+      } }] });
+  }
+  function refreshRoleViews() { if (rolesBuilt) { renderRoleList(); if (!dirtyCount()) loadRole(); } }
+
+  /* ============ arranque ============ */
+  refreshRoleCounts(); renderStats();
+  var mainTabs = UI.tabs($('#mainTabs'), { onChange: function (id) { if (id === 'pnlRoles' && !rolesBuilt) { rolesBuilt = true; renderRoleList(); loadRole(); } } });
+  UI.tabs($('#roleTabs'));
+  $('#btnNewUser').onclick = function () { userForm(null); };
+  $('#btnNewRole').onclick = newRole;
+  var qid = UI.param('id'), qtab = UI.param('tab');
+  if (qtab === 'roles' || location.hash === '#pnlRoles') mainTabs.select('pnlRoles');
+  if (qid && A.idx.usuarios[qid]) openUser(qid);
+});
+</script>
+</body>
+</html>

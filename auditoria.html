@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auditoría y trazabilidad · Armetales</title>
+<meta name="description" content="Registro inmutable de eventos de la plataforma: quién cambió qué, cuándo y desde dónde, con historial completo por pedido, despacho o reserva.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('arm.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  /* Layout específico de auditoría (tokens y componentes viven en app.css) */
+  .kpi-row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 20px; }
+  @media (max-width: 639px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .kpi .kpi-value { font-size: 28px; } .kpi { padding: 12px; } }
+  .select.input-sm { padding-right: 30px; }
+  .date-filter { display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--text-2); flex-wrap: wrap; }
+  .date-filter .input { width: 138px; }
+  @media (max-width: 639px) { .date-filter { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 10px; width: 100%; } .date-filter .input { width: 100%; } .date-filter .btn { grid-column: 1 / -1; justify-self: start; } }
+  .seal { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: var(--r-pill); border: 1px solid var(--green-line); background: var(--green-bg); color: var(--green-fg); font-size: 12.5px; font-weight: 600; }
+  .seal .icon { width: 14px; height: 14px; }
+  .diff { border: 1px solid var(--border); border-radius: var(--r-ctl); overflow: hidden; font-size: 13px; }
+  .diff-row { display: grid; grid-template-columns: minmax(84px, 28%) minmax(0, 1fr) minmax(0, 1fr); border-bottom: 1px solid var(--border); }
+  .diff-row:last-child { border-bottom: 0; }
+  .diff-row > div { padding: 8px 10px; overflow-wrap: anywhere; min-width: 0; }
+  .diff-head { background: var(--surface-3); font-size: 11.5px; font-weight: 600; color: var(--text-2); text-transform: none; }
+  .diff-field { font-family: var(--font-mono); font-size: 12px; color: var(--text-2); }
+  .diff-row.is-same { color: var(--text-3); }
+  .diff-cell.del { background: var(--red-bg); color: var(--red-fg); }
+  .diff-cell.add { background: var(--green-bg); color: var(--green-fg); }
+  .diff-cell .sgn { font-weight: 700; margin-right: 6px; font-family: var(--font-mono); }
+  .hash { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--surface-2); word-break: break-all; color: var(--text-2); }
+  .hash b { color: var(--text); font-weight: 500; }
+  .ent-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+  .sugg { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; font-size: 12.5px; color: var(--text-2); }
+  .hist-head { display: grid; gap: 16px; }
+  @media (min-width: 900px) { .hist-head { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } }
+  .hist-stats { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+  .hist-stats .stat-v { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .hist-stats .stat-l { font-size: 12px; color: var(--text-2); }
+  .tl-src { margin-right: 8px; vertical-align: 1px; }
+  .code { font-family: var(--font-mono); font-size: 12px; line-height: 1.55; padding: 12px 14px; border-radius: var(--r-ctl); background: var(--surface-3); border: 1px solid var(--border); white-space: pre-wrap; word-break: break-word; }
+  @media print { .sidebar, .topbar, .page-actions, .shell-scrim { display: none !important; } .shell-main { margin-left: 0 !important; } }
+  .kpi, .kpi .kpi-foot, .kpi .kpi-note { white-space: normal; }
+  :root[data-theme="dark"] a.btn { color: var(--b-fg); } /* el color de enlace del tema oscuro pisaba el de los botones-enlace */
+</style>
+</head>
+<body data-page="auditoria">
+<main id="app">
+  <header class="page-head">
+    <div class="ph-text">
+      <div class="page-eyebrow">Análisis</div>
+      <h1 class="page-title">Auditoría y trazabilidad</h1>
+      <p class="page-desc">Quién hizo qué, cuándo y desde dónde. Los registros son de solo anexado: nadie puede editarlos ni borrarlos.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-secondary" id="verifyBtn"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>Verificar integridad</button>
+      <button type="button" class="btn btn-secondary" id="exportBtn" aria-haspopup="menu" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Exportar</button>
+    </div>
+  </header>
+
+  <section aria-label="Indicadores de auditoría"><div class="kpi-row" id="kpiRow"></div></section>
+
+  <div class="tabs" role="tablist" aria-label="Vistas de auditoría" id="mainTabs">
+    <button type="button" class="tab" role="tab" id="tabLog" aria-controls="pnlLog" aria-selected="true">Registro de eventos <span class="count" id="logCount">0</span></button>
+    <button type="button" class="tab" role="tab" id="tabHist" aria-controls="pnlHist" aria-selected="false">Historial por entidad</button>
+  </div>
+
+  <div class="tab-panel" role="tabpanel" id="pnlLog" aria-labelledby="tabLog"><div id="logTable"></div></div>
+
+  <div class="tab-panel" role="tabpanel" id="pnlHist" aria-labelledby="tabHist" hidden>
+    <div class="stack-lg">
+      <div class="card"><div class="card-body">
+        <form id="entForm" class="ent-search" novalidate>
+          <div class="field" id="entField">
+            <label class="label" for="entInput">Pedido, despacho o reserva</label>
+            <div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input class="input" id="entInput" list="entList" autocomplete="off" placeholder="ES-489684, DSP-2611-018 o RSV-2611-0174"><datalist id="entList"></datalist></div>
+            <div class="error-text" id="entErr" hidden></div>
+          </div>
+          <button type="submit" class="btn btn-primary" style="align-self:start;margin-top:22px">Armar historial</button>
+        </form>
+        <div class="sugg" id="sugg"></div>
+      </div></div>
+      <div id="histOut"></div>
+    </div>
+  </div>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+UI.ready(function () {
+  var A = ARM, F = UI.fmt, esc = UI.esc, $ = UI.$;
+
+  /* ---------- utilidades ---------- */
+  function h53(s, seed) { var h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed, i, ch; for (i = 0; i < s.length; i++) { ch = s.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909); return ('00000000' + (h2 >>> 0).toString(16)).slice(-8) + ('00000000' + (h1 >>> 0).toString(16)).slice(-8); }
+  function hash(s) { return h53(s, 1) + h53(s, 2) + h53(s, 3) + h53(s, 4); }
+  function rn(e) { return parseInt(e.hash.slice(0, 8), 16); }
+  function ymdLocal(d) { d = new Date(d); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function usr(id) { return A.idx.usuarios[id] || null; }
+  function nombreActor(id) { var u = usr(id); if (u) return u.nombre; var c = A.idx.conductores[id]; if (c) return c.nombre + ' (conductor)'; return id || 'Sistema'; }
+  function fh(v) { return F.fecha(v) + ' · ' + F.hora(v); }
+  function toast(m, t, o) { UI.toast(m, t, o); }
+  function download(name, mime, text) { var blob = new Blob(['﻿' + text], { type: mime + ';charset=utf-8' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+  function csvCell(v) { v = v == null ? '' : String(v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  function toCsv(head, rows) { return [head.map(csvCell).join(';')].concat(rows.map(function (r) { return r.map(csvCell).join(';'); })).join('\r\n'); }
+
+  var LINK = { 'Pedido': function (id) { return 'pedidos.html?id=' + encodeURIComponent(id); }, 'Despacho': function (id) { return 'despachos.html?id=' + encodeURIComponent(id); }, 'Vehículo': function (id) { return 'vehiculos.html?placa=' + encodeURIComponent(id); }, 'Cliente': function (id) { return 'clientes.html?id=' + encodeURIComponent(id); }, 'Reserva': function () { return 'reservas.html'; }, 'Ruta': function (id) { return 'rutas.html?id=' + encodeURIComponent(id); }, 'Usuario': function () { return 'usuarios.html'; }, 'Rol': function () { return 'usuarios.html'; }, 'Integración': function () { return 'integraciones.html'; }, 'Reporte': function () { return 'reportes.html'; }, 'Inventario': function () { return 'inventario.html'; } };
+  function entHref(e) { return LINK[e.entidad] ? LINK[e.entidad](e.entidadId) : null; }
+
+  /* ---------- eventos: copia local, cadena de huellas y diffs ---------- */
+  var EV = A.auditoria.map(function (e) { var o = {}; Object.keys(e).forEach(function (k) { o[k] = e[k]; }); return o; });
+  var CHAIN_SEED = 'armetales-audit-v1';
+  function rechain() {
+    var asc = EV.slice().sort(function (a, b) { return a.fechaHora < b.fechaHora ? -1 : a.fechaHora > b.fechaHora ? 1 : (a.registroId < b.registroId ? -1 : 1); }), prev = hash(CHAIN_SEED);
+    asc.forEach(function (e) { e.prev = prev; e.hash = hash(prev + '|' + e.registroId + '|' + e.fechaHora + '|' + e.usuarioId + '|' + e.tipo + '|' + e.entidad + '|' + e.entidadId + '|' + (e.observaciones || '')); prev = e.hash; });
+  }
+  rechain();
+  EV.forEach(function (e) { e.rol = usr(e.usuarioId) ? usr(e.usuarioId).rol : ''; e.fecha = ymdLocal(e.fechaHora); });
+  function pickR(e, arr, off) { return arr[(rn(e) + (off || 0)) % arr.length]; }
+  function find(col, key, id) { return A[col].filter(function (x) { return x[key] === id; })[0]; }
+
+  /* diffOf → { cambios: [[campo, antes, después]], atributos: [[campo, valor]] } */
+  function diffOf(e) {
+    var D = [], at = null, r = rn(e), ped = e.entidad === 'Pedido' ? A.idx.pedidos[e.entidadId] : null, actor = e.usuario;
+    switch (e.tipo) {
+      case 'Modificación':
+        if (e.entidad === 'Ruta') { D = [['secuencia de municipios', 'Mosquera → Madrid → Facatativá', 'Madrid → Mosquera → Facatativá'], ['kmTotales', '88,4', '91,0'], ['motivo', '—', 'Cierre parcial de la vía principal (cambio manual)'], ['vigencia', 'Vigente', 'Vigente']]; }
+        else if (e.antes) { var a = e.antes.split(': '), b = e.despues.split(': '); D = [[a[0], a.slice(1).join(': '), b.slice(1).join(': ')], ['id', e.entidadId, e.entidadId], ['estado', 'Activo', 'Activo']]; }
+        else D = [['id', e.entidadId, e.entidadId]];
+        break;
+      case 'Cambio de estado': var T = [['Recibido', 'Stock validado'], ['Stock validado', 'En firme'], ['En firme', 'En preparación'], ['En preparación', 'Listo para despacho'], ['Listo para despacho', 'Planificado']], t = T[r % T.length]; D = [['estado', t[0], t[1]], ['actualizadoPor', 'Sistema', actor], ['prioridad', ped ? ped.prioridad : 'Media', ped ? ped.prioridad : 'Media'], ['pedidoId', e.entidadId, e.entidadId]]; break;
+      case 'Creación':
+        if (e.entidad === 'Reserva') { var rv = find('reservas', 'reservaId', e.entidadId); D = [['reservaId', '—', e.entidadId], ['sku', '—', rv ? rv.sku : '1000241'], ['cantidad', '—', rv ? rv.cantidad + ' ' + rv.unidad.toLowerCase() + 's' : '40 unidades'], ['bodegaId', '—', rv ? rv.bodegaId : 'CEDI-BOG'], ['estado', '—', 'Activa']]; }
+        else { var ds = A.idx.despachos[e.entidadId]; D = [['despachoId', '—', e.entidadId], ['vehículo', '—', ds ? ds.vehiculoId : 'WNK 482'], ['ruta', '—', ds ? ds.rutaId : 'R-01'], ['pedidos', '—', ds ? ds.pedidoIds.length : 3], ['estado', '—', 'Programado']]; }
+        break;
+      case 'Liberación': D = [['estado', 'Activa', 'Liberada'], ['cantidadReservada', String(20 + r % 180), '0'], ['motivo', '—', 'Entrega fallida: se libera el inventario'], ['reservaId', e.entidadId, e.entidadId]]; break;
+      case 'Aprobación': D = [['estado', 'Pendiente de aprobación', 'Aprobado'], ['excepción', '—', 'Utilización de ' + (62 + r % 20) + ' %, por debajo del mínimo'], ['aprobadoPor', '—', actor], ['despachoId', e.entidadId, e.entidadId]]; break;
+      case 'Cambio de permisos': D = [['permiso · ' + pickR(e, ['Despachos', 'Planeación', 'Reportes', 'Inventario']), 'Consultar', 'Gestionar'], ['alcance', 'CEDI Bogotá', 'CEDI Bogotá'], ['rolId', e.entidadId, e.entidadId]]; break;
+      case 'Sincronización': D = [['estado', 'Pendiente', 'Procesado'], ['registros', '0', String(40 + r % 300)], ['errores', '0', '0'], ['logId', e.entidadId, e.entidadId]]; break;
+      case 'Exportación': D = [['formato', '—', pickR(e, ['CSV', 'Excel', 'PDF'])], ['filas', '—', String(60 + r % 500)], ['filtros', '—', 'Últimos 30 días · todas las rutas']]; break;
+      case 'Ajuste de inventario': var f = 100 + r % 400, g = f - (1 + r % 9); D = [['stockFísico', String(f), String(g)], ['diferencia', '0', String(g - f)], ['estadoConteo', 'Con diferencia', 'Ajustado'], ['conteoId', e.entidadId, e.entidadId]]; break;
+      case 'Anotación': D = [['anotación', '—', e.observaciones], ['registroOriginal', '—', e.referenciaRegistro || '—']]; break;
+      case 'Inicio de sesión': at = [['Resultado', 'Acceso concedido'], ['Navegador', pickR(e, ['Chrome 126 · Windows', 'Edge 125 · Windows', 'Safari 17 · macOS'])], ['Segundo factor', 'Verificado']]; break;
+      case 'Cierre de sesión': at = [['Resultado', 'Sesión cerrada'], ['Duración', (30 + r % 400) + ' min'], ['Navegador', pickR(e, ['Chrome 126 · Windows', 'Edge 125 · Windows'])]]; break;
+      case 'Acceso denegado': at = [['Motivo', 'Credenciales inválidas'], ['Intentos consecutivos', (1 + r % 4) + ' de 5'], ['Acción tomada', 'Intento rechazado y notificado al administrador de seguridad']]; break;
+    }
+    return { cambios: D, atributos: at };
+  }
+
+  /* ---------- indicadores ---------- */
+  var hoy = ymdLocal(A.ahora), ayer = ymdLocal(new Date(A.ahora.getTime() - 864e5)), desde24 = new Date(A.ahora.getTime() - 864e5).toISOString();
+  function kpis() {
+    var hoyN = EV.filter(function (e) { return e.fechaHora >= desde24; }).length, rutas = EV.filter(function (e) { return e.entidad === 'Ruta' && e.tipo === 'Modificación'; }).length, den = EV.filter(function (e) { return e.tipo === 'Acceso denegado'; }), us = {}; den.forEach(function (e) { us[e.usuarioId] = 1; });
+    $('#kpiRow').innerHTML =
+      UI.kpi({ id: 'hoy', label: 'Eventos en 24 horas', icon: 'list', value: hoyN, note: 'de ' + EV.length + ' en los últimos 7 días', onClick: true }) +
+      UI.kpi({ id: 'rutas', label: 'Cambios manuales de ruta', icon: 'route', value: rutas, note: 'últimos 7 días', onClick: true }) +
+      UI.kpi({ id: 'den', label: 'Accesos denegados', icon: 'ban', value: den.length, note: Object.keys(us).length + ' usuarios distintos', onClick: true }) +
+      UI.kpi({ id: 'int', label: 'Integridad del registro', icon: 'shield-check', valueHtml: '100<small>%</small>', note: 'Cadena sin rupturas', onClick: true });
+  }
+  $('#kpiRow').addEventListener('click', function (e) {
+    var k = e.target.closest('[data-kpi]'); if (!k) return; clearAll(); UI.tabsApi.select('pnlLog');
+    if (k.dataset.kpi === 'hoy') { setDates(ayer, hoy); } else if (k.dataset.kpi === 'rutas') { tbl.setFilter('entidad', 'Ruta'); tbl.setFilter('tipo', 'Modificación'); } else if (k.dataset.kpi === 'den') { tbl.setFilter('tipo', 'Acceso denegado'); } else { verify(); return; }
+    toast('Registro filtrado: ' + $('.kpi-label', k).textContent.toLowerCase() + '.', 'info');
+  });
+
+  /* ---------- tabla de eventos ---------- */
+  function opts(key, extra) { return Array.from(new Set(EV.map(function (e) { return e[key]; }).concat(extra || []))).sort(function (a, b) { return a.localeCompare(b, 'es'); }); }
+  var dateBox = '<div class="date-filter"><label for="dFrom">Desde</label><input class="input input-sm" type="date" id="dFrom" aria-label="Fecha desde"><label for="dTo">hasta</label><input class="input input-sm" type="date" id="dTo" aria-label="Fecha hasta"><button type="button" class="btn btn-ghost btn-sm" id="clearBtn">Limpiar filtros</button></div>';
+  var tbl = UI.table($('#logTable'), {
+    rows: EV, pageSize: 12, dense: true, rowKey: 'registroId', caption: 'Registro de eventos de auditoría', sort: { key: 'fechaHora', dir: 'desc' },
+    searchable: { placeholder: 'Buscar por usuario, ID o texto' }, searchKeys: ['registroId', 'entidadId', 'observaciones', 'ip'], emptyText: 'Ningún evento coincide con los filtros.',
+    filters: [{ key: 'usuario', label: 'Usuario', all: 'Todos los usuarios', options: opts('usuario') }, { key: 'tipo', label: 'Tipo', all: 'Todos los tipos', options: opts('tipo', ['Anotación']) }, { key: 'entidad', label: 'Entidad', all: 'Todas las entidades', options: opts('entidad') }, { key: 'estado', label: 'Estado', all: 'Todos los estados', options: ['Exitoso', 'Rechazado'] }],
+    toolbar: dateBox,
+    columns: [
+      { key: 'fechaHora', label: 'Fecha y hora', render: function (e) { return '<span class="nowrap">' + F.fecha(e.fechaHora) + '</span><div class="cell-sub num">' + F.hora(e.fechaHora) + '</div>'; } },
+      { key: 'usuario', label: 'Usuario', render: function (e) { return '<div class="row nowrap gap-2">' + UI.avatar(e.usuario, { size: 'sm' }) + '<div><div class="cell-main">' + esc(e.usuario) + '</div><div class="cell-sub">' + esc(e.rol) + '</div></div></div>'; } },
+      { key: 'entidad', label: 'Entidad', render: function (e) { return '<span class="cell-main">' + esc(e.entidad) + '</span><div class="cell-sub mono">' + esc(e.entidadId) + '</div>'; } },
+      { key: 'tipo', label: 'Tipo', title: true, render: function (e) { return '<span class="cell-main">' + esc(e.tipo) + '</span>'; } },
+      { key: 'estado', label: 'Estado', render: function (e) { return UI.chip(e.estado); } },
+      { key: 'referenciaOrigen', label: 'Origen', hideMobile: true },
+      { key: 'ip', label: 'IP', mono: true, hideMobile: true }
+    ],
+    onRowClick: function (e) { openEvent(e); },
+    actions: function (e) { var h = entHref(e), it = [{ label: 'Ver detalle', icon: 'eye', onClick: function () { openEvent(e); } }, { label: 'Historial de la entidad', icon: 'clock', onClick: function () { showHistory(e.entidadId, true); } }]; if (h) it.push({ sep: true }, { label: 'Abrir ' + e.entidad.toLowerCase(), icon: 'arrow-up-right', href: h }); return it; }
+  });
+
+  $('#logCount').textContent = EV.length;
+  var dFrom = $('#dFrom'), dTo = $('#dTo'), baseRows = EV;
+  function applyDates() { var f = dFrom.value, t = dTo.value; tbl.setRows(EV.filter(function (e) { return (!f || e.fecha >= f) && (!t || e.fecha <= t); })); }
+  function setDates(f, t) { dFrom.value = f || ''; dTo.value = t || ''; applyDates(); }
+  [dFrom, dTo].forEach(function (i) { i.addEventListener('change', function () { if (dFrom.value && dTo.value && dFrom.value > dTo.value) { toast('La fecha inicial no puede ser posterior a la final.', 'warning'); dTo.value = dFrom.value; } applyDates(); }); });
+  function clearAll() { ['usuario', 'tipo', 'entidad', 'estado'].forEach(function (k) { tbl.setFilter(k, ''); }); UI.$$('#logTable select').forEach(function (s) { s.value = ''; }); var q = $('#logTable input[type=search]'); if (q) { q.value = ''; tbl.search(''); } setDates('', ''); }
+  $('#clearBtn').addEventListener('click', function () { clearAll(); toast('Filtros restablecidos.', 'info'); });
+
+  /* ---------- drawer de evento ---------- */
+  function diffHtml(e) {
+    var d = diffOf(e);
+    if (d.atributos) return '<p class="hint mb-2">Este evento no modifica datos. Se registran sus atributos.</p>' + UI.kv(d.atributos.map(function (a) { return [a[0], esc(a[1])]; }));
+    return '<div class="diff" role="table" aria-label="Cambios campo por campo"><div class="diff-row diff-head" role="row"><div role="columnheader">Campo</div><div role="columnheader">Antes</div><div role="columnheader">Después</div></div>' +
+      d.cambios.map(function (c) { var ch = String(c[1]) !== String(c[2]); return '<div class="diff-row' + (ch ? '' : ' is-same') + '" role="row"><div class="diff-field" role="cell">' + esc(c[0]) + '</div><div role="cell" class="diff-cell' + (ch ? ' del' : '') + '">' + (ch ? '<span class="sgn" aria-label="Valor anterior">−</span>' : '') + esc(c[1]) + '</div><div role="cell" class="diff-cell' + (ch ? ' add' : '') + '">' + (ch ? '<span class="sgn" aria-label="Valor nuevo">+</span>' : '') + esc(c[2]) + '</div></div>'; }).join('') + '</div>' +
+      '<p class="hint mt-2">' + d.cambios.filter(function (c) { return String(c[1]) !== String(c[2]); }).length + ' de ' + d.cambios.length + ' campos cambiaron; los demás se muestran como contexto.</p>';
+  }
+  function openEvent(e) {
+    var h = entHref(e), u = usr(e.usuarioId);
+    var dr = UI.drawer({ initialFocus: '#vBtn', title: e.tipo + ' · ' + e.entidad, subtitleHtml: '<span class="mono">' + e.registroId + '</span> · ' + UI.chip(e.estado, { small: true }), width: 600,
+      body: '<div class="stack-lg">' +
+        '<section>' + UI.kv([['Fecha y hora', esc(fh(e.fechaHora))], ['Usuario', esc(e.usuario) + (e.rol ? '<div class="cell-sub">' + esc(e.rol) + '</div>' : '')], ['Entidad', h ? '<a href="' + h + '">' + esc(e.entidad) + ' <span class="mono">' + esc(e.entidadId) + '</span></a>' : esc(e.entidad) + ' ' + esc(e.entidadId)], ['Origen', esc(e.referenciaOrigen)], ['Dirección IP', '<span class="mono">' + esc(e.ip) + '</span>'], ['Observaciones', esc(e.observaciones)]]) + '</section>' +
+        '<section><h3 class="mb-2">' + (diffOf(e).atributos ? 'Atributos del evento' : 'Cambios · antes y después') + '</h3>' + diffHtml(e) + '</section>' +
+        '<section><div class="row between mb-2"><h3>Integridad</h3><span class="seal">' + UI.icon('lock') + 'Registro inmutable</span></div>' +
+        '<div class="hash"><div>Huella de este registro</div><b id="hCur">' + e.hash + '</b><div class="mt-2">Huella del registro anterior</div><span>' + e.prev + '</span></div>' +
+        '<div class="row mt-2"><button type="button" class="btn btn-secondary btn-sm" id="vBtn">' + UI.icon('shield-check') + 'Verificar huella</button><button type="button" class="btn btn-ghost btn-sm" id="cpBtn">' + UI.icon('copy') + 'Copiar huella</button><span class="hint" id="vRes" role="status"></span></div></section></div>',
+      footer: [{ label: 'Cerrar', kind: 'ghost' }, { label: 'Editar registro', kind: 'secondary', icon: 'lock', keepOpen: true, onClick: function () { blockEdit(e); } }, { label: 'Historial de la entidad', kind: 'primary', icon: 'clock', onClick: function () { showHistory(e.entidadId, true); } }] });
+    $('#vBtn', dr.body).addEventListener('click', function () { var b = this, r = $('#vRes', dr.body); b.disabled = true; r.textContent = 'Recalculando huella…'; setTimeout(function () { var again = hash(e.prev + '|' + e.registroId + '|' + e.fechaHora + '|' + e.usuarioId + '|' + e.tipo + '|' + e.entidad + '|' + e.entidadId + '|' + (e.observaciones || '')); b.disabled = false; r.innerHTML = again === e.hash ? '<span style="color:var(--green-fg)">La huella coincide: el registro no fue alterado.</span>' : '<span style="color:var(--red-fg)">La huella no coincide.</span>'; }, 650); });
+    $('#cpBtn', dr.body).addEventListener('click', function () { try { navigator.clipboard.writeText(e.hash); } catch (x) {} toast('Huella copiada.', 'success'); });
+  }
+  function blockEdit(e) {
+    UI.modal({ title: 'Este registro no se puede editar', width: 520,
+      body: '<div class="stack">' + UI.banner({ tone: 'danger', title: 'Edición bloqueada', text: 'Los registros de auditoría son de solo anexado. Ningún rol, ni siquiera Administrador, puede modificarlos o eliminarlos; así el historial sirve como prueba.' }) +
+        '<p>Si hay un error en el contexto del evento, se agrega una <strong>anotación</strong> que referencia el original. El original queda intacto y la anotación genera su propio registro y su propia huella.</p>' +
+        '<div class="code">PUT /api/auditoria/' + esc(e.registroId) + '\n→ 405 Method Not Allowed\n{ "codigo": "AUDITORIA_INMUTABLE",\n  "mensaje": "Los registros de auditoría no admiten cambios" }</div>' +
+        '<div class="field" id="annField"><label class="label" for="annTxt">Anotación sobre este registro</label><textarea class="textarea" id="annTxt" rows="3" placeholder="Ej.: el ajuste correspondía a la bodega de Funza"></textarea><div class="error-text" id="annErr" hidden></div></div></div>',
+      footer: [{ label: 'Entendido', kind: 'ghost' }, { label: 'Agregar anotación', kind: 'primary', keepOpen: true, onClick: function (api) {
+        var t = $('#annTxt', api.body).value.trim(), er = $('#annErr', api.body), fld = $('#annField', api.body);
+        if (t.length < 10) { er.hidden = false; er.textContent = 'Escribe al menos 10 caracteres para que la anotación sea útil.'; fld.classList.add('is-invalid'); return false; }
+        var ne = { registroId: 'AUD-' + (96000 + EV.length), entidadId: e.entidadId, entidad: e.entidad, tipo: 'Anotación', estado: 'Exitoso', fechaHora: new Date().toISOString(), usuarioId: A.usuarioActual.usuarioId, usuario: A.usuarioActual.nombre, observaciones: t, referenciaOrigen: 'Consola web', ip: '10.12.4.31', antes: null, despues: null, referenciaRegistro: e.registroId };
+        ne.rol = A.usuarioActual.rol; ne.fecha = ymdLocal(ne.fechaHora); EV.unshift(ne); rechain(); applyDates(); $('#logCount').textContent = EV.length; kpis(); api.close();
+        toast('Anotación registrada como ' + ne.registroId + '. El original no cambió.', 'success'); } }] });
+  }
+
+  /* ---------- verificación global ---------- */
+  function verify() {
+    var b = $('#verifyBtn'); b.disabled = true; var t = toast('Recalculando ' + EV.length + ' huellas encadenadas…', 'info', { duration: 1400 });
+    setTimeout(function () { var asc = EV.slice().sort(function (a, c) { return a.fechaHora < c.fechaHora ? -1 : a.fechaHora > c.fechaHora ? 1 : (a.registroId < c.registroId ? -1 : 1); }), prev = hash(CHAIN_SEED), ok = true; asc.forEach(function (e) { if (e.prev !== prev) ok = false; prev = hash(prev + '|' + e.registroId + '|' + e.fechaHora + '|' + e.usuarioId + '|' + e.tipo + '|' + e.entidad + '|' + e.entidadId + '|' + (e.observaciones || '')); if (prev !== e.hash) ok = false; }); b.disabled = false; toast(ok ? 'Los ' + EV.length + ' registros están íntegros: ninguna huella fue alterada.' : 'Se detectó una ruptura en la cadena.', ok ? 'success' : 'error', { title: 'Verificación de integridad' }); }, 1300);
+  }
+  $('#verifyBtn').addEventListener('click', verify);
+
+  /* ---------- exportar ---------- */
+  $('#exportBtn').addEventListener('click', function () {
+    UI.menu(this, [{ heading: 'Vista filtrada · ' + tbl.getView().length + ' eventos' }, { label: 'CSV (.csv)', icon: 'file-text', onClick: function () {
+      var v = tbl.getView(); if (!v.length) { toast('No hay eventos en la vista actual para exportar.', 'warning'); return; }
+      download('armetales-auditoria-' + hoy + '.csv', 'text/csv', toCsv(['Registro', 'Fecha y hora', 'Usuario', 'Rol', 'Entidad', 'ID de entidad', 'Tipo', 'Estado', 'Origen', 'IP', 'Observaciones', 'Huella'], v.map(function (e) { return [e.registroId, e.fechaHora, e.usuario, e.rol, e.entidad, e.entidadId, e.tipo, e.estado, e.referenciaOrigen, e.ip, e.observaciones, e.hash]; })));
+      toast('CSV generado con ' + v.length + ' eventos. La exportación queda registrada.', 'success', { title: 'Exportación lista' }); } },
+      { label: 'PDF (imprimir)', icon: 'download', onClick: function () { toast('Abriendo la vista de impresión: elige «Guardar como PDF».', 'info'); setTimeout(function () { window.print(); }, 350); } }], { align: 'end' });
+  });
+
+  /* ---------- historial por entidad (HU-190) ---------- */
+  var HIST = null;
+  function who(id) { return nombreActor(id); }
+  function buildHistory(id) {
+    var it = [], head = null, tipo = null;
+    function add(t, src, title, meta, o) { if (!t) return; it.push({ t: t, src: src, title: title, meta: meta, aud: o && o.aud, href: o && o.href }); }
+    var p = A.idx.pedidos[id], d = A.idx.despachos[id], rv = find('reservas', 'reservaId', id);
+    if (p) {
+      tipo = 'Pedido'; head = { tipo: tipo, id: id, titulo: p.cliente, sub: p.municipio + ' · ' + F.kg(p.pesoKg) + ' · ' + p.lineas.length + ' líneas', estado: p.estado, href: 'pedidos.html?id=' + encodeURIComponent(id), extra: [['Cliente', p.cliente, 'clientes.html?id=' + encodeURIComponent(p.clienteId)], p.despachoId ? ['Despacho', p.despachoId, 'despachos.html?id=' + encodeURIComponent(p.despachoId)] : null] };
+      (p.historial || []).forEach(function (h) { add(h.fechaHora, 'Pedido', 'Estado: ' + h.estado, 'Por ' + who(h.usuarioId), { href: 'pedidos.html?id=' + encodeURIComponent(id) }); });
+      A.reservas.filter(function (r) { return r.pedidoId === id; }).forEach(function (r) { add(r.fechaCreacion, 'Reserva', 'Reserva ' + r.reservaId + ' creada (' + r.estado.toLowerCase() + ')', r.cantidad + ' ' + r.unidad.toLowerCase() + 's de ' + r.sku + ' · ' + who(r.usuarioId), { href: 'reservas.html' }); });
+      if (p.despachoId && d0(p.despachoId)) { var dd = d0(p.despachoId); add(dd.fechaSalida || dd.salidaPrevista, 'Despacho', 'Salida en ' + dd.despachoId, dd.vehiculoId + ' · ' + who(dd.conductorId), { href: 'despachos.html?id=' + encodeURIComponent(dd.despachoId) }); }
+      A.paradas.filter(function (x) { return x.pedidoId === id && x.horaEvento; }).forEach(function (x) { add(x.horaEvento, 'Seguimiento', 'Parada ' + x.secuencia + ': ' + x.estado, x.cliente + (x.observacion ? ' · ' + x.observacion : ''), { href: 'seguimiento.html' }); });
+      A.evidencias.filter(function (x) { return x.pedidoId === id; }).forEach(function (x) { add(x.fechaHora, 'Evidencia', x.tipo + ' (' + x.validacion.toLowerCase() + ')', x.evidenciaId + ' · precisión ' + x.precisionM + ' m', { href: 'evidencias.html' }); });
+      A.novedades.filter(function (x) { return x.pedidoId === id; }).forEach(function (x) { add(x.fechaHora, 'Novedad', x.tipo + ': ' + x.motivo, x.novedadId + ' · ' + x.estado, { href: 'novedades.html' }); });
+    } else if (d) {
+      tipo = 'Despacho'; head = { tipo: tipo, id: id, titulo: d.vehiculoId + ' · ' + (A.idx.rutas[d.rutaId] || {}).nombre, sub: d.pedidoIds.length + ' pedidos · ' + F.kg(d.pesoKg) + ' · ' + who(d.conductorId), estado: d.estado, href: 'despachos.html?id=' + encodeURIComponent(id), extra: [['Vehículo', d.vehiculoId, 'vehiculos.html?placa=' + encodeURIComponent(d.vehiculoId)]] };
+      add(d.fecha + 'T07:00:00', 'Despacho', 'Despacho creado', 'Por ' + who(d.creadoPor) + ' · ' + d.pedidoIds.length + ' pedidos', { href: 'despachos.html?id=' + encodeURIComponent(id) });
+      add(d.fechaSalida, 'Despacho', 'Salida registrada', d.vehiculoId + ' · ' + who(d.conductorId));
+      A.cargue.filter(function (c) { return c.despachoId === id; }).slice(0, 1).forEach(function (c) { add(d.fecha + 'T08:00:00', 'Cargue', 'Plano de cargue generado', 'Orden de cargue por ' + (A.cargue.filter(function (x) { return x.despachoId === id; }).length) + ' pedidos', { href: 'cargue.html' }); });
+      A.paradas.filter(function (x) { return x.despachoId === id && x.horaEvento; }).forEach(function (x) { add(x.horaEvento, 'Seguimiento', 'Parada ' + x.secuencia + ': ' + x.estado, x.cliente + ' · ' + x.pedidoId, { href: 'seguimiento.html' }); });
+      A.evidencias.filter(function (x) { return x.despachoId === id; }).forEach(function (x) { add(x.fechaHora, 'Evidencia', x.tipo + ' · ' + x.pedidoId, x.evidenciaId, { href: 'evidencias.html' }); });
+      A.novedades.filter(function (x) { return x.despachoId === id; }).forEach(function (x) { add(x.fechaHora, 'Novedad', x.tipo + ': ' + x.motivo, x.novedadId + ' · ' + x.estado, { href: 'novedades.html' }); });
+      add(d.fechaCierre, 'Despacho', 'Despacho cerrado', d.entregadas + ' de ' + d.paradas + ' paradas entregadas');
+    } else if (rv) {
+      tipo = 'Reserva'; head = { tipo: tipo, id: id, titulo: rv.cantidad + ' ' + rv.unidad.toLowerCase() + 's de ' + rv.sku, sub: 'Bodega ' + rv.bodegaId + ' · origen ' + rv.origen.toLowerCase(), estado: rv.estado, href: 'reservas.html', extra: [['Pedido', rv.pedidoId, 'pedidos.html?id=' + encodeURIComponent(rv.pedidoId)]] };
+      add(rv.fechaCreacion, 'Reserva', 'Reserva creada', rv.cantidad + ' ' + rv.unidad.toLowerCase() + 's · ' + who(rv.usuarioId), { href: 'reservas.html' });
+      var pp = A.idx.pedidos[rv.pedidoId]; if (pp && pp.historial) pp.historial.forEach(function (h) { add(h.fechaHora, 'Pedido', 'Pedido ' + rv.pedidoId + ': ' + h.estado, 'Por ' + who(h.usuarioId), { href: 'pedidos.html?id=' + encodeURIComponent(rv.pedidoId) }); });
+      if (rv.estado === 'Consumida' || rv.estado === 'Liberada') add(rv.vence, 'Reserva', 'Reserva ' + rv.estado.toLowerCase(), rv.estado === 'Consumida' ? 'Consumida por el despacho' : 'Inventario devuelto al disponible');
+    } else return null;
+    EV.filter(function (e) { return e.entidadId === id; }).forEach(function (e) { add(e.fechaHora, 'Auditoría', e.tipo + ' · ' + e.estado, e.usuario + ' · ' + e.referenciaOrigen + ' · ' + e.registroId, { aud: e.registroId }); });
+    if (p && p.historial && p.historial.length) { var t0 = p.historial[0].fechaHora; it = it.filter(function (x) { return x.t >= t0; }); }
+    it.sort(function (a, b) { return a.t < b.t ? -1 : a.t > b.t ? 1 : 0; });
+    return { head: head, items: it };
+  }
+  function d0(id) { return A.idx.despachos[id]; }
+  var SRC_TONE = { 'Auditoría': 'info', 'Novedad': 'danger', 'Evidencia': 'success' };
+  function renderHistory(id) {
+    var H = buildHistory(id), out = $('#histOut');
+    if (!H) { out.innerHTML = '<div class="card"><div class="card-body">' + UI.empty({ icon: 'search', title: 'No encontramos «' + esc(id) + '»', text: 'Revisa el identificador. Acepta pedidos (ES-…), despachos (DSP-…) y reservas (RSV-…).' }) + '</div></div>'; return false; }
+    HIST = H; var items = H.items, srcs = {}; items.forEach(function (x) { srcs[x.src] = 1; });
+    var span = items.length > 1 ? Math.max(1, Math.round((new Date(items[items.length - 1].t) - new Date(items[0].t)) / 36e5)) : 0;
+    out.innerHTML = '<div class="card"><div class="card-body hist-head"><div><div class="row gap-2"><span class="chip chip-neutral chip-sm no-dot">' + H.head.tipo + '</span><span class="mono strong">' + esc(H.head.id) + '</span>' + UI.chip(H.head.estado) + '</div><h2 class="mt-2" style="font-size:18px">' + esc(H.head.titulo) + '</h2><p class="muted t-13">' + esc(H.head.sub) + '</p></div>' +
+      '<div class="row"><a class="btn btn-secondary btn-sm" href="' + H.head.href + '">Abrir ' + H.head.tipo.toLowerCase() + UI.icon('arrow-up-right') + '</a>' + H.head.extra.filter(Boolean).map(function (x) { return '<a class="btn btn-ghost btn-sm" href="' + x[2] + '">' + esc(x[0]) + '</a>'; }).join('') + '<button type="button" class="btn btn-ghost btn-sm" id="hExp">' + UI.icon('download') + 'Exportar CSV</button></div></div>' +
+      '<div class="card-foot" style="justify-content:flex-start"><div class="hist-stats"><div class="stat"><div class="stat-v">' + items.length + '</div><div class="stat-l">eventos cruzados</div></div><div class="stat"><div class="stat-v">' + Object.keys(srcs).length + '</div><div class="stat-l">módulos de origen</div></div><div class="stat"><div class="stat-v">' + (span >= 48 ? Math.round(span / 24) + ' d' : span + ' h') + '</div><div class="stat-l">de punta a punta</div></div></div></div></div>' +
+      '<div class="card mt-4"><div class="card-head"><div><h2 class="card-title">Línea de tiempo</h2><p class="card-sub">Del más antiguo al más reciente, cruzando pedidos, reservas, despachos, seguimiento, evidencias, novedades y auditoría.</p></div></div><div class="card-body" id="tlHost"></div></div>';
+    $('#tlHost').innerHTML = UI.timeline(items.map(function (x) { return { state: 'done', titleHtml: '<span class="tl-src">' + (x.href ? '<a href="' + x.href + '" aria-label="Abrir ' + esc(x.src) + '" style="text-decoration:none">' : '') + UI.chip(x.src, { tone: SRC_TONE[x.src] || 'neutral', small: true, noDot: true }) + (x.href ? '</a>' : '') + '</span>' + esc(x.title), meta: fh(x.t) + ' · ' + x.meta, body: x.aud ? '<button type="button" class="link-btn" data-aud="' + x.aud + '">Ver registro de auditoría</button>' : '' }; }));
+    $('#tlHost').addEventListener('click', function (e) { var b = e.target.closest('[data-aud]'); if (b) openEvent(EV.filter(function (x) { return x.registroId === b.dataset.aud; })[0]); });
+    $('#hExp').addEventListener('click', function () { download('armetales-historial-' + id + '.csv', 'text/csv', toCsv(['Fecha y hora', 'Módulo', 'Evento', 'Detalle'], items.map(function (x) { return [x.t, x.src, x.title, x.meta]; }))); toast('Historial de ' + id + ' exportado (' + items.length + ' eventos).', 'success'); });
+    return true;
+  }
+  function showHistory(id, switchTab) { if (switchTab) UI.tabsApi.select('pnlHist'); $('#entInput').value = id; $('#entErr').hidden = true; $('#entField').classList.remove('is-invalid'); renderHistory(String(id).trim()); }
+  $('#entForm').addEventListener('submit', function (ev) {
+    ev.preventDefault(); var v = $('#entInput').value.trim().toUpperCase(), er = $('#entErr'), f = $('#entField');
+    if (!v) { er.hidden = false; er.textContent = 'Escribe el número de un pedido, despacho o reserva.'; f.classList.add('is-invalid'); return; }
+    if (!/^(ES|DSP|RSV)-/.test(v)) { er.hidden = false; er.textContent = 'El identificador debe empezar por ES-, DSP- o RSV-.'; f.classList.add('is-invalid'); return; }
+    er.hidden = true; f.classList.remove('is-invalid'); renderHistory(v);
+  });
+  $('#entInput').addEventListener('input', function () { $('#entErr').hidden = true; $('#entField').classList.remove('is-invalid'); });
+
+  /* sugerencias: los pedidos con más cruces + un despacho y una reserva */
+  var rich = A.pedidos.filter(function (p) { return p.despachoId; }).map(function (p) { return { id: p.pedidoId, n: buildHistory(p.pedidoId).items.length }; }).sort(function (a, b) { return b.n - a.n; });
+  var sample = rich.slice(0, 3).map(function (x) { return x.id; }).concat([A.despachos[A.despachos.length - 2].despachoId, EV.filter(function (e) { return e.entidad === 'Reserva'; })[0].entidadId]);
+  $('#sugg').innerHTML = 'Prueba con: ' + sample.map(function (s) { return '<button type="button" class="filter-chip mono" data-s="' + s + '">' + s + '</button>'; }).join('');
+  $('#sugg').addEventListener('click', function (e) { var b = e.target.closest('[data-s]'); if (b) showHistory(b.dataset.s); });
+  $('#entList').innerHTML = A.pedidos.map(function (p) { return '<option value="' + p.pedidoId + '">' + esc(p.cliente) + '</option>'; }).join('') + A.despachos.map(function (d) { return '<option value="' + d.despachoId + '">' + esc(d.vehiculoId) + '</option>'; }).join('');
+
+  /* ---------- arranque ---------- */
+  UI.tabsApi = UI.tabs($('#mainTabs'), { hash: false, onChange: function () { } });
+  UI.tabsApi.select('pnlLog');
+  kpis();
+  $('#histOut').innerHTML = '<div class="card"><div class="card-body">' + UI.empty({ icon: 'clock', title: 'Elige una entidad para ver su historial', text: 'Escribe un pedido, despacho o reserva, o usa una de las sugerencias, y armamos su línea de tiempo completa.' }) + '</div></div>';
+  var q = UI.param('id'), ev0 = q && EV.filter(function (e) { return e.registroId === q; })[0];
+  if (ev0) openEvent(ev0); else if (q) showHistory(q, true);
+});
+</script>
+</body>
+</html>
